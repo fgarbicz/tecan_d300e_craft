@@ -681,7 +681,25 @@ function pasteSel() {
   mutate('paste wells', () => { const { truncated } = pasteWells(plate(), S.clip, r0, c0); if (truncated) toast(`${truncated} wells did not fit and were skipped`); });
 }
 
+// ---------------- themes ----------------
+const THEMES = { light: ['Light', '#f6f7f9', '#2f6fde'], dark: ['Dark', '#15181e', '#6a9cf5'], lab: ['Lab teal', '#eef5f4', '#0f8b7f'],
+  midnight: ['Midnight', '#0e1424', '#f2a65a'], solar: ['Solarized', '#fdf6e3', '#268bd2'], contrast: ['High contrast', '#ffffff', '#000000'] };
+function applyTheme(t) {
+  if (t in THEMES) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('d300.theme', t || ''); } catch { /* storage unavailable: theme just isn't remembered */ }
+  for (const b of $('themePick').children) b.classList.toggle('on', b.dataset.t === t);
+  if (S.protocol) renderGrid();
+}
+function initThemes() {
+  $('themePick').innerHTML = Object.entries(THEMES).map(([k, [label, bg, acc]]) =>
+    `<button data-t="${k}" title="${label}" style="background:linear-gradient(135deg, ${bg} 50%, ${acc} 50%)"></button>`).join('');
+  $('themePick').onclick = (e) => { if (e.target.dataset.t) applyTheme(e.target.dataset.t); };
+  let saved = ''; try { saved = localStorage.getItem('d300.theme') || ''; } catch { /* ignore */ }
+  applyTheme(saved);
+}
+
 bind();
+initThemes();
 newDoc();
 // Optional: ?open=<url> loads a protocol (used for testing with fixtures).
 const q = new URLSearchParams(location.search).get('open');

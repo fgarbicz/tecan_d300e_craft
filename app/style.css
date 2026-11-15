@@ -1,18 +1,41 @@
-:root {
+/* ---- Themes: every colour is a token; [data-theme] on <html> picks a palette. ---- */
+:root, :root[data-theme="light"] {
   --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2433; --muted: #6b7385; --line: #dfe3ea;
   --accent: #2f6fde; --accent-soft: #e5eefc; --danger: #c43d3d; --warn: #b7791f; --ok: #2f855a;
-  --well-empty: #f1f3f6; --sel: #2f6fde;
+  --well-empty: #eef1f5; --sel: #2f6fde; --plate: #d9dee6;
   font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #15181e; --panel: #1d2129; --ink: #e6e9ef; --muted: #98a1b3; --line: #2e3440;
-    --accent: #6a9cf5; --accent-soft: #23304a; --well-empty: #262b35; --sel: #8ab4ff;
-  }
 }
 :root[data-theme="dark"] {
   --bg: #15181e; --panel: #1d2129; --ink: #e6e9ef; --muted: #98a1b3; --line: #2e3440;
-  --accent: #6a9cf5; --accent-soft: #23304a; --well-empty: #262b35; --sel: #8ab4ff;
+  --accent: #6a9cf5; --accent-soft: #23304a; --danger: #ef6b6b; --warn: #e0a84b; --ok: #5cc28b;
+  --well-empty: #262b35; --sel: #8ab4ff; --plate: #11141a;
+}
+:root[data-theme="lab"] { /* calm teal, like a bench notebook */
+  --bg: #eef5f4; --panel: #fbfefd; --ink: #12302d; --muted: #5d7b77; --line: #cfe2df;
+  --accent: #0f8b7f; --accent-soft: #d6efec; --danger: #c2453f; --warn: #b9802a; --ok: #2e8a55;
+  --well-empty: #e4efed; --sel: #0f8b7f; --plate: #c7dcd9;
+}
+:root[data-theme="midnight"] { /* deep navy with warm accent */
+  --bg: #0e1424; --panel: #151d33; --ink: #e8ecf7; --muted: #8e9ab8; --line: #263253;
+  --accent: #f2a65a; --accent-soft: #3a2f2a; --danger: #ff7a7a; --warn: #f2c35a; --ok: #6fd3a0;
+  --well-empty: #1d2742; --sel: #f2a65a; --plate: #0a0f1c;
+}
+:root[data-theme="solar"] { /* solarized light */
+  --bg: #fdf6e3; --panel: #fffbef; --ink: #073642; --muted: #657b83; --line: #eee8d5;
+  --accent: #268bd2; --accent-soft: #e3eef6; --danger: #dc322f; --warn: #b58900; --ok: #859900;
+  --well-empty: #f3ecd8; --sel: #268bd2; --plate: #e6dfc8;
+}
+:root[data-theme="contrast"] { /* high contrast for bright labs / projectors */
+  --bg: #ffffff; --panel: #ffffff; --ink: #000000; --muted: #333333; --line: #000000;
+  --accent: #0040c1; --accent-soft: #dbe6ff; --danger: #b00000; --warn: #8a5a00; --ok: #006b2d;
+  --well-empty: #f0f0f0; --sel: #000000; --plate: #bdbdbd;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #15181e; --panel: #1d2129; --ink: #e6e9ef; --muted: #98a1b3; --line: #2e3440;
+    --accent: #6a9cf5; --accent-soft: #23304a; --danger: #ef6b6b; --warn: #e0a84b; --ok: #5cc28b;
+    --well-empty: #262b35; --sel: #8ab4ff; --plate: #11141a;
+  }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); height: 100vh; display: flex; flex-direction: column; }
@@ -51,7 +74,7 @@ ol.plates li.active { background: var(--accent-soft); }
 .form .full { grid-column: 1 / -1; }
 .chk { display: inline-flex; gap: 4px; align-items: center; }
 .plate-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-.plate-grid { display: grid; gap: 2px; user-select: none; outline: none; width: max-content; }
+.plate-grid { display: grid; gap: 2px; user-select: none; outline: none; width: max-content; background: var(--plate); padding: 8px; border-radius: 10px; }
 .plate-grid .hdr { font-size: 10px; color: var(--muted); text-align: center; cursor: pointer; line-height: 1; display: flex; align-items: center; justify-content: center; }
 .plate-grid .hdr:hover { color: var(--accent); }
 .well { position: relative; border-radius: 50%; background: var(--well-empty); border: 1px solid transparent; }
@@ -81,3 +104,7 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--p
 dialog::backdrop { background: rgba(0,0,0,.35); }
 .syn-fluid { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 8px 0; }
 @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .side, .ops { border: none; } }
+
+.theme-pick { display: inline-flex; gap: 4px; align-items: center; }
+.theme-pick button { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
+.theme-pick button.on { border-color: var(--ink); }
