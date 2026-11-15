@@ -50,3 +50,12 @@ thumbnail). D300e Control 4.0.1 opened it without any message, showed all conten
 a file byte-identical to ours except `<Revisions>` (it appends its own) and `<Thumbnail>` (it adds one).
 Normalization total shown in D300e: 11.3 µL; engine: 11.285 µL. Files: `fixtures/reference/roundtrip/`.
 Note: D300e's revision list included a revision from the previously open document (its own quirk).
+
+## Fluid classes (confirmed, `fixtures/reference/t10-classes.tdd`)
+Fluid editor: "Fluid group" (DMSO / Aqueous / Master Mix) then "Fluid class".
+ClassID 0 DMSO · 1 Aqueous+Tween 20 · 2 Aqueous+Brij 35 · 3 Aqueous+Triton X100 · 4 Aqueous+Tween 20+glycerol ·
+5 Aqueous+Brij 35+glycerol · 6 Aqueous+Triton X100+glycerol · 12 Brilliant II SYBR Green qRT-PCR 1-Step Master Mix
+(Master Mix classes force Dispense by Volume; IDs 7-11 and the other ~9 master mixes not yet mapped).
+`<Color>` is written only when the user picks a non-default colour (default = palette index by fluid order:
+1 red, 2 green, 3 blue, 4 yellow, 5 pink, 6 cyan, …, 10 magenta).
+New fluids default to "Fluid N", DMSO, 10 mM, MaxVolume 1000 nL.

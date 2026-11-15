@@ -35,12 +35,19 @@ export const fromDisplay = (value, unit) => value * ({ ...MOLARITY_UNITS, ...MAS
 
 // ---------- fluid classes ----------
 // Increments from the guide, Appendix E (p.109-110), standard-volume cassettes; volumes in nL.
-// The ClassID -> class mapping is UNVERIFIED except that ClassID 0 holds DMSO drug stocks
-// in the reference file (and the plate DMSO limit applies to it).
+// ClassID -> class CONFIRMED with fixtures/reference/t10-classes.tdd (one fluid per class, saved by D300e
+// Control 4.0.1). Master-mix classes (group "Master Mix") are dispensed by volume; only ID 12 is known.
+const AQ = { isDmso: false, minVolume: 0.011, bands: [[3.6, 0.011], [Infinity, 0.56]] };
+const AQG = { isDmso: false, minVolume: 0.012, bands: [[3.6, 0.012], [Infinity, 0.6]] };
 export const FLUID_CLASSES = {
-  0: { key: 'dmso', label: 'DMSO', isDmso: true, minVolume: 0.013, bands: [[0.017, 0.013], [3.6, 0.02], [Infinity, 0.4]], unverifiedId: false },
-  1: { key: 'aqueous', label: 'Aqueous + surfactant', isDmso: false, minVolume: 0.011, bands: [[3.6, 0.011], [Infinity, 0.56]], unverifiedId: true },
-  2: { key: 'aqueous_glycerol', label: 'Aqueous + glycerol', isDmso: false, minVolume: 0.012, bands: [[3.6, 0.012], [Infinity, 0.6]], unverifiedId: true },
+  0: { key: 'dmso', group: 'DMSO', label: 'DMSO', short: 'DMSO', isDmso: true, minVolume: 0.013, bands: [[0.017, 0.013], [3.6, 0.02], [Infinity, 0.4]] },
+  1: { key: 'aq_tween20', group: 'Aqueous', label: 'Aqueous+Tween 20', short: 'a+Tw', ...AQ },
+  2: { key: 'aq_brij35', group: 'Aqueous', label: 'Aqueous+Brij 35', short: 'a+B', ...AQ },
+  3: { key: 'aq_tritonx100', group: 'Aqueous', label: 'Aqueous+Triton X100', short: 'a+TX', ...AQ },
+  4: { key: 'aq_tween20_gly', group: 'Aqueous', label: 'Aqueous+Tween 20+glycerol', short: 'a+Tw+g', ...AQG },
+  5: { key: 'aq_brij35_gly', group: 'Aqueous', label: 'Aqueous+Brij 35+glycerol', short: 'a+B+g', ...AQG },
+  6: { key: 'aq_tritonx100_gly', group: 'Aqueous', label: 'Aqueous+Triton X100+glycerol', short: 'a+TX+g', ...AQG },
+  12: { key: 'mm_brilliant2_sybr', group: 'Master Mix', label: 'Brilliant II SYBR Green qRT-PCR 1-Step Master Mix', short: 'B2SG', byVolumeOnly: true, ...AQG }, // UNVERIFIED increments
 };
 export const MAX_VOLUME_PER_FLUID_PER_WELL = 10000; // nL (10 µL), p.109-110
 export const MIN_NORMALIZATION_VOLUME = 1; // nL, p.109-110 ("normalization and bulk dispense")

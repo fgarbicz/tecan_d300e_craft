@@ -363,7 +363,7 @@ function editFluid(f) {
     <label>Dispense by</label><select name="byVol" ${usedInWells ? 'disabled' : ''}><option value="0" ${!f.byVol ? 'selected' : ''}>Concentration</option><option value="1" ${f.byVol ? 'selected' : ''}>Volume</option></select>
     <label>Stock conc.</label><span><input name="conc" type="number" step="any" min="0" value="${f.byVol ? '' : +toDisplay(f.concentration, f.concentrationUnit).toPrecision(12)}">
       <select name="unit">${units.map((u) => `<option ${u === f.concentrationUnit ? 'selected' : ''} value="${u}">${unitLabel(u)}</option>`).join('')}</select></span>
-    <label>Fluid class</label><select name="cls">${Object.entries(FLUID_CLASSES).map(([id, c]) => `<option value="${id}" ${+id === f.classId ? 'selected' : ''}>${c.label}${c.unverifiedId ? ' (ID unverified)' : ''}</option>`).join('')}</select>
+    <label>Fluid class</label><select name="cls">${Object.entries(FLUID_CLASSES).map(([id, c]) => `<option value="${id}" ${+id === f.classId ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
     </div>${usedInWells ? '<p class="hint">Dispense mode cannot change while the fluid is used in wells.</p>' : ''}
     ${isNew ? '' : '<p><button value="delete" class="danger" formnovalidate>Delete fluid</button></p>'}`, (form) => {
     const fd = new FormData(form);
