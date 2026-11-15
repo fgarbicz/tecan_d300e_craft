@@ -59,7 +59,9 @@ export function roundVolume(v, cls) {
   for (const [upper, inc] of cls.bands) {
     if (v <= upper || upper === Infinity) {
       // Nearest multiple of the band's increment (UNVERIFIED: tie and band-edge handling).
-      let r = Math.round(v / inc) * inc;
+      // Nearest multiple, ties to even (.NET Math.Round default). Confirmed on the D3 run report:
+      // 1.01 nL → 1.00 nL (50.5 × 20 pL → 50). (was: Math.round, ties up)
+      let r = roundHalfEven(v / inc) * inc;
       if (r < lower) r = lower;
       return { volume: cleanFloat(r), belowMin: false };
     }
@@ -68,7 +70,38 @@ export function roundVolume(v, cls) {
   return { volume: v, belowMin: false };
 }
 const cleanFloat = (x) => Number(x.toPrecision(12));
+
+/**
+ * Normalization (backfill) volume as D300e Control 4.0.1 computes it. Derived from the run report of the
+ * D3 protocol (fixtures/reference/reports/), which it reproduces for all 536 normalized wells:
+ *  - nothing is added when target − ROUNDED current volume < 1 nL (minimum normalization dispense);
+ *  - otherwise N = target − EXACT current volume (exact volumes to 0.1 pL), floored to the 400 pL grid
+ *    (also below 3.6 nL), and never less than 1 nL.
+ * (The guide's older p.89 example rounded to the nearest step: 99.9 → 100 nL.)
+ */
+export function normalizationVolume(target, currentRounded, currentExact, cls, grid = 0.4, mode = 'floor') {
+  if (!(target - currentRounded >= MIN_NORMALIZATION_VOLUME - 1e-9)) return 0;
+  const gap = target - Math.round(currentExact * 1e4) / 1e4;
+  const n = (mode === 'nearest' ? roundHalfEven(gap / grid) : Math.floor(gap / grid + 1e-9)) * grid;
+  return cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, n));
+}
+
+/** Largest dispensable volume ≤ v on the class's increment grid. */
+export function floorVolume(v, cls) {
+  if (v < cls.minVolume) return 0;
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (v <= upper || upper === Infinity) return cleanFloat(Math.max(lower, Math.floor(v / inc + 1e-9) * inc));
+    lower = upper;
+  }
+  return v;
+}
 const round3 = (x) => Math.round(x * 1000) / 1000;
+export function roundHalfEven(q) {
+  const f = Math.floor(q), d = q - f;
+  if (Math.abs(d - 0.5) < 1e-9) return f % 2 === 0 ? f : f + 1;
+  return Math.round(q);
+}
 
 // ---------- per-well computation ----------
 /**
@@ -78,10 +111,17 @@ const round3 = (x) => Math.round(x * 1000) / 1000;
  * @param {object} plate                 plate model (assayVolume = additional volume A, dmsoLimit fraction)
  * @param {number} normalization         extra DMSO-class volume (nL) from backfill, already rounded
  */
-export function computeWell(requests, fluids, plate, normalization = 0) {
+/**
+ * @param {number|null} sizingTotal  For wells in a normalization group, D300e Control sizes every fluid
+ *   with a fixed well volume = additional volume + the group's target (C·sizingTotal/S, not iterated);
+ *   see computeProtocol(). Otherwise volumes solve C = S·V/V_total iteratively (guide Appendix D).
+ */
+export function computeWell(requests, fluids, plate, normalization = 0, sizingTotal = null) {
   const A = plate.assayVolume;
   const warnings = [];
   let k = 0; // Σ C_i / S_i over concentration-mode fluids
+  // Fluid volumes are sized with the normalization volume included in the well total (D3 run report,
+  // plate 9: Kynurenin 50 µM → 126.4 nL with 378.4 nL normalization; 125.2 nL without).
   let fixed = A + normalization; // volume-mode fluids add fixed volumes
   const items = [];
   for (const [id, req] of requests) {
@@ -104,7 +144,7 @@ export function computeWell(requests, fluids, plate, normalization = 0) {
   const out = [];
   for (const it of items) {
     const cls = fluidClass(it.f.classId);
-    const exact = it.mode === 'vol' ? it.req : (it.req * vTotalExact) / it.S;
+    const exact = it.mode === 'vol' ? it.req : sizingTotal != null ? (it.req * sizingTotal) / it.S : (it.req * vTotalExact) / it.S;
     const { volume, belowMin } = roundVolume(exact, cls);
     if (belowMin) warnings.push({ code: 'below_min_volume', fluidId: it.id, requestedVolume: exact });
     if (volume > MAX_VOLUME_PER_FLUID_PER_WELL) warnings.push({ code: 'above_max_volume', fluidId: it.id, volume });
@@ -121,12 +161,12 @@ export function computeWell(requests, fluids, plate, normalization = 0) {
   // so normalizing to exactly the limit (e.g. 1.0004 % after 400 pL rounding) is not flagged.
   // UNVERIFIED: the real software's comparison; check with T05.
   if (plate.dmsoLimit != null && round3(dmsoFraction * 100) > round3(plate.dmsoLimit * 100)) warnings.push({ code: 'dmso_limit', dmsoFraction, limit: plate.dmsoLimit });
-  return { fluids: out, totalVolume, dmsoFraction, warnings, normalization, classVolumes: classVolumes(out) };
+  return { fluids: out, totalVolume, dmsoFraction, warnings, normalization, classVolumes: classVolumes(out), exactClassVolumes: classVolumes(out, 'exactVolume') };
 }
 
-function classVolumes(out) {
+function classVolumes(out, field = 'volume') {
   const m = new Map();
-  for (const x of out) m.set(x.classId, (m.get(x.classId) || 0) + x.volume);
+  for (const x of out) m.set(x.classId, (m.get(x.classId) || 0) + x[field]);
   return m;
 }
 
@@ -165,7 +205,9 @@ export function computeProtocol(protocol) {
     const base = sel.map((w) => {
       const plate = result[w.p].plate, key = `${w.r},${w.c}`;
       const r = result[w.p].wells.get(key) || computeWell(emptyReq, fluids, plate, 0);
-      return { w, key, plate, req: plate.wells.get(key) || emptyReq, classVol: (r.classVolumes && r.classVolumes.get(b.classId)) || 0 };
+      return { w, key, plate, req: plate.wells.get(key) || emptyReq,
+        classVol: (r.classVolumes && r.classVolumes.get(b.classId)) || 0,
+        exactClassVol: (r.exactClassVolumes && r.exactClassVolumes.get(b.classId)) || 0 };
     });
     // Type names confirmed in fixtures/reference/t05-normalize.tdd (one row per UI option).
     // "Total" volume = additional volume + every dispensed fluid (all classes), before normalization.
@@ -176,19 +218,31 @@ export function computeProtocol(protocol) {
     const maxClass = Math.max(0, ...base.map((x) => x.classVol));
     const maxTotal = Math.max(0, ...base.map((x) => x.totalVol));
     for (const x of base) {
-      let n = 0;
+      // Target of the group, and the fixed well volume used to size the fluids of a normalized well.
+      // Derived from the D3 run report (fixtures/reference/reports/): ToMaxVolume plates 1-2 and
+      // ToAssayVolumePct plates 7-9 reproduce every dispensed volume with sizing = A + class target.
+      const A = x.plate.assayVolume;
+      let target, sizing, totalBased = false;
       switch (b.type) {
-        case 'ToMaxVolume': n = maxClass - x.classVol; break; // highest class volume in the group
-        case 'ToVolume': n = Math.max(0, b.param - x.classVol); break; // class volume up to Param nL
-        case 'ToAssayVolumePct': n = solvePctNormalization(x, b.param, fluids, b.classId); break; // class = Param × total
-        case 'ToMaxTotalVolume': n = maxTotal - x.totalVol; break; // highest total volume in the group
-        case 'ToTotalVolume': n = Math.max(0, b.param - x.totalVol); break; // total volume up to Param nL
+        case 'ToMaxVolume': target = maxClass; sizing = null; break; // iterative sizing incl. N (plates 1-2: 1628/1628)
+        case 'ToVolume': target = b.param; sizing = A + target; break; // UNVERIFIED sizing
+        // Fluids are sized with a fixed well volume A·(1+p); the class target is p × that volume, and the
+        // top-up rounds to nearest (ties to even). Fitted on the D3 report, plate 9 (308 normalized wells).
+        case 'ToAssayVolumePct': sizing = A * (1 + b.param); target = b.param * sizing; break;
+        case 'ToMaxTotalVolume': target = maxTotal; sizing = target; totalBased = true; break; // UNVERIFIED sizing
+        case 'ToTotalVolume': target = b.param; sizing = target; totalBased = true; break; // UNVERIFIED sizing
         default: continue; // unknown type: leave unnormalized
       }
-      let rounded = n >= MIN_NORMALIZATION_VOLUME ? roundVolume(n, cls).volume : 0;
-      const r = computeWell(x.req, fluids, x.plate, rounded);
-      r.normalizationRequested = n;
-      // n < 1 nL: not dispensed. The guide describes this as normal behaviour, so it is not a warning.
+      // The gap uses the volumes as sized for this group: iterative for ToMaxVolume, A·(1+p) for % of total.
+      const r0 = computeWell(x.req, fluids, x.plate, 0, sizing);
+      const cr = (r0.classVolumes && r0.classVolumes.get(b.classId)) || 0;
+      const ce = (r0.exactClassVolumes && r0.exactClassVolumes.get(b.classId)) || 0;
+      const curRounded = totalBased ? r0.totalVolume : cr;
+      const curExact = totalBased ? r0.totalVolume - cr + ce : ce;
+      // Rounding of the top-up: floor for ToMaxVolume (plates 1-2), nearest for % of total (plate 9).
+      const n = normalizationVolume(target, curRounded, curExact, cls, 0.4, b.type === 'ToAssayVolumePct' ? 'nearest' : 'floor');
+      const r = computeWell(x.req, fluids, x.plate, n, sizing);
+      r.normalizationRequested = target - curExact;
       result[x.w.p].wells.set(x.key, r);
     }
   }

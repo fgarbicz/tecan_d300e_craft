@@ -74,7 +74,10 @@ test('guide p.89 row B: ToMaxVolume normalization volumes and totals', () => {
   // Row B, Fluid 2 = 10 mM DMSO, A = 100 µL; B01 holds the class maximum (100 nL).
   // [well col, requested µM, fluid nL, normalization nL, total nL]
   const rows = [[0, 10, 100, 0, 100100], [2, 0.6309573, 6.4, 93.6, 100100], [3, 0.1584893, 1.58, 98.4, 100099.98],
-    [4, 0.03981072, 0.4, 99.6, 100100], [5, 0.01, 0.1, 100, 100100.1]];
+    [4, 0.03981072, 0.4, 99.6, 100100],
+    // B06: the guide figure (older software) shows 100 nL (nearest step); D300e Control 4.0.1 rounds the
+    // top-up DOWN (see the D3 run-report test), giving 99.6 nL. We follow 4.0.1.
+    [5, 0.01, 0.1, 99.6, 100099.7]];
   const plate = { assayVolume: 100000, dmsoLimit: 0.01, wells: new Map(rows.map(([c, conc]) => [`1,${c}`, new Map([[2, conc]])])) };
   const protocol = { fluids: [{ id: 2, byVol: false, concentration: 10000, classId: 0 }], plates: [plate],
     backfills: [{ classId: 0, type: 'ToMaxVolume', wells: rows.map(([c]) => ({ p: 0, r: 1, c })) }] };
@@ -88,26 +91,15 @@ test('guide p.89 row B: ToMaxVolume normalization volumes and totals', () => {
   close(res.get('1,3').fluids[0].dispensed, 0.157842189, 1e-8, 'B04 dispensed conc');
 });
 
-test('reference D3 protocol: computes cleanly; normalization follows the 1 nL minimum', () => {
-  const p = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', '2026.08.28 synergy D3.tdd'), 'utf8'));
-  const res = computeProtocol(p);
-  assert.equal(res.length, 9);
-  const bad = res.flatMap(({ wells }) => [...wells.values()].flatMap((w) => w.warnings.filter((x) => x.code === 'no_solution')));
-  assert.equal(bad.length, 0);
-  for (const b of p.backfills.filter((x) => x.type === 'ToMaxVolume')) {
-    const rs = b.wells.map((w) => res[w.p].wells.get(`${w.r},${w.c}`));
-    const target = Math.max(...rs.map((r) => r.totalVolume - 50000 - r.normalization));
-    for (const r of rs) {
-      if (r.normalization > 0) close(r.totalVolume - 50000, target, 0.2 + 1e-9, 'normalized well reaches target ± half a 400 pL step');
-      else assert.ok(r.normalizationRequested < 1 + 1e-9, 'skipped normalization only when < 1 nL');
-    }
-  }
-  for (const b of p.backfills.filter((x) => x.type === 'ToAssayVolumePct')) {
-    for (const w of b.wells) {
-      const r = res[w.p].wells.get(`${w.r},${w.c}`);
-      if (r.normalization > 0) close(r.dmsoFraction, b.param, 0.2 / 50000 + 1e-9, 'DMSO fraction reaches Param');
-    }
-  }
+test('D300e Control 4.0.1 run report: every dispense of the D3 protocol is reproduced', async () => {
+  // 5,752 dispense rows (all fluids + normalization, 9 plates): volume, total well volume and dispensed
+  // concentration must all match. tools/compare/compare_report.py does the comparison.
+  const { execFileSync } = await import('node:child_process');
+  const root = join(import.meta.dirname, '..');
+  const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py',
+    'fixtures/reference/2026.08.28 synergy D3.tdd', 'fixtures/reference/reports/2026.08.28 synergy D3.xml'], { cwd: root, encoding: 'utf8' });
+  assert.match(out, /'rows': 5752, 'vol_ok': 5752, 'total_ok': 5752, 'conc_ok': 5752/, out.split('\n')[0]);
+  assert.match(out, /ALL ROWS MATCH/);
 });
 
 test('DMSO limit: normalizing to exactly the limit is not flagged; a real excess is', () => {
