@@ -4,7 +4,7 @@
 import { parseTdd, writeTdd, newProtocol, wellKey, splitKey, wellName, formatNumber } from '../src/tdd.js';
 import { computeProtocol, computeWell, validRange, fluidTotals, primingIssues, scrapWellValues, PRIMING_VOLUME, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitKind, unitLabel, toDisplay, fromDisplay } from '../src/dispense.js';
 import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid,
-  buildSynergy, NORMALIZE_TYPES, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
+  buildSynergy, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
 
 // ---------------- state ----------------
 const S = {
@@ -516,17 +516,17 @@ function renderNormalize(el) {
   const n = S.sel.size;
   el.innerHTML = `<div class="form"><label>Fluid class</label><select id="nCls">${Object.entries(FLUID_CLASSES).map(([id, c]) => `<option value="${id}">${c.label}</option>`).join('')}</select>
     <label>Method</label><select id="nType">${Object.entries(NORMALIZE_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-    <label>Percent</label><span><input id="nPct" type="number" step="any" min="0" value="${+(plate().dmsoLimit * 100).toPrecision(6)}"> % of total</span></div>
+    <label id="nParamL">Value</label><span><input id="nPct" type="number" step="any" min="0" value="${+(plate().dmsoLimit * 100).toPrecision(6)}"> <span id="nUnit"></span></span></div>
     <p class="hint">${n} well${n === 1 ? '' : 's'} selected on this plate. A well can be in one normalization group per fluid class; applying replaces its previous group for that class.</p>
-    <p class="hint">Other normalization methods from the guide (specified volume, highest total volume) are not available until their file format is confirmed.</p>
     <div class="actions"><button id="nApply" class="primary" ${n ? '' : 'disabled'}>Normalize selection</button><button id="nRemove" ${n ? '' : 'disabled'}>Remove from selection</button></div>
-    <h2 style="margin-top:14px">Groups</h2><ul class="warnlist">${S.protocol.backfills.map((b, i) => `<li>${i + 1}. ${esc(NORMALIZE_TYPES[b.type] || b.type)}${b.param != null ? ` (${+(b.param * 100).toPrecision(6)} %)` : ''} · ${FLUID_CLASSES[b.classId]?.label ?? b.classId} · ${b.wells.length} wells on plate(s) ${[...new Set(b.wells.map((w) => w.p + 1))].join(', ')} <button class="small" data-g="${i}">Select</button></li>`).join('') || '<li class="muted">None</li>'}</ul>`;
-  const upd = () => { $('nPct').disabled = $('nType').value !== 'ToAssayVolumePct'; }; $('nType').onchange = upd; upd();
+    <h2 style="margin-top:14px">Groups</h2><ul class="warnlist">${S.protocol.backfills.map((b, i) => `<li>${i + 1}. ${esc(NORMALIZE_TYPES[b.type] || b.type)}${b.param != null ? ` (${NORMALIZE_PARAM[b.type] === '%' ? +(b.param * 100).toPrecision(6) + ' %' : b.param + ' nL'})` : ''} · ${FLUID_CLASSES[b.classId]?.label ?? b.classId} · ${b.wells.length} wells on plate(s) ${[...new Set(b.wells.map((w) => w.p + 1))].join(', ')} <button class="small" data-g="${i}">Select</button></li>`).join('') || '<li class="muted">None</li>'}</ul>`;
+  const upd = () => { const u = NORMALIZE_PARAM[$('nType').value]; $('nPct').disabled = !u; $('nUnit').textContent = u ? (u === '%' ? '% of total' : 'nL') : ''; }; $('nType').onchange = upd; upd();
   const wells = () => selectedCells().map(([r, c]) => ({ p: S.plateIdx, r, c }));
   $('nApply').onclick = () => {
-    const type = $('nType').value, pct = +$('nPct').value;
-    if (type === 'ToAssayVolumePct' && !(pct > 0 && pct < 100)) return toast('Percent must be between 0 and 100');
-    mutate('normalize', () => addNormalization(S.protocol, +$('nCls').value, type, type === 'ToAssayVolumePct' ? pct / 100 : undefined, wells()));
+    const type = $('nType').value, v = +$('nPct').value, u = NORMALIZE_PARAM[type];
+    if (u === '%' && !(v > 0 && v < 100)) return toast('Percent must be between 0 and 100');
+    if (u === 'nL' && !(v > 0)) return toast('Volume must be above 0 nL');
+    mutate('normalize', () => addNormalization(S.protocol, +$('nCls').value, type, u === '%' ? v / 100 : u === 'nL' ? v : undefined, wells()));
   };
   $('nRemove').onclick = () => mutate('remove normalization', () => removeNormalization(S.protocol, wells()));
   for (const b of el.querySelectorAll('[data-g]')) b.onclick = () => {

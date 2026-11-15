@@ -262,10 +262,15 @@ export function buildSynergy(spec) {
 }
 
 // ---------- normalization (§3.7 / §5) ----------
+// XML type names confirmed with fixtures/reference/t05-normalize.tdd.
 export const NORMALIZE_TYPES = {
-  ToMaxVolume: 'Normalize to highest class volume',
-  ToAssayVolumePct: 'Normalize to % of total volume',
+  ToMaxVolume: 'Fluid class: to highest class volume',
+  ToVolume: 'Fluid class: to specified volume (nL)',
+  ToAssayVolumePct: 'Fluid class: to % of total volume',
+  ToMaxTotalVolume: 'Total volume: to highest total volume',
+  ToTotalVolume: 'Total volume: to specified total volume (nL)',
 };
+export const NORMALIZE_PARAM = { ToVolume: 'nL', ToAssayVolumePct: '%', ToTotalVolume: 'nL' };
 
 /** Add a normalization group. "only one group for each fluid class" per well: the well is removed from other groups of that class. */
 export function addNormalization(protocol, classId, type, param, wells) {
@@ -273,7 +278,7 @@ export function addNormalization(protocol, classId, type, param, wells) {
   for (const b of protocol.backfills) if (b.classId === classId) b.wells = b.wells.filter((w) => !keys.has(`${w.p},${w.r},${w.c}`));
   protocol.backfills = protocol.backfills.filter((b) => b.wells.length);
   const b = { classId, type, wells: [...wells] };
-  if (type === 'ToAssayVolumePct') b.param = param;
+  if (param != null) b.param = param;
   protocol.backfills.push(b);
   return b;
 }

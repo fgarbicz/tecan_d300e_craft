@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>Fluid 1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="1">
+        <Name>Fluid 1 - 1:300</Name>
+        <RootFluidID>0</RootFluidID>
+        <DilutionFactor>300</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>33.33333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name />
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.01</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="0">
+            <Fluid ID="0">1</Fluid>
+          </Well>
+          <Well Row="0" Col="1">
+            <Fluid ID="0">33.33333333333</Fluid>
+          </Well>
+          <Well Row="0" Col="2">
+            <Fluid ID="0">0.0034</Fluid>
+          </Well>
+          <Well Row="0" Col="3">
+            <Fluid ID="0">0.006</Fluid>
+          </Well>
+          <Well Row="0" Col="4">
+            <Fluid ID="0">0.72</Fluid>
+          </Well>
+          <Well Row="0" Col="5">
+            <Fluid ID="0">0.72</Fluid>
+          </Well>
+          <Well Row="0" Col="6">
+            <Fluid ID="0">0.7</Fluid>
+          </Well>
+          <Well Row="0" Col="7">
+            <Fluid ID="0">0.0026</Fluid>
+          </Well>
+          <Well Row="0" Col="8">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="0" Col="9">
+            <Fluid ID="0">100</Fluid>
+          </Well>
+          <Well Row="0" Col="10">
+            <Fluid ID="0">0.5</Fluid>
+          </Well>
+          <Well Row="0" Col="11">
+            <Fluid ID="0">0.001</Fluid>
+          </Well>
+          <Well Row="0" Col="12">
+            <Fluid ID="1">1E-05</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills>
+      <Backfill ClassID="0" Type="ToMaxVolume">
+        <Wells>
+          <Well P="0" R="0" C="0" />
+          <Well P="0" R="0" C="1" />
+          <Well P="0" R="0" C="2" />
+          <Well P="0" R="0" C="3" />
+          <Well P="0" R="0" C="4" />
+          <Well P="0" R="0" C="5" />
+          <Well P="0" R="0" C="6" />
+          <Well P="0" R="0" C="7" />
+          <Well P="0" R="0" C="8" />
+          <Well P="0" R="0" C="9" />
+          <Well P="0" R="0" C="10" />
+          <Well P="0" R="0" C="11" />
+          <Well P="0" R="0" C="12" />
+          <Well P="0" R="0" C="13" />
+          <Well P="0" R="0" C="14" />
+          <Well P="0" R="0" C="15" />
+          <Well P="0" R="0" C="16" />
+          <Well P="0" R="0" C="17" />
+          <Well P="0" R="0" C="18" />
+          <Well P="0" R="0" C="19" />
+          <Well P="0" R="0" C="20" />
+          <Well P="0" R="0" C="21" />
+          <Well P="0" R="0" C="22" />
+          <Well P="0" R="0" C="23" />
+        </Wells>
+      </Backfill>
+      <Backfill ClassID="0" Type="ToVolume" Param="200">
+        <Wells>
+          <Well P="0" R="1" C="0" />
+          <Well P="0" R="1" C="1" />
+          <Well P="0" R="1" C="2" />
+          <Well P="0" R="1" C="3" />
+          <Well P="0" R="1" C="4" />
+          <Well P="0" R="1" C="5" />
+          <Well P="0" R="1" C="6" />
+          <Well P="0" R="1" C="7" />
+          <Well P="0" R="1" C="8" />
+          <Well P="0" R="1" C="9" />
+          <Well P="0" R="1" C="10" />
+          <Well P="0" R="1" C="11" />
+          <Well P="0" R="1" C="12" />
+          <Well P="0" R="1" C="13" />
+          <Well P="0" R="1" C="14" />
+          <Well P="0" R="1" C="15" />
+          <Well P="0" R="1" C="16" />
+          <Well P="0" R="1" C="17" />
+          <Well P="0" R="1" C="18" />
+          <Well P="0" R="1" C="19" />
+          <Well P="0" R="1" C="20" />
+          <Well P="0" R="1" C="21" />
+          <Well P="0" R="1" C="22" />
+          <Well P="0" R="1" C="23" />
+        </Wells>
+      </Backfill>
+      <Backfill ClassID="0" Type="ToAssayVolumePct" Param="0.005">
+        <Wells>
+          <Well P="0" R="2" C="0" />
+          <Well P="0" R="2" C="1" />
+          <Well P="0" R="2" C="2" />
+          <Well P="0" R="2" C="3" />
+          <Well P="0" R="2" C="4" />
+          <Well P="0" R="2" C="5" />
+          <Well P="0" R="2" C="6" />
+          <Well P="0" R="2" C="7" />
+          <Well P="0" R="2" C="8" />
+          <Well P="0" R="2" C="9" />
+          <Well P="0" R="2" C="10" />
+          <Well P="0" R="2" C="11" />
+          <Well P="0" R="2" C="12" />
+          <Well P="0" R="2" C="13" />
+          <Well P="0" R="2" C="14" />
+          <Well P="0" R="2" C="15" />
+          <Well P="0" R="2" C="16" />
+          <Well P="0" R="2" C="17" />
+          <Well P="0" R="2" C="18" />
+          <Well P="0" R="2" C="19" />
+          <Well P="0" R="2" C="20" />
+          <Well P="0" R="2" C="21" />
+          <Well P="0" R="2" C="22" />
+          <Well P="0" R="2" C="23" />
+        </Wells>
+      </Backfill>
+      <Backfill ClassID="0" Type="ToMaxTotalVolume">
+        <Wells>
+          <Well P="0" R="3" C="0" />
+          <Well P="0" R="3" C="1" />
+          <Well P="0" R="3" C="2" />
+          <Well P="0" R="3" C="3" />
+          <Well P="0" R="3" C="4" />
+          <Well P="0" R="3" C="5" />
+          <Well P="0" R="3" C="6" />
+          <Well P="0" R="3" C="7" />
+          <Well P="0" R="3" C="8" />
+          <Well P="0" R="3" C="9" />
+          <Well P="0" R="3" C="10" />
+          <Well P="0" R="3" C="11" />
+          <Well P="0" R="3" C="12" />
+          <Well P="0" R="3" C="13" />
+          <Well P="0" R="3" C="14" />
+          <Well P="0" R="3" C="15" />
+          <Well P="0" R="3" C="16" />
+          <Well P="0" R="3" C="17" />
+          <Well P="0" R="3" C="18" />
+          <Well P="0" R="3" C="19" />
+          <Well P="0" R="3" C="20" />
+          <Well P="0" R="3" C="21" />
+          <Well P="0" R="3" C="22" />
+          <Well P="0" R="3" C="23" />
+        </Wells>
+      </Backfill>
+      <Backfill ClassID="0" Type="ToTotalVolume" Param="50300">
+        <Wells>
+          <Well P="0" R="4" C="0" />
+          <Well P="0" R="4" C="1" />
+          <Well P="0" R="4" C="2" />
+          <Well P="0" R="4" C="3" />
+          <Well P="0" R="4" C="4" />
+          <Well P="0" R="4" C="5" />
+          <Well P="0" R="4" C="6" />
+          <Well P="0" R="4" C="7" />
+          <Well P="0" R="4" C="8" />
+          <Well P="0" R="4" C="9" />
+          <Well P="0" R="4" C="10" />
+          <Well P="0" R="4" C="11" />
+          <Well P="0" R="4" C="12" />
+          <Well P="0" R="4" C="13" />
+          <Well P="0" R="4" C="14" />
+          <Well P="0" R="4" C="15" />
+          <Well P="0" R="4" C="16" />
+          <Well P="0" R="4" C="17" />
+          <Well P="0" R="4" C="18" />
+          <Well P="0" R="4" C="19" />
+          <Well P="0" R="4" C="20" />
+          <Well P="0" R="4" C="21" />
+          <Well P="0" R="4" C="22" />
+          <Well P="0" R="4" C="23" />
+        </Wells>
+      </Backfill>
+    </Backfills>
+    <Revisions>
+      <Revision Time="2026-11-15T14:34:29.539-05:00" UserID="PC-workstation\Filip dfci" />
+      <Revision Time="2026-11-15T14:39:43.587-05:00" UserID="PC-workstation\Filip dfci" />
+    </Revisions>
+    <Thumbnail>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</Thumbnail>
+  </Protocol>
+</Root>

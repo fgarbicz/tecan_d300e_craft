@@ -143,10 +143,12 @@ export function validRange(fluid, plate) {
 /**
  * Compute every well of every plate, including normalization (backfill) blocks.
  * Normalization semantics (guide p.32-34, INFERRED mapping to XML):
- *   ToMaxVolume      : each selected well is topped up with class fluid to the highest
- *                      class volume among the block's selected wells (UNVERIFIED: scope is the
- *                      whole block across its plates, not per plate).
- *   ToAssayVolumePct : class volume brought to Param × total well volume (total includes N).
+ *   ToMaxVolume      : class volume topped up to the highest class volume in the group
+ *   ToVolume         : class volume topped up to Param nL
+ *   ToAssayVolumePct : class volume brought to Param × total well volume (total includes N)
+ *   ToMaxTotalVolume : total well volume topped up to the highest total in the group
+ *   ToTotalVolume    : total well volume topped up to Param nL
+ *   (group scope = the whole block across its plates: UNVERIFIED)
  *   Volumes < 1 nL are not normalized (minimum normalization dispense 1 nL).
  */
 export function computeProtocol(protocol) {
@@ -165,12 +167,24 @@ export function computeProtocol(protocol) {
       const r = result[w.p].wells.get(key) || computeWell(emptyReq, fluids, plate, 0);
       return { w, key, plate, req: plate.wells.get(key) || emptyReq, classVol: (r.classVolumes && r.classVolumes.get(b.classId)) || 0 };
     });
-    const target = b.type === 'ToMaxVolume' ? Math.max(0, ...base.map((x) => x.classVol)) : null;
+    // Type names confirmed in fixtures/reference/t05-normalize.tdd (one row per UI option).
+    // "Total" volume = additional volume + every dispensed fluid (all classes), before normalization.
+    for (const x of base) {
+      const r = result[x.w.p].wells.get(x.key);
+      x.totalVol = r && Number.isFinite(r.totalVolume) ? r.totalVolume : x.plate.assayVolume;
+    }
+    const maxClass = Math.max(0, ...base.map((x) => x.classVol));
+    const maxTotal = Math.max(0, ...base.map((x) => x.totalVol));
     for (const x of base) {
       let n = 0;
-      if (b.type === 'ToMaxVolume') n = target - x.classVol;
-      else if (b.type === 'ToAssayVolumePct') n = solvePctNormalization(x, b.param, fluids, b.classId);
-      else continue; // UNVERIFIED other types: leave unnormalized
+      switch (b.type) {
+        case 'ToMaxVolume': n = maxClass - x.classVol; break; // highest class volume in the group
+        case 'ToVolume': n = Math.max(0, b.param - x.classVol); break; // class volume up to Param nL
+        case 'ToAssayVolumePct': n = solvePctNormalization(x, b.param, fluids, b.classId); break; // class = Param × total
+        case 'ToMaxTotalVolume': n = maxTotal - x.totalVol; break; // highest total volume in the group
+        case 'ToTotalVolume': n = Math.max(0, b.param - x.totalVol); break; // total volume up to Param nL
+        default: continue; // unknown type: leave unnormalized
+      }
       let rounded = n >= MIN_NORMALIZATION_VOLUME ? roundVolume(n, cls).volume : 0;
       const r = computeWell(x.req, fluids, x.plate, rounded);
       r.normalizationRequested = n;

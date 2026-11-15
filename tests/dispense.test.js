@@ -134,3 +134,15 @@ test('priming: fluids below 30 nL on a plate are flagged; scrap well values reac
   const lack = primingIssues(d3, computeProtocol(d3)).flatMap((x) => x.lacking);
   assert.deepEqual(lack, []);
 });
+
+test('T05 (D300e Control): all five normalization types reproduce the software totals', () => {
+  const p = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't05-normalize.tdd'), 'utf8'));
+  assert.deepEqual(p.backfills.map((b) => b.type), ['ToMaxVolume', 'ToVolume', 'ToAssayVolumePct', 'ToMaxTotalVolume', 'ToTotalVolume']);
+  const res = computeProtocol(p)[0].wells;
+  const sumRow = (r) => [...Array(24).keys()].reduce((s, c) => s + (res.get(`${r},${c}`)?.normalization || 0), 0) / 1000;
+  // Normalization panel showed DMSO 11.4 µL after row A, 16.2 after B, 22.3 after C, 29.5 after D+E.
+  const a = sumRow(0), b = sumRow(1), c = sumRow(2), d = sumRow(3), e = sumRow(4);
+  close(a, 11.4, 0.05, 'row A'); close(a + b, 16.2, 0.05, 'rows A-B'); close(a + b + c, 22.3, 0.05, 'rows A-C');
+  close(a + b + c + d + e, 29.5, 0.05, 'rows A-E');
+  assert.equal(d, 0); close(e, 7.2, 1e-9, 'row E: 300 nL x 24');
+});
