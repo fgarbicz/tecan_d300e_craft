@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D300 Designer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <strong class="brand">D300 Designer</strong>
+  <button id="btnNew" title="New protocol (⌘N)">New</button>
+  <button id="btnOpen" title="Open .tdd (⌘O)">Open…</button>
+  <button id="btnSave" title="Save (⌘S)">Save</button>
+  <button id="btnSaveAs">Save as…</button>
+  <span class="sep"></span>
+  <button id="btnUndo" title="Undo (⌘Z)">Undo</button>
+  <button id="btnRedo" title="Redo (⇧⌘Z)">Redo</button>
+  <span class="sep"></span>
+  <button id="btnReport" title="Per-well volumes as CSV">Export volumes (CSV)</button>
+  <span id="fileName" class="filename">untitled.tdd</span>
+  <span id="dirty" class="dirty" hidden>● unsaved</span>
+  <input id="fileInput" type="file" accept=".tdd,.xml" hidden>
+</header>
+
+<main class="layout">
+  <aside class="side">
+    <section>
+      <h2>Fluids <button id="btnAddFluid" class="small">+ Add</button></h2>
+      <table class="fluids" id="fluidTable"></table>
+    </section>
+    <section>
+      <h2>Plates <button id="btnAddPlate" class="small">+ Add</button></h2>
+      <ol id="plateList" class="plates"></ol>
+      <div class="row-btns">
+        <button id="btnReplicatePlate" class="small">Replicate</button>
+        <button id="btnClearPlate" class="small">Clear</button>
+        <button id="btnRemovePlate" class="small danger">Remove</button>
+      </div>
+    </section>
+    <section id="plateParams"></section>
+    <section id="protocolSettings"></section>
+  </aside>
+
+  <section class="center">
+    <div class="plate-toolbar">
+      <label>Show <select id="showFluid"></select></label>
+      <label class="chk"><input type="checkbox" id="showNorm" checked> normalization</label>
+      <span id="selInfo" class="muted"></span>
+      <button id="btnSelectAll" class="small">Select all</button>
+      <button id="btnSelectNone" class="small">Select none</button>
+      <button id="btnCopy" class="small" title="⌘C">Copy</button>
+      <button id="btnPaste" class="small" title="⌘V at top-left selected well">Paste</button>
+      <button id="btnClearSel" class="small danger" title="Delete">Clear wells</button>
+    </div>
+    <div id="plateGrid" class="plate-grid" tabindex="0"></div>
+    <div id="legend" class="legend"></div>
+    <section id="inspector" class="inspector"></section>
+  </section>
+
+  <aside class="ops">
+    <nav class="tabs" id="opTabs">
+      <button data-tab="set" class="active">Set value</button>
+      <button data-tab="titration">Titration</button>
+      <button data-tab="synergy">Synergy</button>
+      <button data-tab="normalize">Normalize</button>
+      <button data-tab="check">Check</button>
+    </nav>
+    <div id="opPanel" class="op-panel"></div>
+  </aside>
+</main>
+<div id="toast" class="toast" hidden></div>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<script type="module" src="app.js"></script>
+</body>
+</html>

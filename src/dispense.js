@@ -68,6 +68,7 @@ export function roundVolume(v, cls) {
   return { volume: v, belowMin: false };
 }
 const cleanFloat = (x) => Number(x.toPrecision(12));
+const round3 = (x) => Math.round(x * 1000) / 1000;
 
 // ---------- per-well computation ----------
 /**
@@ -116,8 +117,10 @@ export function computeWell(requests, fluids, plate, normalization = 0) {
     if (fluidClass(x.classId).isDmso) dmsoVol += x.volume;
   }
   const dmsoFraction = totalVolume > 0 ? dmsoVol / totalVolume : 0;
-  // UNVERIFIED: whether the check is > or >= and whether it uses rounded volumes.
-  if (plate.dmsoLimit != null && dmsoFraction > plate.dmsoLimit + 1e-12) warnings.push({ code: 'dmso_limit', dmsoFraction, limit: plate.dmsoLimit });
+  // Compared at the precision D300e Control displays DMSO % (3 decimals, guide p.33 tooltip "0.911 %"),
+  // so normalizing to exactly the limit (e.g. 1.0004 % after 400 pL rounding) is not flagged.
+  // UNVERIFIED: the real software's comparison; check with T05.
+  if (plate.dmsoLimit != null && round3(dmsoFraction * 100) > round3(plate.dmsoLimit * 100)) warnings.push({ code: 'dmso_limit', dmsoFraction, limit: plate.dmsoLimit });
   return { fluids: out, totalVolume, dmsoFraction, warnings, normalization, classVolumes: classVolumes(out) };
 }
 
@@ -171,7 +174,7 @@ export function computeProtocol(protocol) {
       let rounded = n >= MIN_NORMALIZATION_VOLUME ? roundVolume(n, cls).volume : 0;
       const r = computeWell(x.req, fluids, x.plate, rounded);
       r.normalizationRequested = n;
-      if (n > 0 && n < MIN_NORMALIZATION_VOLUME) r.warnings.push({ code: 'normalization_below_min', requested: n });
+      // n < 1 nL: not dispensed. The guide describes this as normal behaviour, so it is not a warning.
       result[x.w.p].wells.set(x.key, r);
     }
   }
@@ -207,3 +210,32 @@ export function fluidTotals(computed) {
 }
 
 export { splitKey };
+
+// ---------- priming / scrap well (guide Appendix F, p.113) ----------
+// "it is recommended that the first plate using a fluid includes a well with volume of 30 nL or
+// greater ... Since plate dispense order can vary, it is recommended that all plates follow this
+// recommendation. ... consider dedicating one 'scrap' well on each plate to a larger dispense volume.
+// This same well can be used for all fluids on the plate."
+export const PRIMING_VOLUME = 30; // nL
+
+/** For each plate, the fluids used on it whose largest dispense is < 30 nL. */
+export function primingIssues(protocol, computed) {
+  return computed.map(({ wells }, p) => {
+    const maxVol = new Map();
+    for (const r of wells.values()) for (const x of r.fluids) maxVol.set(x.fluidId, Math.max(maxVol.get(x.fluidId) || 0, x.volume));
+    const lacking = [...maxVol.entries()].filter(([, v]) => v > 0 && v < PRIMING_VOLUME - 1e-9).map(([fluidId, maxVolume]) => ({ fluidId, maxVolume }));
+    return { plate: p, lacking };
+  });
+}
+
+/** Concentrations (protocol units) that give ≥ 30 nL of each listed fluid when all share one well.
+ *  Rounded UP to 3 significant digits so the values are readable, as in hand-made protocols. */
+export function scrapWellValues(fluids, plate, volume = PRIMING_VOLUME) {
+  const total = plate.assayVolume + volume * fluids.length;
+  return fluids.map((f) => {
+    if (f.byVol) return [f.id, volume];
+    const exact = (stockInBase(f) * volume) / total;
+    const mag = Math.pow(10, Math.floor(Math.log10(exact)) - 2);
+    return [f.id, Math.ceil(exact / mag - 1e-9) * mag];
+  });
+}

@@ -13,7 +13,7 @@ import { parseXml, writeXml, el, child, childrenNamed, attr, textOf } from './xm
 // ---------- number formatting ----------
 // Per-well values in the reference file are written with 13 significant digits,
 // trailing zeros removed (matches .NET Double.ToString("G13")): 4908/4908 values match.
-// UNVERIFIED: exponent form for very small/large values (.NET writes e.g. "1E-05").
+// Exponent form confirmed for small values: 1E-05 (T01).
 export function formatNumber(x) {
   if (!Number.isFinite(x)) throw new Error(`Cannot write non-finite number ${x}`);
   if (x === 0) return '0';
@@ -21,7 +21,9 @@ export function formatNumber(x) {
   // (9.9999999999999 -> 10), as .NET does.
   const [mant, expStr] = x.toExponential(12).split('e');
   const e = parseInt(expStr, 10);
-  if (e < -5 || e >= 13) {
+  // .NET "G": scientific when the exponent is < -4 or >= precision.
+  // Confirmed: 0.00001 is saved as "1E-05" (fixtures/reference/t01-setvalue-units.tdd, well A13).
+  if (e < -4 || e >= 13) {
     const m = mant.includes('.') ? mant.replace(/0+$/, '').replace(/\.$/, '') : mant;
     return `${m}E${e < 0 ? '-' : '+'}${String(Math.abs(e)).padStart(2, '0')}`;
   }
@@ -40,11 +42,11 @@ export const PROTOCOL_DEFAULT_ORDER = [
   'FluidOrderRun', 'BackfillOrder', 'BackfillNoDispense', 'Plates', 'HPDDPlates', 'Backfills',
   'Revisions', 'Thumbnail',
 ];
-// Values as saved by D300e Control 4.0.1 in the reference file (not necessarily the app's defaults).
+// Defaults of a NEW protocol in D300e Control 4.0.1 (fixtures/reference/t01-setvalue-units.tdd).
 export const DEFAULT_SETTINGS = {
   Version: '4', VolumeUnit: 'nL', MolarityConcentrationUnit: 'µM', MassConcentrationUnit: 'ng_mL',
   BlockFluidOnCellFail: 'True', ShowCellCountAsDispensed: 'True', CellDispenseMode: '3',
-  ShakePerFluid: 'True', ShakePlateDuration: '5', ShakePerWell: 'True', ShakeThresholdVolume: '100',
+  ShakePerFluid: 'False', ShakePlateDuration: '5', ShakePerWell: 'False', ShakeThresholdVolume: '100',
   PrioritizeSurfactantFreeCassettes: 'True', FluidOrderRun: 'False', BackfillOrder: 'Mixed',
   BackfillNoDispense: 'False',
 };
@@ -53,18 +55,21 @@ export const DEFAULT_COMMENTS = [
   'Application: Version: 4.0.1, DLL version: 2.182',
 ];
 
-const FLUID_ORDER = ['Name', 'ByVol', 'Concentration', 'ConcentrationUnit', 'MaxVolume', 'MaxVolumeUnit', 'ClassID', 'Color'];
+const FLUID_ORDER = ['Name', 'RootFluidID', 'DilutionFactor', 'ByVol', 'Concentration', 'ConcentrationUnit', 'MaxVolume', 'MaxVolumeUnit', 'ClassID', 'Color'];
 const PLATE_ORDER = ['PlateType', 'Rows', 'Cols', 'Name', 'AssayVolume', 'DMSOLimit', 'DontShake', 'Deionize', 'PromptPlateLoad', 'Wells', 'Randomize'];
 
 // ---------- parse ----------
 export function parseTdd(src) {
   const doc = parseXml(src);
-  if (doc.root.name !== 'Root') throw new Error(`Expected <Root>, found <${doc.root.name}>`);
-  const pnode = child(doc.root, 'Protocol');
+  // Format version 4 wraps <Protocol> in <Root>; versions 2-3 (Tecan's example protocols) use <Protocol> as root.
+  const legacyRoot = doc.root.name === 'Protocol';
+  if (!legacyRoot && doc.root.name !== 'Root') throw new Error(`Expected <Root>, found <${doc.root.name}>`);
+  const pnode = legacyRoot ? doc.root : child(doc.root, 'Protocol');
   if (!pnode) throw new Error('Missing <Protocol> element');
 
   const protocol = {
-    _doc: { bom: doc.bom, declaration: doc.declaration, newline: doc.newline, trailingNewline: doc.trailingNewline },
+    _doc: { bom: doc.bom, declaration: doc.declaration, newline: doc.newline, trailingNewline: doc.trailingNewline, legacyRoot },
+    _platesExtra: [], // non-<Plate> children of <Plates> (e.g. <Mode> in version 2), with their position
     _layout: [], // ordered list of {kind, name, value?} describing Protocol children
     settings: {},
     fluids: [],
@@ -78,7 +83,11 @@ export function parseTdd(src) {
     if (n.type === 'comment') { protocol._layout.push({ kind: 'comment', text: n.text }); continue; }
     switch (n.name) {
       case 'Fluids': protocol.fluids = childrenNamed(n, 'Fluid').map(parseFluid); break;
-      case 'Plates': protocol.plates = childrenNamed(n, 'Plate').map(parsePlate); break;
+      case 'Plates':
+        protocol.plates = childrenNamed(n, 'Plate').map(parsePlate);
+        (n.children || []).forEach((c, i) => { if (c.type !== 'element' || c.name !== 'Plate') protocol._platesExtra.push({ index: i, node: c }); });
+        if (n.text !== undefined) protocol._platesText = n.text;
+        break;
       case 'HPDDPlates': protocol.hpddPlates = n; break; // UNVERIFIED semantics: kept raw
       case 'Backfills': protocol.backfills = childrenNamed(n, 'Backfill').map(parseBackfill); break;
       case 'Revisions':
@@ -113,6 +122,8 @@ function parseFluid(n) {
       case 'MaxVolumeUnit': f.maxVolumeUnit = t; break;
       case 'ClassID': f.classId = Number(t); break;
       case 'Color': f.color = Number(t); break;
+      case 'RootFluidID': f.rootFluidId = Number(t); break;
+      case 'DilutionFactor': f.dilutionFactor = Number(t); f._dilText = t; break;
       default: f._extra[c.name] = c;
     }
   }
@@ -136,6 +147,7 @@ function parsePlate(n) {
       case 'Deionize': p.deionize = bool(t); break;
       case 'PromptPlateLoad': p.promptPlateLoad = bool(t); break;
       case 'Wells':
+        if (c.text !== undefined) p._wellsText = c.text;
         for (const w of childrenNamed(c, 'Well')) {
           const r = Number(attr(w, 'Row')), col = Number(attr(w, 'Col'));
           const m = new Map();
@@ -182,7 +194,8 @@ export function writeTdd(protocol) {
     const node = el(k, [], String(protocol.settings[k]));
     if (idx >= 0) kids.splice(idx, 0, node); else kids.push(node);
   }
-  const root = el('Root', [], [el('Protocol', [], kids)]);
+  const pnode = el('Protocol', [], kids);
+  const root = protocol._doc && protocol._doc.legacyRoot ? pnode : el('Root', [], [pnode]);
   const d = protocol._doc || { bom: false, declaration: '<?xml version="1.0" encoding="utf-8"?>', newline: '\r\n', trailingNewline: false };
   return writeXml({ ...d, root });
 }
@@ -199,7 +212,12 @@ function defaultLayout(protocol) {
 function protocolElement(protocol, name) {
   switch (name) {
     case 'Fluids': return el('Fluids', [], protocol.fluids.map(writeFluid));
-    case 'Plates': return el('Plates', [], protocol.plates.map(writePlate));
+    case 'Plates': {
+      const kids = protocol.plates.map(writePlate);
+      for (const { index, node } of protocol._platesExtra || []) kids.splice(Math.min(index, kids.length), 0, node);
+      if (!kids.length && protocol._platesText !== undefined) return el('Plates', [], protocol._platesText);
+      return el('Plates', [], kids);
+    }
     case 'HPDDPlates': return protocol.hpddPlates || el('HPDDPlates');
     case 'Backfills': return el('Backfills', [], protocol.backfills.filter((b) => b.wells.length).map(writeBackfill));
     case 'Revisions': return el('Revisions', [], protocol.revisions.map((r) => el('Revision', r._attrs || [['Time', r.time], ['UserID', r.userId]])));
@@ -211,7 +229,8 @@ function protocolElement(protocol, name) {
 }
 
 function writeFluid(f) {
-  const order = f._order && f._order.length ? [...f._order] : FLUID_ORDER.filter((k) => k !== 'Color' || f.color != null);
+  const optional = { Color: f.color, RootFluidID: f.rootFluidId, DilutionFactor: f.dilutionFactor };
+  const order = f._order && f._order.length ? [...f._order] : FLUID_ORDER.filter((k) => !(k in optional) || optional[k] != null);
   if (f.color != null && !order.includes('Color')) order.push('Color');
   const kids = [];
   for (const k of order) {
@@ -224,6 +243,8 @@ function writeFluid(f) {
       case 'MaxVolumeUnit': kids.push(el('MaxVolumeUnit', [], f.maxVolumeUnit)); break;
       case 'ClassID': kids.push(el('ClassID', [], String(f.classId))); break;
       case 'Color': if (f.color != null) kids.push(el('Color', [], String(f.color))); break;
+      case 'RootFluidID': if (f.rootFluidId != null) kids.push(el('RootFluidID', [], String(f.rootFluidId))); break;
+      case 'DilutionFactor': if (f.dilutionFactor != null) kids.push(el('DilutionFactor', [], numText(f.dilutionFactor, f._dilText))); break;
       default: if (f._extra && f._extra[k]) kids.push(f._extra[k]);
     }
   }
@@ -244,7 +265,11 @@ function writePlate(p) {
       case 'DontShake': kids.push(el('DontShake', [], boolStr(p.dontShake))); break;
       case 'Deionize': kids.push(el('Deionize', [], boolStr(p.deionize))); break;
       case 'PromptPlateLoad': kids.push(el('PromptPlateLoad', [], boolStr(p.promptPlateLoad))); break;
-      case 'Wells': kids.push(el('Wells', [], writeWells(p))); break;
+      case 'Wells': {
+        const ws = writeWells(p);
+        kids.push(!ws.length && p._wellsText !== undefined ? el('Wells', [], p._wellsText) : el('Wells', [], ws));
+        break;
+      }
       case 'Randomize': kids.push(p.randomize || el('Randomize')); break;
       default: if (p._extra && p._extra[k]) kids.push(p._extra[k]);
     }

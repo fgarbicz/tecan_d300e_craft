@@ -4,8 +4,9 @@
 import { wellKey, splitKey } from './tdd.js';
 import { validRange } from './dispense.js';
 
-// UNVERIFIED plate-type strings except Default384 (seen in the reference file). Check with T11.
+// Plate-type strings confirmed in protocol files: Default48, Default96, Default384, Default1536.
 export const PLATE_TYPES = {
+  Default48: { rows: 6, cols: 8, label: '48-well' },
   Default96: { rows: 8, cols: 12, label: '96-well' },
   Default384: { rows: 16, cols: 24, label: '384-well' },
   Default1536: { rows: 32, cols: 48, label: '1536-well' },
@@ -17,7 +18,7 @@ export function newPlate(template = {}) {
   return {
     plateType: type, rows: dims.rows, cols: dims.cols, name: template.name || '',
     assayVolume: template.assayVolume ?? 50000, dmsoLimit: template.dmsoLimit ?? 0.01,
-    dontShake: template.dontShake ?? false, deionize: template.deionize ?? true,
+    dontShake: template.dontShake ?? true, // new 384-well plates default to DontShake=True (T01) deionize: template.deionize ?? true,
     promptPlateLoad: template.promptPlateLoad ?? true, wells: new Map(), randomize: null,
   };
 }
@@ -155,8 +156,12 @@ export function suggestShift(fluid, plate, high, low) {
   return high <= dilutedMax * (1 + 1e-9) ? { kind: 'shift', factor: d } : { kind: 'extend', factor: d };
 }
 
+// Saved by D300e Control as <RootFluidID> and <DilutionFactor> right after <Name> (T01, fluid "Fluid 1 - 1:300").
 export function dilutedFluid(protocol, fluid, factor) {
-  return addFluid(protocol, { ...fluid, name: `${fluid.name} - 1:${factor}`, concentration: fluid.concentration / factor, color: undefined });
+  const f = addFluid(protocol, { ...fluid, name: `${fluid.name} - 1:${factor}`, concentration: fluid.concentration / factor, color: undefined });
+  f.rootFluidId = fluid.rootFluidId ?? fluid.id;
+  f.dilutionFactor = (fluid.dilutionFactor ?? 1) * factor;
+  return f;
 }
 
 // ---------- synergy (§4.1) ----------

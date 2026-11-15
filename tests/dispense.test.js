@@ -109,3 +109,28 @@ test('reference D3 protocol: computes cleanly; normalization follows the 1 nL mi
     }
   }
 });
+
+test('DMSO limit: normalizing to exactly the limit is not flagged; a real excess is', () => {
+  const fl = new Map([[0, dmsoFluid(1000)]]);
+  const plate = { assayVolume: 50000, dmsoLimit: 0.01 };
+  // 505.2 nL normalization -> 505.2 / 50505.2 = 1.00029 % (rounds to 1.000 %)
+  assert.ok(!computeWell(new Map(), fl, plate, 505.2).warnings.some((w) => w.code === 'dmso_limit'));
+  // 0.505 µM -> 25.6 nL + 485 nL normalization would be 1.01 %
+  assert.ok(computeWell(new Map([[0, 10.2]]), fl, plate).warnings.some((w) => w.code === 'dmso_limit'));
+});
+
+test('priming: fluids below 30 nL on a plate are flagged; scrap well values reach ≥ 30 nL', async () => {
+  const { primingIssues, scrapWellValues, PRIMING_VOLUME } = await import('../src/dispense.js');
+  const fluids = [{ id: 0, byVol: false, concentration: 1000, classId: 0 }, { id: 1, byVol: false, concentration: 10000, classId: 0 }];
+  const plate = { assayVolume: 50000, dmsoLimit: 0.01, wells: new Map([['1,1', new Map([[0, 0.02], [1, 3]])]]) };
+  const protocol = { fluids, plates: [plate], backfills: [] };
+  const issues = primingIssues(protocol, computeProtocol(protocol))[0].lacking.map((x) => x.fluidId).sort();
+  assert.deepEqual(issues, [0, 1]); // 1 nL and 15 nL
+  const vals = scrapWellValues(fluids, plate);
+  const r = computeWell(new Map(vals), new Map(fluids.map((f) => [f.id, f])), plate);
+  for (const x of r.fluids) assert.ok(x.volume >= PRIMING_VOLUME, `${x.fluidId}: ${x.volume}`);
+  // the reference D3 file's scrap wells (A23 Bortezomib 0.6 µM, A24 MEN 6 µM) satisfy the rule
+  const d3 = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', '2026.08.28 synergy D3.tdd'), 'utf8'));
+  const lack = primingIssues(d3, computeProtocol(d3)).flatMap((x) => x.lacking);
+  assert.deepEqual(lack, []);
+});

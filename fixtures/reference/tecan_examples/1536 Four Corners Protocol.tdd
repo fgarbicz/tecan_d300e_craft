@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Protocol>
+  <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+  <Version>2</Version>
+  <VolumeUnit>nL</VolumeUnit>
+  <ConcentrationUnit>µM</ConcentrationUnit>
+  <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+  <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+  <ShakePerFluid>False</ShakePerFluid>
+  <ShakePlateDuration>5</ShakePlateDuration>
+  <ShakePerWell>False</ShakePerWell>
+  <ShakeThresholdVolume>100</ShakeThresholdVolume>
+  <BackfillOrder>LastPriority</BackfillOrder>
+  <BackfillNoDispense>False</BackfillNoDispense>
+  <Fluids>
+    <Fluid ID="0">
+      <Name>1</Name>
+      <Concentration>10000</Concentration>
+      <ConcentrationUnit>mM</ConcentrationUnit>
+      <ClassID>0</ClassID>
+    </Fluid>
+  </Fluids>
+  <Plates>
+    <Mode>Volume</Mode>
+    <Plate>
+      <PlateType>Default1536</PlateType>
+      <Rows>32</Rows>
+      <Cols>48</Cols>
+      <Name />
+      <AssayVolume>10000</AssayVolume>
+      <DMSOLimit>0.01</DMSOLimit>
+      <AqueousLimit>0.05</AqueousLimit>
+      <DontShake>False</DontShake>
+      <Wells>
+        <Well Row="0" Col="0">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="0" Col="1">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="0" Col="46">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="0" Col="47">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="1" Col="0">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="1" Col="1">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="1" Col="46">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="1" Col="47">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="30" Col="0">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="30" Col="1">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="30" Col="46">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="30" Col="47">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="31" Col="0">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="31" Col="1">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="31" Col="46">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+        <Well Row="31" Col="47">
+          <Fluid ID="0">30</Fluid>
+        </Well>
+      </Wells>
+      <Randomize />
+    </Plate>
+  </Plates>
+  <Backfills />
+</Protocol>

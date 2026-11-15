@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>Fluid 1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="1">
+        <Name>Fluid 1 - 1:300</Name>
+        <RootFluidID>0</RootFluidID>
+        <DilutionFactor>300</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>33.33333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name />
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.01</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="0">
+            <Fluid ID="0">1</Fluid>
+          </Well>
+          <Well Row="0" Col="1">
+            <Fluid ID="0">33.33333333333</Fluid>
+          </Well>
+          <Well Row="0" Col="2">
+            <Fluid ID="0">0.0034</Fluid>
+          </Well>
+          <Well Row="0" Col="3">
+            <Fluid ID="0">0.006</Fluid>
+          </Well>
+          <Well Row="0" Col="4">
+            <Fluid ID="0">0.72</Fluid>
+          </Well>
+          <Well Row="0" Col="5">
+            <Fluid ID="0">0.72</Fluid>
+          </Well>
+          <Well Row="0" Col="6">
+            <Fluid ID="0">0.7</Fluid>
+          </Well>
+          <Well Row="0" Col="7">
+            <Fluid ID="0">0.0026</Fluid>
+          </Well>
+          <Well Row="0" Col="8">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="0" Col="9">
+            <Fluid ID="0">100</Fluid>
+          </Well>
+          <Well Row="0" Col="10">
+            <Fluid ID="0">0.5</Fluid>
+          </Well>
+          <Well Row="0" Col="11">
+            <Fluid ID="0">0.001</Fluid>
+          </Well>
+          <Well Row="0" Col="12">
+            <Fluid ID="1">1E-05</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills />
+    <Revisions>
+      <Revision Time="2026-11-15T14:34:29.539-05:00" UserID="PC-workstation\Filip dfci" />
+    </Revisions>
+    <Thumbnail>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</Thumbnail>
+  </Protocol>
+</Root>
