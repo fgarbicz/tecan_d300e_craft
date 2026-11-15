@@ -28,7 +28,7 @@ test('fluid shift / extend: both guide examples (p.29-30)', () => {
 test('titration placement with replicates', () => {
   const p = newPlate({ plateType: 'Default96' });
   const cells = [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5]];
-  applyTitration(p, cells, 0, [10, 1, 0.1], { replicates: 2, direction: 'rows' });
+  applyTitration(p, cells, 0, [10, 1, 0.1], { replicates: 2, pattern: 'rowsTL' });
   assert.deepEqual([0, 1, 2, 3, 4, 5].map((c) => p.wells.get(wellKey(0, c)).get(0)), [10, 10, 1, 1, 0.1, 0.1]);
   assert.throws(() => applyTitration(p, cells.slice(0, 5), 0, [1, 2], { replicates: 2 }));
 });
@@ -80,4 +80,25 @@ test('synergy reproduces D300e Control output exactly (T06: 2 fluids, 6 levels e
   assert.equal(mine.name, 'Synergy');
   assert.equal(mine.wells.size, ref.wells.size);
   for (const [k, m] of ref.wells) for (const [id, v] of m) close(mine.wells.get(k)?.get(id), v, 1e-12, `well ${k} fluid ${id}`);
+});
+
+test('titration patterns reproduce D300e Control (T04)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd } = await import('../src/tdd.js');
+  const { TITRATION_PATTERNS } = await import('../src/ops.js');
+  const ref = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't04-titration.tdd'), 'utf8')).plates[0];
+  const p = newPlate({ plateType: 'Default384' });
+  const L = (n) => titrationLevels({ mode: 'highLow', high: 10, low: 0.003, levels: n, distribution: 'log' });
+  // same order of operations as in D300e: row B, then column 4, then column 6 (later ones replace)
+  applyTitration(p, Array.from({ length: 24 }, (_, c) => [1, c]), 0, L(8), { replicates: 3, pattern: 'rowsTL' });
+  applyTitration(p, Array.from({ length: 16 }, (_, r) => [r, 3]), 0, L(8), { replicates: 2, pattern: 'colsTL' });
+  applyTitration(p, Array.from({ length: 16 }, (_, r) => [r, 5]), 0, L(8), { replicates: 2, pattern: 'colsBL' });
+  assert.equal(p.wells.size, ref.wells.size);
+  for (const [k, m] of ref.wells) close(p.wells.get(k)?.get(0), m.get(0), 1e-12, `well ${k}`);
+  // the four corners, row-wise from top-right on a 2x3 block: highest at top-right, then leftwards
+  const q = newPlate({ plateType: 'Default96' });
+  applyTitration(q, [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]], 0, [6, 5, 4, 3, 2, 1], { pattern: 'rowsTR' });
+  assert.deepEqual([[0, 2], [0, 1], [0, 0], [1, 2], [1, 1], [1, 0]].map(([r, c]) => q.wells.get(`${r},${c}`).get(0)), [6, 5, 4, 3, 2, 1]);
+  assert.equal(Object.keys(TITRATION_PATTERNS).length, 8);
 });

@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>Fluid 1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name />
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.01</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="3">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="0" Col="5">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="1" Col="0">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="1" Col="1">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="1" Col="2">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="1" Col="3">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="1" Col="4">
+            <Fluid ID="0">3.138568472156</Fluid>
+          </Well>
+          <Well Row="1" Col="5">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="1" Col="6">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="1" Col="7">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="1" Col="8">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="1" Col="9">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="1" Col="10">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="1" Col="11">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="1" Col="12">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="1" Col="13">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="1" Col="14">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="1" Col="15">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="1" Col="16">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="1" Col="17">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="1" Col="18">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="1" Col="19">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="1" Col="20">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="1" Col="21">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="1" Col="22">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="1" Col="23">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="2" Col="3">
+            <Fluid ID="0">3.138568472156</Fluid>
+          </Well>
+          <Well Row="2" Col="5">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="3" Col="3">
+            <Fluid ID="0">3.138568472156</Fluid>
+          </Well>
+          <Well Row="3" Col="5">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="4" Col="3">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="4" Col="5">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="5" Col="3">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="5" Col="5">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="6" Col="3">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="6" Col="5">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="7" Col="3">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="7" Col="5">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="8" Col="3">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="8" Col="5">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="9" Col="3">
+            <Fluid ID="0">0.09703455784651</Fluid>
+          </Well>
+          <Well Row="9" Col="5">
+            <Fluid ID="0">0.3091682042541</Fluid>
+          </Well>
+          <Well Row="10" Col="3">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="10" Col="5">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="11" Col="3">
+            <Fluid ID="0">0.03045496039666</Fluid>
+          </Well>
+          <Well Row="11" Col="5">
+            <Fluid ID="0">0.9850612054411</Fluid>
+          </Well>
+          <Well Row="12" Col="3">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="12" Col="5">
+            <Fluid ID="0">3.138568472156</Fluid>
+          </Well>
+          <Well Row="13" Col="3">
+            <Fluid ID="0">0.009558497852173</Fluid>
+          </Well>
+          <Well Row="13" Col="5">
+            <Fluid ID="0">3.138568472156</Fluid>
+          </Well>
+          <Well Row="14" Col="3">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="14" Col="5">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="15" Col="3">
+            <Fluid ID="0">0.003</Fluid>
+          </Well>
+          <Well Row="15" Col="5">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills />
+    <Revisions>
+      <Revision Time="2026-11-15T15:09:38.471-05:00" UserID="PC-workstation\Filip dfci" />
+      <Revision Time="2026-11-15T15:13:30.174-05:00" UserID="PC-workstation\Filip dfci" />
+    </Revisions>
+    <Thumbnail>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</Thumbnail>
+  </Protocol>
+</Root>

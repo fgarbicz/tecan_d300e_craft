@@ -115,30 +115,40 @@ const range = (n) => Array.from({ length: n }, (_, i) => i);
 
 // ---------- titration placement (§3.4 titration pattern) ----------
 /**
- * Order the selected cells for a titration.
- * direction: 'rows' (levels advance along a row, left->right then next row) |
- *            'cols' (levels advance down a column, top->bottom then next column)
- * highFirst: true = highest level at the start corner.
- * Replicates: consecutive wells in this order hold the same level
- * (UNVERIFIED: the guide's pattern graphics; check with T04).
+ * The 8 "Titration pattern" choices of D300e Control: levels flow along rows or down columns, starting at a
+ * corner that holds the HIGHEST level. Every row (or column) runs in the same direction (pattern icons show
+ * parallel bars, no serpentine; multi-line selections are UNVERIFIED because ranges cannot be selected over
+ * Remote Desktop). Replicates of a level occupy consecutive wells along the flow.
+ * Confirmed with fixtures/reference/t04-titration.tdd: row-wise from top-left (row B, 3 replicates),
+ * column-wise from top-left (column 4) and from bottom (column 6), 2 replicates.
  */
-export function orderCells(cells, direction = 'rows') {
+export const TITRATION_PATTERNS = {
+  colsTL: { direction: 'cols', corner: 'TL', label: 'Down columns, highest top-left' },
+  colsTR: { direction: 'cols', corner: 'TR', label: 'Down columns, highest top-right' },
+  colsBL: { direction: 'cols', corner: 'BL', label: 'Up columns, highest bottom-left' },
+  colsBR: { direction: 'cols', corner: 'BR', label: 'Up columns, highest bottom-right' },
+  rowsTL: { direction: 'rows', corner: 'TL', label: 'Along rows, highest top-left' },
+  rowsTR: { direction: 'rows', corner: 'TR', label: 'Along rows, highest top-right' },
+  rowsBL: { direction: 'rows', corner: 'BL', label: 'Along rows, highest bottom-left' },
+  rowsBR: { direction: 'rows', corner: 'BR', label: 'Along rows, highest bottom-right' },
+};
+
+export function orderCells(cells, direction = 'rows', corner = 'TL') {
+  const rs = corner[0] === 'B' ? -1 : 1, cs = corner[1] === 'R' ? -1 : 1;
   const s = [...cells];
-  return direction === 'rows' ? s.sort((a, b) => a[0] - b[0] || a[1] - b[1]) : s.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  return direction === 'rows'
+    ? s.sort((a, b) => rs * (a[0] - b[0]) || cs * (a[1] - b[1]))
+    : s.sort((a, b) => cs * (a[1] - b[1]) || rs * (a[0] - b[0]));
 }
 
-export function applyTitration(plate, cells, fluidId, levels, { replicates = 1, direction = 'rows', highFirst = true, replicateLayout = 'adjacent' } = {}) {
+export function applyTitration(plate, cells, fluidId, levels, { replicates = 1, pattern = 'colsTL', direction, highFirst = true } = {}) {
   if (cells.length % replicates) throw new Error(`The number of selected wells (${cells.length}) must be a multiple of replicates (${replicates})`);
   const nLevels = cells.length / replicates;
   if (levels.length !== nLevels) throw new Error(`Selection gives ${nLevels} levels but ${levels.length} values were supplied`);
-  const ordered = orderCells(cells, direction);
+  const pat = TITRATION_PATTERNS[pattern] || { direction: direction || 'rows', corner: 'TL' };
+  const ordered = orderCells(cells, direction || pat.direction, pat.corner);
   const lv = highFirst ? levels : [...levels].reverse();
-  ordered.forEach(([r, c], i) => {
-    // adjacent: replicates sit next to each other (L1 L1 L1 L2 L2 L2 ...)
-    // series:   whole series repeats (L1 L2 ... Ln L1 L2 ...)
-    const level = replicateLayout === 'adjacent' ? Math.floor(i / replicates) : i % nLevels;
-    setWell(plate, r, c, fluidId, lv[level]);
-  });
+  ordered.forEach(([r, c], i) => setWell(plate, r, c, fluidId, lv[Math.floor(i / replicates)]));
 }
 
 // ---------- fluid shift / extend (§3.6) ----------

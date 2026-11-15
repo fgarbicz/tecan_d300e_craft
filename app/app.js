@@ -4,7 +4,7 @@
 import { parseTdd, writeTdd, newProtocol, wellKey, splitKey, wellName, formatNumber } from '../src/tdd.js';
 import { computeProtocol, computeWell, validRange, fluidTotals, primingIssues, scrapWellValues, PRIMING_VOLUME, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitKind, unitLabel, toDisplay, fromDisplay } from '../src/dispense.js';
 import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid,
-  buildSynergy, synergyLevels, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
+  buildSynergy, synergyLevels, TITRATION_PATTERNS, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
 
 // ---------------- state ----------------
 const S = {
@@ -446,9 +446,7 @@ function renderOpPanel() {
       <label>Distribution</label><select id="tDist"></select>
       <label id="tFacL">Factor (1:N)</label><input id="tFac" type="number" step="any" min="1" value="2">
       <label>Replicates</label><input id="tRep" type="number" min="1" value="1">
-      <label>Direction</label><select id="tDir"><option value="rows">Along rows</option><option value="cols">Down columns</option></select>
-      <label>Order</label><select id="tOrder"><option value="high">Highest first</option><option value="low">Lowest first</option></select>
-      <label>Replicates</label><select id="tRepLayout"><option value="adjacent">Adjacent (L1 L1 L2 L2…)</option><option value="series">Repeat series (L1 L2… L1 L2…)</option></select>
+      <label>Pattern</label><select id="tPat">${Object.entries(TITRATION_PATTERNS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select>
       </div><p class="hint" id="tRange"></p><p class="hint" id="tInfo"></p><p class="hint" id="tPreview"></p>
       <div class="actions"><button id="tApply" class="primary">Apply</button></div>`;
     const dists = { highLow: [['log', 'Logarithmic'], ['linear', 'Linear']], high: [['halfLog', '1/2 Log'], ['thirdLog', '1/3 Log'], ['quarterLog', '1/4 Log'], ['dilution', '1:N'], ['linear', 'Linear (increment)']] };
@@ -476,7 +474,7 @@ function renderOpPanel() {
       let levels; try { levels = titrationLevels(o); } catch (e) { return toast(e.message); }
       const cells = selectedCells();
       if (conflicts(plate(), cells, o.fid).length && !confirm('This fluid is already in some selected wells. Replace those values?')) return;
-      const opts = { replicates: o.replicates, direction: $('tDir').value, highFirst: $('tOrder').value === 'high', replicateLayout: $('tRepLayout').value };
+      const opts = { replicates: o.replicates, pattern: $('tPat').value };
       await maybeShift(o.fid, Math.max(...levels), Math.min(...levels), (useFid, extendFid, stockMin) => {
         if (extendFid == null) return applyTitration(plate(), cells, useFid, levels, opts);
         // Extension (INFERRED, §3.6): levels the stock can reach use the stock, lower levels the diluted fluid.
