@@ -99,14 +99,8 @@ fn negative_control_a_changed_value_changes_the_bytes() {
 }
 
 #[test]
-fn empty_elements_quirk_is_mirrored() {
-    // JS defect (reported, not fixed): an empty fluid <Name /> or an unknown empty protocol-level element
-    // is written back as <X></X>. The port mirrors the JS writer.
+fn empty_elements_round_trip_as_self_closing() {
+    // Empty <Name /> and unknown empty protocol-level elements come back as written (fixed; previously <X></X>).
     let src = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<Root>\r\n  <Protocol>\r\n    <Version>4</Version>\r\n    <Foo />\r\n    <Fluids>\r\n      <Fluid ID=\"0\">\r\n        <Name />\r\n      </Fluid>\r\n    </Fluids>\r\n  </Protocol>\r\n</Root>";
-    let out = write_tdd(&parse_tdd(src).unwrap()).unwrap();
-    assert_eq!(
-        out,
-        src.replace("<Foo />", "<Foo></Foo>")
-            .replace("<Name />", "<Name></Name>")
-    );
+    assert_eq!(write_tdd(&parse_tdd(src).unwrap()).unwrap(), src);
 }
