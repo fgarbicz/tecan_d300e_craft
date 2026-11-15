@@ -561,7 +561,7 @@ function renderSynergy(el) {
     <label class="full chk"><input type="checkbox" id="sNorm" ${st.normalize ? 'checked' : ''}> Normalize DMSO to highest class volume</label>
     </div>${Array.from({ length: st.n }, (_, i) => fluidBlock(i)).join('')}
     <p class="hint" id="sInfo"></p><div class="actions"><button id="sGo" class="primary">Create plates</button></div>`;
-  const upRange = () => { for (const p of el.querySelectorAll('[data-range]')) { const i = p.dataset.range; const fid = +el.querySelector(`[data-k=fid][data-i="${i}"]`).value; const f = fluidById(fid); const { min, max } = validRange(f, { assayVolume: +$('sAssay').value * 1000, dmsoLimit: +$('sDmso').value / 100 }); p.textContent = `Valid range ${fmt(min, 3)} to ${fmt(max, 3)} ${unitLabel(wellUnit(f))}`; } };
+  const upRange = () => { for (const p of el.querySelectorAll('[data-range]')) { const i = p.dataset.range; const fid = +el.querySelector(`[data-k=fid][data-i="${i}"]`).value; const f = fluidById(fid); const { min, max } = validRange(f, { assayVolume: +$('sAssay').value * 1000, dmsoLimit: +$('sDmso').value / 100 }, st.n); p.textContent = `Valid range ${fmt(min, 3)} to ${fmt(max, 3)} ${unitLabel(wellUnit(f))}`; } };
   el.oninput = upRange; upRange();
   $('sType').onchange = () => { st.type = $('sType').value; renderSynergy(el); };
   $('sN').onchange = () => { st.n = Math.max(2, Math.min(+$('sN').value || 2, fl.length)); renderSynergy(el); };

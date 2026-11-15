@@ -159,3 +159,21 @@ test('Quick Plate reproduces D300e Control (T08) and the guide examples', async 
   assert.equal(g3[0].wells.get('0,3').get(8), 10); assert.equal(g3[0].wells.get('0,4').get(0), 9);
   assert.equal(g3[0].wells.get('15,21').get(15), 1); assert.equal(g3[0].wells.has('0,22'), false);
 });
+
+test('three-fluid synergy reproduces D300e Control (T07: A×B×C, grids stacked by columns, C low→high)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd, writeTdd } = await import('../src/tdd.js');
+  const { synergyLevels } = await import('../src/ops.js');
+  const proto = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't07-synergy3.tdd'), 'utf8'));
+  const ref = proto.plates.at(-1);
+  const ax = (id, n, low, order) => ({ fluidId: id, includeZero: true, order,
+    levels: synergyLevels({ mode: 'highLow', high: 10, low, levels: n, distribution: 'log', includeZero: true }) });
+  const [mine] = buildSynergy({ type: 'ABC', layout: 'multiple', gridOrder: 'cols', plate: { plateType: 'Default384', assayVolume: 50000, dmsoLimit: 0.01 },
+    fluids: [ax(0, 4, 0.1, 'highFirst'), ax(2, 4, 0.1, 'lowFirst'), ax(1, 3, 1, 'lowFirst')] });
+  assert.equal(mine.wells.size, ref.wells.size);
+  for (const [k, m] of ref.wells) {
+    assert.deepEqual([...mine.wells.get(k).keys()], [...m.keys()], `fluid order in well ${k}`);
+    for (const [id, v] of m) close(mine.wells.get(k).get(id), v, 1e-12, `well ${k} fluid ${id}`);
+  }
+});

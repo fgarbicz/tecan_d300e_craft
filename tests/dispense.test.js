@@ -138,3 +138,9 @@ test('T05 (D300e Control): all five normalization types reproduce the software t
   close(a + b + c + d + e, 29.5, 0.05, 'rows A-E');
   assert.equal(d, 0); close(e, 7.2, 1e-9, 'row E: 300 nL x 24');
 });
+
+test('synergy shares the DMSO limit between its fluids (T06/T07 valid ranges)', () => {
+  const f = dmsoFluid(10000), plate = { assayVolume: 50000, dmsoLimit: 0.01 };
+  close(validRange(f, plate, 1).max, 100, 1e-12, '1 fluid'); close(validRange(f, plate, 2).max, 50, 1e-12, '2 fluids');
+  close(validRange(f, plate, 3).max, 33.3333333333, 1e-9, '3 fluids'); close(validRange(f, plate, 3).min, 0.0026, 1e-6, 'min unchanged');
+});

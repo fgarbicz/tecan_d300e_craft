@@ -177,12 +177,14 @@ function classVolumes(out, field = 'volume') {
   return m;
 }
 
-/** Valid concentration range for a fluid on a plate (guide p.23/25: one-drop minimum to DMSO limit). */
-export function validRange(fluid, plate) {
+/** Valid concentration range for a fluid on a plate (guide p.23/25: one-drop minimum to DMSO limit).
+ *  sharedBy: number of fluids sharing the DMSO limit — the Synergy wizard divides it evenly
+ *  (confirmed: 10 mM, 1 %: 1 fluid 100 µM, 2 fluids 50 µM (T06), 3 fluids 33.3 µM (T07)). */
+export function validRange(fluid, plate, sharedBy = 1) {
   const cls = fluidClass(fluid.classId);
   const S = stockInBase(fluid), A = plate.assayVolume;
   const min = (S * cls.minVolume) / (A + cls.minVolume);
-  const max = cls.isDmso && plate.dmsoLimit ? S * plate.dmsoLimit : S * MAX_VOLUME_PER_FLUID_PER_WELL / (A + MAX_VOLUME_PER_FLUID_PER_WELL);
+  const max = cls.isDmso && plate.dmsoLimit ? (S * plate.dmsoLimit) / sharedBy : S * MAX_VOLUME_PER_FLUID_PER_WELL / (A + MAX_VOLUME_PER_FLUID_PER_WELL);
   return { min, max };
 }
 

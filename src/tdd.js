@@ -289,13 +289,15 @@ function writePlate(p) {
 }
 
 function writeWells(p) {
-  // Observed: wells row-major, fluids within a well ascending by ID; empty wells omitted.
+  // Observed: wells row-major; empty wells omitted.
   const entries = [...p.wells.entries()]
     .map(([k, m]) => [splitKey(k), m])
     .filter(([, m]) => [...m.values()].some((v) => v !== 0))
     .sort(([a], [b]) => a[0] - b[0] || a[1] - b[1]);
   return entries.map(([[r, c], m]) => el('Well', [['Row', String(r)], ['Col', String(c)]],
-    [...m.entries()].filter(([, v]) => v !== 0).sort((a, b) => a[0] - b[0])
+    // Fluids inside a well keep the order in which they were applied (not sorted by ID):
+    // t07-synergy3.tdd lists A, B, C = IDs 0, 2, 1. Map insertion order preserves that.
+    [...m.entries()].filter(([, v]) => v !== 0)
       .map(([id, v]) => el('Fluid', [['ID', String(id)]], formatNumber(v)))));
 }
 
