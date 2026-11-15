@@ -61,3 +61,11 @@ test('a diluted fluid created by the app is written like D300e Control writes it
   const block = (txt) => txt.split('<Fluids>')[1].split('</Fluids>')[0];
   assert.equal(block(writeTdd(mine)), block(t01));
 });
+
+test('new plates default to Deionize=True; empty names are written <Name />', async () => {
+  const { newPlate, addFluid } = await import('../src/ops.js');
+  const p = newProtocol(); p.plates.push(newPlate()); addFluid(p, { name: '' });
+  const out = writeTdd(p);
+  assert.match(out, /<Deionize>True<\/Deionize>/);
+  assert.ok(!out.includes('<Name></Name>'));
+});

@@ -35,6 +35,9 @@ export function escapeAttr(s) {
  *  {type:'comment', text}
  */
 export function el(name, attrs = [], childrenOrText = []) {
+  // A new element with empty text is written `<X />`, as .NET XmlWriter does (e.g. an empty <Name />).
+  // (Parsed nodes keep their original form, so `<X></X>` read from a file still round-trips.)
+  if (childrenOrText === '') return { type: 'element', name, attrs, children: [] };
   if (typeof childrenOrText === 'string') return { type: 'element', name, attrs, text: childrenOrText };
   return { type: 'element', name, attrs, children: childrenOrText };
 }

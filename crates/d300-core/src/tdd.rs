@@ -655,6 +655,11 @@ fn num_text(val: Option<f64>, orig: Option<&str>) -> Result<String> {
 }
 
 fn leaf(name: &str, text: impl Into<String>) -> Node {
+    // A new element with empty text is written `<X />`, as .NET XmlWriter does (e.g. an empty <Name />).
+    let text = text.into();
+    if text.is_empty() {
+        return Element::empty(name).into();
+    }
     Node::Element(Element::leaf(name, vec![], text))
 }
 fn opt_leaf(name: &str, text: Option<&String>) -> Node {

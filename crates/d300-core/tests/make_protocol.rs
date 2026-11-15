@@ -114,9 +114,12 @@ fn build() -> String {
 #[test]
 fn rust_built_protocol_equals_the_d300e_round_trip_fixture() {
     let mine = build();
-    let fixture = std::fs::read(reference_dir().join("roundtrip").join("mac-made-1.tdd")).unwrap();
+    let fixture = std::fs::read_to_string(reference_dir().join("roundtrip").join("mac-made-1.tdd")).unwrap();
+    // The fixture was written before the newPlate Deionize default was fixed (it has Deionize=False on
+    // both plates; D300e Control accepted it). The only intended difference is that default.
+    let expected = fixture.replace("<Deionize>False</Deionize>", "<Deionize>True</Deionize>");
     assert!(
-        mine.as_bytes() == fixture.as_slice(),
+        mine == expected,
         "differs from mac-made-1.tdd"
     );
 }

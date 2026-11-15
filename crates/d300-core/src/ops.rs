@@ -97,11 +97,7 @@ pub fn new_plate(template: &PlateTemplate) -> Result<Plate> {
         assay_volume: template.assay_volume.unwrap_or(50000.0),
         dmso_limit: Some(template.dmso_limit.unwrap_or(0.01)),
         dont_shake: template.dont_shake.unwrap_or(true), // new 384-well plates default to DontShake=True (T01)
-        // MIRRORS A JS BUG (src/ops.js newPlate): `deionize: template.deionize ?? true,` sits inside the
-        // `//` comment of the line above, so JS new plates have deionize undefined, written
-        // <Deionize>False</Deionize>, although D300e Control's default is True (docs/format_notes.md).
-        // template.deionize is ignored for the same reason. Change both together once the JS is fixed.
-        deionize: false,
+        deionize: template.deionize.unwrap_or(true), // new plates default to Deionize=True (T01)
         prompt_plate_load: template.prompt_plate_load.unwrap_or(true),
         ..Plate::default()
     })

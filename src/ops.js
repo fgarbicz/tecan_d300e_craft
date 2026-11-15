@@ -18,7 +18,7 @@ export function newPlate(template = {}) {
   return {
     plateType: type, rows: dims.rows, cols: dims.cols, name: template.name || '',
     assayVolume: template.assayVolume ?? 50000, dmsoLimit: template.dmsoLimit ?? 0.01,
-    dontShake: template.dontShake ?? true, // new 384-well plates default to DontShake=True (T01) deionize: template.deionize ?? true,
+    dontShake: template.dontShake ?? true, deionize: template.deionize ?? true, // new plates: DontShake=True, Deionize=True (T01)
     promptPlateLoad: template.promptPlateLoad ?? true, wells: new Map(), randomization: [],
   };
 }
