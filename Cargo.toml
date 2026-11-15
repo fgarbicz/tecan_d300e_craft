@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/d300-core"]
+resolver = "2"

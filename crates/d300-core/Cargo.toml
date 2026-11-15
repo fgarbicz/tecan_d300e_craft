@@ -1,0 +1,16 @@
+[package]
+name = "d300-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+publish = false
+description = "Protocol engine for the Tecan D300e designer: .tdd read/write, dispense volumes, design operations (Rust port of src/*.js)"
+
+[dependencies]
+indexmap = { version = "2.13", features = ["serde"] }
+serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+# float_roundtrip: parse JSON numbers from node exactly (the default parser can be 1 ulp off).
+serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
+quick-xml = "0.41"
