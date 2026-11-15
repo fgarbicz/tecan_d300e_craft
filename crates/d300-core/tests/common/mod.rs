@@ -152,8 +152,15 @@ pub fn engine_dump(p: &Protocol) -> Vec<DumpRow> {
 /// Run node with `args` in the repo root. Ok(None) only when node is not installed (spawn NotFound);
 /// a non-zero exit is a test failure.
 pub fn run_node(args: &[&str], stdin: Option<&str>) -> Option<String> {
+    run_node_env(args, stdin, &[])
+}
+
+/// As run_node, with environment variables set on the child only (tests run in parallel, so the
+/// process environment must not be used to pass data).
+pub fn run_node_env(args: &[&str], stdin: Option<&str>, env: &[(&str, String)]) -> Option<String> {
     use std::io::Write;
     let mut cmd = Command::new("node");
+    cmd.envs(env.iter().map(|(k, v)| (*k, v.as_str())));
     cmd.args(args)
         .current_dir(repo_root())
         .stdout(std::process::Stdio::piped())
@@ -164,7 +171,11 @@ pub fn run_node(args: &[&str], stdin: Option<&str>) -> Option<String> {
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            eprintln!("SKIPPED: `node` is not installed, so the differential test against the JS engine cannot run");
+            // written to stderr directly: eprintln! output is captured for passing tests
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED: `node` is not installed, so the differential test against the JS engine cannot run"
+            );
             return None;
         }
         Err(e) => panic!("spawn node: {e}"),
@@ -183,8 +194,8 @@ pub fn run_node(args: &[&str], stdin: Option<&str>) -> Option<String> {
 }
 
 /// Evaluate an ES-module script with node (imports like './src/tdd.js' resolve from the repo root).
-pub fn node_eval(script: &str) -> Option<String> {
-    run_node(&["--input-type=module", "-"], Some(script))
+pub fn node_eval(script: &str, env: &[(&str, String)]) -> Option<String> {
+    run_node_env(&["--input-type=module", "-"], Some(script), env)
 }
 
 /// JSON number (or null for a non-finite JS value) as f64.

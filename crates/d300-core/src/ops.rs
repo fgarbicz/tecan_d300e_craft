@@ -726,19 +726,24 @@ pub struct SynergyFluid {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SynergySpec {
+    /// 'ABC' | 'AxEach'
     #[serde(rename = "type")]
     pub kind: SynergyType,
+    /// ABC: fluids[0] down rows, fluids[1] across columns, fluids[2..] combinations;
+    /// AxEach: fluids[0] primary (rows), each of fluids[1..] crossed separately (columns)
     pub fluids: Vec<SynergyFluid>,
     /// template plate fields (plateType, assayVolume, dmsoLimit)
     pub plate: PlateTemplate,
     pub excluded_rows: BTreeSet<u32>,
     pub excluded_cols: BTreeSet<u32>,
+    /// 'single' | 'multiple' | 'multipleBreaks' | 'noEmpty'
     pub layout: SynergyLayout,
     /// None behaves as in the JS when gridOrder is undefined: column-first slots for 'noEmpty',
     /// row-first grid packing otherwise.
     pub grid_order: Option<Direction>,
 }
 
+/// each grid: {rowFluid, rowVals, colFluid, colVals, extras: [[id,val],...]}
 struct Grid {
     row_fluid: i64,
     row_vals: Vec<f64>,
@@ -1000,7 +1005,9 @@ pub struct QuickPlateSpec {
     pub order: AxisOrder,
     pub layout: Direction,
     pub keep_replicates_together: bool,
+    /// 'none' | 'level' (keep together) | 'singlicate' (not together) | 'well'
     pub interleave: Interleave,
+    /// 'continuous' | 'newLine': example-layout options 1 and 3 (confirmed, T08)
     pub start: QuickStart,
     pub plate: PlateTemplate,
     pub excluded_rows: BTreeSet<u32>,

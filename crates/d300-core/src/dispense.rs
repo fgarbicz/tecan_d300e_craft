@@ -77,8 +77,9 @@ fn unit_factor(u: &str) -> f64 {
         .unwrap_or(f64::NAN)
 }
 
-/// CONFIRMED (T01, docs/format_notes.md): <Concentration> is stored in the protocol base unit
+/// UNVERIFIED (docs/format_notes.md): <Concentration> is stored in the protocol base unit
 /// (µM / ng/mL) and <ConcentrationUnit> is only the display unit. NaN when the fluid has none.
+/// (Status copied from the JS comment; docs/format_notes.md has since recorded this as CONFIRMED by T01.)
 pub fn stock_in_base(fluid: &Fluid) -> f64 {
     fluid.concentration.unwrap_or(f64::NAN)
 }
@@ -217,6 +218,7 @@ pub fn round_volume(v: f64, cls: &FluidClass) -> Rounded {
     let mut lower = 0.0;
     for &(upper, inc) in cls.bands {
         if v <= upper || upper == f64::INFINITY {
+            // Nearest multiple of the band's increment (UNVERIFIED: tie and band-edge handling).
             // Nearest multiple, ties to even (.NET Math.Round default). Confirmed on the D3 run report:
             // 1.01 nL → 1.00 nL (50.5 × 20 pL → 50). (was: Math.round, ties up)
             let mut r = round_half_even(v / inc) * inc;

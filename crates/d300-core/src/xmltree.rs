@@ -83,6 +83,8 @@ impl Element {
             Content::Children { .. } => None,
         }
     }
+    // Helpers for working with the generic tree.
+
     /// `child(n, name)`: first child element with that name.
     pub fn child(&self, name: &str) -> Option<&Element> {
         self.children().iter().find_map(|c| match c {
@@ -306,7 +308,7 @@ pub fn parse_xml(src: &str) -> Result<XmlDoc> {
             }
             let mut el = open.el;
             if open.children.is_empty() {
-                // <Tag>text</Tag>, and <Tag></Tag> / whitespace-only content kept as text so it round-trips.
+                // <Tag>text</Tag>; and <Tag></Tag> with only whitespace: keep as text so we round-trip it.
                 el.content = Content::Text {
                     text: decode_entities(between)?,
                 };

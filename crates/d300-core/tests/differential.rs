@@ -18,6 +18,7 @@ use d300_core::jsnum::{
 use d300_core::ops::*;
 use d300_core::tdd::format_number;
 use serde_json::{json, Value};
+use std::io::Write;
 
 fn bits(x: f64) -> Value {
     Value::String(format!("{:x}", x.to_bits()))
@@ -37,9 +38,10 @@ const NB = (x) => { __u[0] = BigInt('0x' + x); return __f[0]; };
 const files = JSON.parse(process.env.D300_FILES || '[]');
 "#;
 
-fn node_script(body: &str, files: &[String]) -> Option<Value> {
-    std::env::set_var("D300_FILES", serde_json::to_string(files).unwrap());
-    let out = node_eval(&format!("{JS_BITS}\n{body}"))?;
+fn node_script(body: &str, files: &[String], extra_env: &[(&str, String)]) -> Option<Value> {
+    let mut env = vec![("D300_FILES", serde_json::to_string(files).unwrap())];
+    env.extend(extra_env.iter().cloned());
+    let out = node_eval(&format!("{JS_BITS}\n{body}"), &env)?;
     Some(serde_json::from_str(&out).expect("node output is JSON"))
 }
 
@@ -140,7 +142,7 @@ const out = files.map((f) => computeProtocol(parseTdd(readFileSync('fixtures/ref
     CV(r.classVolumes), CV(r.exactClassVolumes)])));
 process.stdout.write(JSON.stringify(out));
 "#;
-    let Some(js_out) = node_script(js, &files) else {
+    let Some(js_out) = node_script(js, &files, &[]) else {
         return;
     };
     let warn = |w: &Warning| -> Value {
@@ -261,9 +263,13 @@ const rows = xs.map((x, i) => {
 const strs = ['', ' ', '  1E-05 \n', '0x10', '0X1f', '0o17', '0b101', '-0x10', '0x', '5.', '.5', '5.e3', '.', '+.5', '-.5e-3', '1e', '1e+',
   'inf', 'nan', 'Infinity', '-Infinity', '+Infinity', 'infinity', '1_0', '12abc', ' 12 ', '﻿7', '\u00857', '1e400', '-0',
   '0x1fffffffffffff1', '0.1', '33.33333333333', '1E-05', '000123', '1.2.3', '--1', '+-1', '0b', '0o8', '9007199254740993'];
-process.stdout.write(JSON.stringify({ rows, nums: strs.map((t) => [t, B(Number(t))]) }));
+const up = (x) => { __f[0] = x; __u[0] += 1n; return __f[0]; }, down = (x) => { __f[0] = x; __u[0] -= 1n; return __f[0]; };
+const p10 = []; for (let k = -15; k <= 15; k++) { const x = Number(`1e${k}`); p10.push(x, up(x), down(x), up(up(x)), down(down(x))); }
+const floors = p10.map((x) => [B(x), B(Math.floor(Math.log10(x)))]);
+const logs = xs.filter((x) => x > 0).map((x) => [B(x), B(Math.log10(x))]);
+process.stdout.write(JSON.stringify({ rows, nums: strs.map((t) => [t, B(Number(t))]), floors, logs }));
 "#;
-    let Some(out) = node_script(js, &[]) else {
+    let Some(out) = node_script(js, &[], &[]) else {
         return;
     };
     let rows = out["rows"].as_array().unwrap();
@@ -287,6 +293,18 @@ process.stdout.write(JSON.stringify({ rows, nums: strs.map((t) => [t, B(Number(t
         ]);
         assert_same(&mine, r, &format!("value {x:e} (#{i})"));
     }
+    // floor(log10(x)) is what scrap_well_values uses: exact agreement at and next to powers of ten
+    for f in out["floors"].as_array().unwrap() {
+        let x = from_bits(&f[0]);
+        assert_eq!(bits(x.log10().floor()), f[1], "floor(log10({x:e}))");
+    }
+    // raw log10 is NOT bit-identical (system log10 vs V8's); informational count only
+    let logs = out["logs"].as_array().unwrap();
+    let diff = logs
+        .iter()
+        .filter(|l| bits(from_bits(&l[0]).log10()) != l[1])
+        .count();
+    let _ = writeln!(std::io::stderr(), "log10: {diff} of {} values differ from V8 in the last bit (not used except via floor/round)", logs.len());
     for n in out["nums"].as_array().unwrap() {
         let t = n[0].as_str().unwrap();
         assert_eq!(bits(to_number(t)), n[1], "Number({t:?})");
@@ -342,8 +360,32 @@ fn titration_cases() -> Vec<TitrationOptions> {
 fn d_design_operations_are_identical() {
     let cases = titration_cases();
     let files = file_list();
-    std::env::set_var("D300_TITRATIONS", serde_json::to_string(&cases).unwrap());
     let mut targeted = vec![];
+    // target at the geometric mean of high and low with an odd number of tail levels: the split
+    // rest·spanHi/(spanHi+spanLo) is k + 0.5 up to rounding, so Math.round depends on log10's last bits
+    for (high, low, target) in [
+        (10.0, 0.001, 0.1),
+        (100.0, 0.01, 1.0),
+        (1.0, 0.0001, 0.01),
+        (1000.0, 0.1, 10.0),
+        (20.0, 0.002, 0.2),
+        (50.0, 0.005, 0.5),
+    ] {
+        for levels in [7usize, 9, 11, 13, 15, 17, 21] {
+            for region in [2usize, 4, 6] {
+                for range in [0.25, 0.5, 0.1, 1.0 / 3.0] {
+                    targeted.push(TargetedOptions {
+                        high,
+                        low,
+                        levels,
+                        target,
+                        region,
+                        range,
+                    });
+                }
+            }
+        }
+    }
     for (high, low) in [(10.0, 0.003), (100.0, 0.001), (50.0, 0.5), (1.0, 0.9)] {
         for levels in [3usize, 4, 8, 12, 16, 24] {
             for target in [0.5, 1.0, 0.01, 7.0] {
@@ -362,7 +404,6 @@ fn d_design_operations_are_identical() {
             }
         }
     }
-    std::env::set_var("D300_TARGETED", serde_json::to_string(&targeted).unwrap());
     let js = r#"
 const { readFileSync } = await import('node:fs');
 const { parseTdd } = await import('./src/tdd.js');
@@ -377,6 +418,8 @@ const { targetedLevels } = await import('./src/ops.js');
 const targeted = JSON.parse(process.env.D300_TARGETED).map((o) => tryLv(() => targetedLevels(o)));
 const scrap = files.map((f) => { const p = parseTdd(readFileSync('fixtures/reference/' + f, 'utf8'));
   return p.plates.map((pl) => scrapWellValues(p.fluids, pl).map(([id, v]) => [id, B(v)])); });
+const scrap10 = [1, 10, 100, 1000, 10000, 100000, 3, 30].flatMap((S) => [[29970, 1], [29940, 2], [50000, 1]].map(([A, n]) =>
+  scrapWellValues(Array.from({ length: n }, (_, id) => ({ id, byVol: false, concentration: S, classId: 0 })), { assayVolume: A }).map(([id, v]) => [id, B(v)])));
 const tsv = files.map((f) => { const p = parseTdd(readFileSync('fixtures/reference/' + f, 'utf8'));
   return p.plates.flatMap((pl) => p.fluids.map((fl) => plateToTsv(pl, fl))); });
 const lv = synergyLevels({ mode: 'highLow', high: 50, low: 0.05, levels: 6, distribution: 'log', includeZero: true });
@@ -385,9 +428,13 @@ const syns = ['single', 'multiple', 'multipleBreaks', 'noEmpty'].flatMap((layout
     fluids: [{ fluidId: 0, levels: lv, includeZero: true }, { fluidId: 1, levels: lv.slice(0, 3), includeZero: false, order: 'lowFirst' },
       { fluidId: 2, levels: [3, 2, 1], includeZero: true }] })
   .map((p) => [p.name, [...p.wells].map(([k, m]) => [k, [...m].map(([id, v]) => [id, B(v)])])])));
-process.stdout.write(JSON.stringify({ titr, syn, targeted, scrap, tsv, syns }));
+process.stdout.write(JSON.stringify({ titr, syn, targeted, scrap, scrap10, tsv, syns }));
 "#;
-    let Some(out) = node_script(js, &files) else {
+    let env = [
+        ("D300_TITRATIONS", serde_json::to_string(&cases).unwrap()),
+        ("D300_TARGETED", serde_json::to_string(&targeted).unwrap()),
+    ];
+    let Some(out) = node_script(js, &files, &env) else {
         return;
     };
     let lvls = |r: d300_core::Result<Vec<f64>>| match r {
@@ -425,6 +472,33 @@ process.stdout.write(JSON.stringify({ titr, syn, targeted, scrap, tsv, syns }));
         })
         .collect();
     assert_same(&Value::Array(scrap), &out["scrap"], "scrapWellValues");
+    // exact = S·30/(A + 30n) lands on powers of ten (0.001 … 100): the floor(log10) boundary
+    let mut scrap10 = vec![];
+    for s in [1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 3.0, 30.0] {
+        for (a, n) in [(29970.0, 1), (29940.0, 2), (50000.0, 1)] {
+            let fl: Vec<d300_core::tdd::Fluid> = (0..n)
+                .map(|id| d300_core::tdd::Fluid {
+                    id,
+                    concentration: Some(s),
+                    class_id: Some(0),
+                    ..Default::default()
+                })
+                .collect();
+            let pl = d300_core::tdd::Plate {
+                assay_volume: a,
+                ..Default::default()
+            };
+            scrap10.push(json!(scrap_well_values(&fl, &pl, PRIMING_VOLUME)
+                .into_iter()
+                .map(|(id, v)| json!([id, bits(v)]))
+                .collect::<Vec<_>>()));
+        }
+    }
+    assert_same(
+        &Value::Array(scrap10),
+        &out["scrap10"],
+        "scrapWellValues at powers of ten",
+    );
     let tsv: Vec<Value> = protos
         .iter()
         .map(|p| {

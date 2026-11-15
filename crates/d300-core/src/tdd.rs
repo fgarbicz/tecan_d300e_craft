@@ -389,10 +389,12 @@ pub struct Revision {
 pub struct Protocol {
     #[serde(rename = "_doc")]
     pub doc: Option<DocInfo>,
+    /// non-<Plate> children of <Plates> (e.g. <Mode> in version 2), with their position
     #[serde(rename = "_platesExtra")]
     pub plates_extra: Vec<PlatesExtra>,
     #[serde(rename = "_platesText", skip_serializing_if = "Option::is_none")]
     pub plates_text: Option<String>,
+    /// ordered list of {kind, name, node?} describing Protocol children
     #[serde(rename = "_layout")]
     pub layout: Vec<LayoutItem>,
     pub settings: IndexMap<String, String>,
