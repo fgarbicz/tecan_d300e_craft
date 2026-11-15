@@ -19,7 +19,7 @@ export function newPlate(template = {}) {
     plateType: type, rows: dims.rows, cols: dims.cols, name: template.name || '',
     assayVolume: template.assayVolume ?? 50000, dmsoLimit: template.dmsoLimit ?? 0.01,
     dontShake: template.dontShake ?? true, // new 384-well plates default to DontShake=True (T01) deionize: template.deionize ?? true,
-    promptPlateLoad: template.promptPlateLoad ?? true, wells: new Map(), randomize: null,
+    promptPlateLoad: template.promptPlateLoad ?? true, wells: new Map(), randomization: [],
   };
 }
 
@@ -282,6 +282,25 @@ export function synergyLevels({ levels, includeZero, ...titration }) {
   return titrationLevels({ ...titration, levels: n });
 }
 
+// ---------- randomization (§3.8; storage confirmed with T09) ----------
+/** Randomize wells on a plate. "Randomization is a per plate feature"; adding wells re-randomizes them
+ *  together with the plate's existing randomized wells as one group. rng() returns [0,1). */
+export function randomizeWells(plate, cells, rng = Math.random) {
+  const keys = new Map((plate.randomization || []).map((m) => [`${m.r},${m.c}`, [m.r, m.c]]));
+  for (const [r, c] of cells) keys.set(`${r},${c}`, [r, c]);
+  const from = [...keys.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const to = from.map((x) => x.slice());
+  for (let i = to.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [to[i], to[j]] = [to[j], to[i]]; } // Fisher-Yates
+  plate.randomization = from.map(([r, c], i) => ({ r, c, toR: to[i][0], toC: to[i][1] }));
+  return plate.randomization;
+}
+export function removeRandomization(plate) { plate.randomization = []; }
+/** Dispensed (randomized) position of a design well. */
+export function dispensedWell(plate, r, c) {
+  const m = (plate.randomization || []).find((x) => x.r === r && x.c === c);
+  return m ? [m.toR, m.toC] : [r, c];
+}
+
 // ---------- normalization (§3.7 / §5) ----------
 // XML type names confirmed with fixtures/reference/t05-normalize.tdd.
 export const NORMALIZE_TYPES = {
@@ -319,7 +338,7 @@ export function removePlate(protocol, index) {
 
 export function replicatePlate(protocol, index) {
   const src = protocol.plates[index];
-  const copy = { ...src, wells: new Map([...src.wells].map(([k, m]) => [k, new Map(m)])), _order: src._order && [...src._order] };
+  const copy = { ...src, wells: new Map([...src.wells].map(([k, m]) => [k, new Map(m)])), _order: src._order && [...src._order], randomization: (src.randomization || []).map((m) => ({ ...m })) }; // guide: includes randomization
   protocol.plates.push(copy);
   const ni = protocol.plates.length - 1;
   for (const b of protocol.backfills) {

@@ -102,3 +102,23 @@ test('titration patterns reproduce D300e Control (T04)', async () => {
   assert.deepEqual([[0, 2], [0, 1], [0, 0], [1, 2], [1, 1], [1, 0]].map(([r, c]) => q.wells.get(`${r},${c}`).get(0)), [6, 5, 4, 3, 2, 1]);
   assert.equal(Object.keys(TITRATION_PATTERNS).length, 8);
 });
+
+test('randomization: T09 storage round-trips; randomizing makes a permutation and merges groups', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd, writeTdd } = await import('../src/tdd.js');
+  const { randomizeWells, dispensedWell } = await import('../src/ops.js');
+  const txt = readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't09-randomize.tdd'), 'utf8');
+  const p = parseTdd(txt);
+  assert.equal(p.plates[0].randomization.length, 24);
+  assert.deepEqual(dispensedWell(p.plates[0], 1, 0), [1, 12]);
+  // rewriting from the semantic list (not the raw node) gives the same bytes
+  delete p.plates[0]._randomizeRaw;
+  assert.equal(writeTdd(p), txt);
+  const q = newPlate();
+  let seed = 1; const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  randomizeWells(q, [[0, 0], [0, 1], [0, 2]], rng);
+  randomizeWells(q, [[1, 0]], rng);
+  const from = q.randomization.map((m) => `${m.r},${m.c}`).sort(), to = q.randomization.map((m) => `${m.toR},${m.toC}`).sort();
+  assert.deepEqual(from, ['0,0', '0,1', '0,2', '1,0']); assert.deepEqual(to, from);
+});

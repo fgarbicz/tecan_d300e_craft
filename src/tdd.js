@@ -131,7 +131,7 @@ function parseFluid(n) {
 }
 
 function parsePlate(n) {
-  const p = { _order: [], _extra: {}, wells: new Map(), randomize: null };
+  const p = { _order: [], _extra: {}, wells: new Map(), randomization: [] };
   for (const c of n.children) {
     if (c.type !== 'element') continue;
     p._order.push(c.name);
@@ -155,7 +155,12 @@ function parsePlate(n) {
           p.wells.set(wellKey(r, col), m);
         }
         break;
-      case 'Randomize': p.randomize = c; break; // UNVERIFIED: only the empty form has been seen
+      case 'Randomize':
+        // Confirmed (fixtures/reference/t09-randomize.tdd): <Well R C ToR ToC/> maps each design well to the
+        // well it is dispensed into; well contents stay at their design (non-random) positions.
+        p.randomization = childrenNamed(c, 'Well').map((w) => ({ r: Number(attr(w, 'R')), c: Number(attr(w, 'C')), toR: Number(attr(w, 'ToR')), toC: Number(attr(w, 'ToC')) }));
+        p._randomizeRaw = c; p._randomizeJson = JSON.stringify(p.randomization);
+        break;
       default: p._extra[c.name] = c;
     }
   }
@@ -270,7 +275,13 @@ function writePlate(p) {
         kids.push(!ws.length && p._wellsText !== undefined ? el('Wells', [], p._wellsText) : el('Wells', [], ws));
         break;
       }
-      case 'Randomize': kids.push(p.randomize || el('Randomize')); break;
+      case 'Randomize': {
+        const list = p.randomization || [];
+        if (p._randomizeRaw && JSON.stringify(list) === p._randomizeJson) { kids.push(p._randomizeRaw); break; }
+        kids.push(el('Randomize', [], [...list].sort((a, b) => a.r - b.r || a.c - b.c)
+          .map((m) => el('Well', [['R', String(m.r)], ['C', String(m.c)], ['ToR', String(m.toR)], ['ToC', String(m.toC)]]))));
+        break;
+      }
       default: if (p._extra && p._extra[k]) kids.push(p._extra[k]);
     }
   }
