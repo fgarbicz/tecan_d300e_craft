@@ -122,3 +122,40 @@ test('randomization: T09 storage round-trips; randomizing makes a permutation an
   const from = q.randomization.map((m) => `${m.r},${m.c}`).sort(), to = q.randomization.map((m) => `${m.toR},${m.toC}`).sort();
   assert.deepEqual(from, ['0,0', '0,1', '0,2', '1,0']); assert.deepEqual(to, from);
 });
+
+test('Quick Plate reproduces D300e Control (T08) and the guide examples', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd } = await import('../src/tdd.js');
+  const { buildQuickPlate } = await import('../src/ops.js');
+  const ref = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't08-quickplate.tdd'), 'utf8')).plates;
+  const levels = titrationLevels({ mode: 'highLow', high: 10, low: 0.003, levels: 8, distribution: 'log' });
+  const base = { fluids: [0], levels, replicates: 2, layout: 'rows', keepReplicatesTogether: false, plate: { plateType: 'Default384' } };
+  for (const [start, refPlate] of [['continuous', ref[1]], ['newLine', ref[2]]]) {
+    const [mine] = buildQuickPlate({ ...base, start });
+    assert.equal(mine.name, 'Quick Plate');
+    assert.deepEqual([...mine.wells.keys()].sort(), [...refPlate.wells.keys()].sort(), start);
+    for (const [k, m] of refPlate.wells) close(mine.wells.get(k).get(0), m.get(0), 1e-12, `${start} ${k}`);
+  }
+  // Guide example 1 (p.58-59): 96-well, 4 fluids, 8 levels, 3 replicates, by columns, not together, no interleave
+  const g1 = buildQuickPlate({ fluids: [0, 1, 2, 3], levels: [8, 7, 6, 5, 4, 3, 2, 1], replicates: 3, layout: 'cols',
+    keepReplicatesTogether: false, interleave: 'none', start: 'continuous', plate: { plateType: 'Default96' } });
+  assert.equal(g1.length, 1);
+  for (let f = 0; f < 4; f++) for (let k = 0; k < 3; k++) for (let r = 0; r < 8; r++)
+    assert.equal(g1[0].wells.get(`${r},${f * 3 + k}`).get(f), 8 - r, `ex1 fluid ${f} col ${f * 3 + k} row ${r}`);
+  // Guide example 2 (p.60-61): 3 x 96-well with perimeter excluded, 6 fluids, 10 levels, 3 replicates,
+  // by rows, not together, change fluid after each singlicate -> replicate k on plate k, rows B-G = fluids
+  const ten = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+  const g2 = buildQuickPlate({ fluids: [0, 1, 2, 3, 4, 5], levels: ten, replicates: 3, layout: 'rows', keepReplicatesTogether: false,
+    interleave: 'singlicate', start: 'continuous', plate: { plateType: 'Default96' }, excludedRows: new Set([0, 7]), excludedCols: new Set([0, 11]) });
+  assert.equal(g2.length, 3);
+  for (const pl of g2) for (let f = 0; f < 6; f++) for (let c = 1; c <= 10; c++) assert.equal(pl.wells.get(`${f + 1},${c}`).get(f), 11 - c);
+  // Guide example 3 (p.62-63): 384, cols 1-2 excluded, 16 fluids, 10 levels, 2 replicates, by columns, keep
+  // replicates together, change fluid after each level replicate -> col 3 = level 1 of fluids 1-8, col 4 = fluids 9-16 ...
+  const g3 = buildQuickPlate({ fluids: [...Array(16).keys()], levels: ten, replicates: 2, layout: 'cols', keepReplicatesTogether: true,
+    interleave: 'level', start: 'newLine', plate: { plateType: 'Default384' }, excludedCols: new Set([0, 1]) });
+  assert.equal(g3.length, 1);
+  assert.equal(g3[0].wells.get('0,2').get(0), 10); assert.equal(g3[0].wells.get('1,2').get(0), 10); assert.equal(g3[0].wells.get('2,2').get(1), 10);
+  assert.equal(g3[0].wells.get('0,3').get(8), 10); assert.equal(g3[0].wells.get('0,4').get(0), 9);
+  assert.equal(g3[0].wells.get('15,21').get(15), 1); assert.equal(g3[0].wells.has('0,22'), false);
+});

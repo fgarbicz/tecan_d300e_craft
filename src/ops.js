@@ -282,6 +282,55 @@ export function synergyLevels({ levels, includeZero, ...titration }) {
   return titrationLevels({ ...titration, levels: n });
 }
 
+// ---------- Quick Plate (§4.2) ----------
+/**
+ * Build Quick Plate plates: the same titration for several fluids.
+ * spec: { fluids: [id...], levels: [high→low], replicates, order: 'highFirst'|'lowFirst',
+ *         layout: 'rows'|'cols', keepReplicatesTogether: bool,
+ *         interleave: 'none' | 'level' (keep together) | 'singlicate' (not together) | 'well',
+ *         start: 'continuous' | 'newLine',   // example-layout options 1 and 3 (confirmed, T08)
+ *         plate: {...}, excludedRows: Set, excludedCols: Set }
+ * Confirmed with fixtures/reference/t08-quickplate.tdd (1 fluid, by rows, replicates not together:
+ * option 1 = series end to end along the row, option 3 = each series on a new row; plates named
+ * "Quick Plate"). Interleave modes follow the guide text and its three worked examples (tests).
+ */
+export function buildQuickPlate(spec) {
+  const F = spec.fluids, R = spec.replicates || 1;
+  const L = spec.order === 'lowFirst' ? [...spec.levels].reverse() : spec.levels;
+  const n = L.length;
+  const items = []; // {f, l, unit} in placement order; a new unit may start a new line
+  const push = (f, l, unit) => items.push({ f, l, unit });
+  const inter = spec.interleave || 'none';
+  if (!spec.keepReplicatesTogether) {
+    if (inter === 'singlicate') { for (let r = 0; r < R; r++) for (const f of F) for (let l = 0; l < n; l++) push(f, l, `${r}:${f}`); }
+    else if (inter === 'well') { for (let r = 0; r < R; r++) for (let l = 0; l < n; l++) for (const f of F) push(f, l, `${r}:${l}`); }
+    else { for (const f of F) for (let r = 0; r < R; r++) for (let l = 0; l < n; l++) push(f, l, `${f}:${r}`); }
+  } else {
+    if (inter === 'level') { for (let l = 0; l < n; l++) for (const f of F) for (let r = 0; r < R; r++) push(f, l, `${l}`); }
+    else if (inter === 'well') { for (let l = 0; l < n; l++) for (let r = 0; r < R; r++) for (const f of F) push(f, l, `${l}:${r}`); }
+    else { for (const f of F) for (let l = 0; l < n; l++) for (let r = 0; r < R; r++) push(f, l, `${f}`); }
+  }
+  const tmpl = newPlate(spec.plate);
+  const rows = range(tmpl.rows).filter((r) => !spec.excludedRows?.has(r));
+  const cols = range(tmpl.cols).filter((c) => !spec.excludedCols?.has(c));
+  const byRows = spec.layout !== 'cols';
+  const lineLen = byRows ? cols.length : rows.length, nLines = byRows ? rows.length : cols.length;
+  if (!lineLen || !nLines) throw new Error('No wells available on the plate');
+  const plates = [];
+  let plate = null, line = 0, pos = 0, lastUnit = null;
+  const fresh = () => { plate = newPlate({ name: 'Quick Plate', ...spec.plate }); plates.push(plate); line = 0; pos = 0; };
+  fresh();
+  for (const it of items) {
+    if (spec.start === 'newLine' && lastUnit !== null && it.unit !== lastUnit && pos > 0) { line++; pos = 0; }
+    if (pos === lineLen) { line++; pos = 0; }
+    if (line === nLines) fresh();
+    const [r, c] = byRows ? [rows[line], cols[pos]] : [rows[pos], cols[line]];
+    setWell(plate, r, c, it.f, L[it.l]);
+    pos++; lastUnit = it.unit;
+  }
+  return plates;
+}
+
 // ---------- randomization (§3.8; storage confirmed with T09) ----------
 /** Randomize wells on a plate. "Randomization is a per plate feature"; adding wells re-randomizes them
  *  together with the plate's existing randomized wells as one group. rng() returns [0,1). */
