@@ -42,3 +42,11 @@ Tecan's example protocols (`fixtures/reference/tecan_examples/`, from OneDrive D
 - Guide Appendix F p.113: each plate should have a well with ≥ 30 nL of every fluid it uses (a shared
   "scrap" well is fine). The reference D3 file does this (A23 Bortezomib 0.6 µM, A24 MEN 6 µM = 30 nL each).
   App: Check tab → Priming → "Add scrap well".
+
+## Reverse direction confirmed (2026-11-15)
+`tools/roundtrip/make_protocol.mjs` built a protocol from scratch (3 fluids incl. a 1:100 diluted fluid,
+titration, set values, scrap well, synergy plate, ToMaxVolume + ToAssayVolumePct normalization, no
+thumbnail). D300e Control 4.0.1 opened it without any message, showed all content, and Save As produced
+a file byte-identical to ours except `<Revisions>` (it appends its own) and `<Thumbnail>` (it adds one).
+Normalization total shown in D300e: 11.3 µL; engine: 11.285 µL. Files: `fixtures/reference/roundtrip/`.
+Note: D300e's revision list included a revision from the previously open document (its own quirk).
