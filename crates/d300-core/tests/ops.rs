@@ -457,13 +457,10 @@ fn quick_plate_reproduces_d300e_control_t08_and_the_guide_examples() {
 }
 
 #[test]
-fn new_plate_mirrors_the_js_deionize_defect() {
-    // src/ops.js:21 — `deionize: template.deionize ?? true` is inside a // comment (reported, not fixed).
-    let p = new_plate(&PlateTemplate {
-        deionize: Some(true),
-        ..Default::default()
-    })
-    .unwrap();
+fn new_plate_defaults_deionize_true_and_honours_the_template() {
+    // New plates in D300e Control 4.0.1 have Deionize=True (T01). (Previously mirrored a JS defect.)
+    assert!(new_plate(&PlateTemplate::default()).unwrap().deionize);
+    let p = new_plate(&PlateTemplate { deionize: Some(false), ..Default::default() }).unwrap();
     assert!(!p.deionize);
 }
 
