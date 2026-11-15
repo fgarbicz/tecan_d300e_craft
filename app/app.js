@@ -48,8 +48,17 @@ const fmt = (x, d = 4) => (x == null || Number.isNaN(x) ? '–' : Math.abs(x) >=
 const stockDisplay = (f) => (f.byVol ? '' : `${fmt(toDisplay(f.concentration, f.concentrationUnit), 5)} ${unitLabel(f.concentrationUnit)}`);
 
 // ---------------- file I/O ----------------
+// Inside the desktop app (Tauri) files go through the Rust engine: native dialogs, and every save is
+// cross-checked by d300-core before anything is written. In a browser the web file APIs are used.
+const TAURI = window.__TAURI__?.core;
+const invoke = (cmd, args) => TAURI.invoke(cmd, args);
 async function openFile() {
   if (S.dirty && !confirm('Discard unsaved changes?')) return;
+  if (TAURI) {
+    try { const r = await invoke('open_tdd'); if (r) { loadText(r.text, r.name, null); S.diskPath = r.path; } }
+    catch (e) { toast(String(e), 8000); }
+    return;
+  }
   if (window.showOpenFilePicker) {
     try {
       const [h] = await window.showOpenFilePicker({ types: [{ description: 'D300e protocol', accept: { 'application/xml': ['.tdd'] } }] });
@@ -82,7 +91,11 @@ async function save(as = false) {
   const text = serialize();
   let name = S.fileName.endsWith('.tdd') ? S.fileName : `${S.fileName}.tdd`;
   try {
-    if (window.showSaveFilePicker) {
+    if (TAURI) {
+      const r = await invoke('save_tdd', { path: as ? null : S.diskPath || null, suggested: name, text });
+      if (!r) return; // dialog cancelled
+      S.diskPath = r.path; name = r.name;
+    } else if (window.showSaveFilePicker) {
       let h = as ? null : S.fileHandle;
       if (!h) h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'D300e protocol', accept: { 'application/xml': ['.tdd'] } }] });
       const w = await h.createWritable(); await w.write(new Blob([text], { type: 'application/xml' })); await w.close();
@@ -93,7 +106,7 @@ async function save(as = false) {
     }
     // keep the revision we just wrote
     S.protocol = parseTdd(text); S.fileName = name; S.dirty = false; recompute(); render(); toast(`Saved ${name}`);
-  } catch (e) { if (e.name !== 'AbortError') toast(`Save failed: ${e.message}`, 8000); }
+  } catch (e) { if (e?.name !== 'AbortError') toast(`Save failed: ${e?.message ?? e}`, 10000); }
 }
 function download(name, text, type) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
@@ -130,7 +143,9 @@ function exportCsv() {
     }
   });
   const csv = rows.map((r) => r.map((v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v)).join(',')).join('\n');
-  download(S.fileName.replace(/\.tdd$/, '') + '_volumes.csv', csv, 'text/csv');
+  const csvName = S.fileName.replace(/\.tdd$/, '') + '_volumes.csv';
+  if (TAURI) { invoke('save_text', { suggested: csvName, text: csv, extension: 'csv' }).then((p) => p && toast(`Saved ${p}`)).catch((e) => toast(String(e), 8000)); return; }
+  download(csvName, csv, 'text/csv');
 }
 
 // ---------------- rendering ----------------
@@ -642,7 +657,7 @@ function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&am
 function newDoc() {
   if (S.dirty && !confirm('Discard unsaved changes?')) return;
   const p = newProtocol(); p.plates.push(newPlate());
-  S.protocol = p; S.fileName = 'untitled.tdd'; S.fileHandle = null; S.dirty = false; S.undo = []; S.redo = []; S.plateIdx = 0; S.sel.clear(); S.fluidId = null;
+  S.protocol = p; S.fileName = 'untitled.tdd'; S.fileHandle = null; S.diskPath = null; S.dirty = false; S.undo = []; S.redo = []; S.plateIdx = 0; S.sel.clear(); S.fluidId = null;
   recompute(); render();
 }
 
