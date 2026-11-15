@@ -184,7 +184,10 @@ export function buildSynergy(spec) {
   const colsAvail = range(tmpl.cols).filter((c) => !spec.excludedCols?.has(c));
   const axis = (f) => {
     let v = [...f.levels];
-    if (f.includeZero) v.push(0); // UNVERIFIED (§10.10): 0 is added in addition to the levels
+    // Include "0": 0 is the LAST (lowest) of the requested levels, i.e. N levels = N-1 nonzero + 0.
+    // Confirmed with fixtures/reference/t06-synergy.tdd: 6 levels 50→0.05 log = 50, 8.89, 1.58, 0.281, 0.05, 0.
+    // Callers pass the nonzero levels (see synergyLevels()).
+    if (f.includeZero) v.push(0);
     return f.order === 'lowFirst' ? v.reverse() : v;
   };
   const [A, ...rest] = spec.fluids;
@@ -211,7 +214,7 @@ export function buildSynergy(spec) {
   if (gh > rowsAvail.length || gw > colsAvail.length) throw new Error(`Synergy grid ${gh}×${gw} does not fit the ${rowsAvail.length}×${colsAvail.length} available wells`);
 
   const plates = [];
-  const fresh = () => { const p = newPlate(spec.plate); plates.push(p); return p; };
+  const fresh = () => { const p = newPlate({ name: 'Synergy', ...spec.plate }); plates.push(p); return p; }; // plate named "Synergy" (T06)
   const putGrid = (plate, g, cellAt) => {
     for (let i = 0; i < gh; i++) for (let j = 0; j < gw; j++) {
       const [r, c] = cellAt(i, j);
@@ -259,6 +262,14 @@ export function buildSynergy(spec) {
     putGrid(plate, g, (i, j) => [rowsAvail[gy * gh + i], colsAvail[gx * gw + j]]);
   });
   return plates;
+}
+
+/** Levels for one synergy axis as D300e Control computes them: with Include "0", the N requested
+ *  levels are N-1 titrated values (high→low) plus 0. Returns the nonzero levels. */
+export function synergyLevels({ levels, includeZero, ...titration }) {
+  const n = includeZero ? levels - 1 : levels;
+  if (n < 1) throw new Error('Synergy needs at least 2 levels when "0" is included');
+  return titrationLevels({ ...titration, levels: n });
 }
 
 // ---------- normalization (§3.7 / §5) ----------

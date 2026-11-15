@@ -4,7 +4,7 @@
 import { parseTdd, writeTdd, newProtocol, wellKey, splitKey, wellName, formatNumber } from '../src/tdd.js';
 import { computeProtocol, computeWell, validRange, fluidTotals, primingIssues, scrapWellValues, PRIMING_VOLUME, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitKind, unitLabel, toDisplay, fromDisplay } from '../src/dispense.js';
 import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid,
-  buildSynergy, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
+  buildSynergy, synergyLevels, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate, copyWells, pasteWells } from '../src/ops.js';
 
 // ---------------- state ----------------
 const S = {
@@ -546,7 +546,7 @@ function renderSynergy(el) {
       <label>Levels</label><input data-k="levels" data-i="${i}" type="number" min="1" value="${i < 2 ? 6 : 3}">
       <label>Distribution</label><select data-k="dist" data-i="${i}"><option value="log">Logarithmic</option><option value="linear">Linear</option></select>
       <label class="full chk"><input type="checkbox" data-k="zero" data-i="${i}" checked> Include 0</label>
-      <label>Order</label><select data-k="order" data-i="${i}"><option value="highFirst">High → low</option><option value="lowFirst">Low → high</option></select>
+      <label>Order</label><select data-k="order" data-i="${i}"><option value="highFirst" ${i === 1 ? '' : 'selected'}>High → low</option><option value="lowFirst" ${i === 1 ? 'selected' : ''}>Low → high</option></select>
       </div><p class="hint" data-range="${i}"></p></div>`;
   el.innerHTML = `<div class="form">
     <label>Type</label><select id="sType"><option value="ABC" ${st.type === 'ABC' ? 'selected' : ''}>A×B×C (all crossed)</option><option value="AxEach" ${st.type === 'AxEach' ? 'selected' : ''}>A×B, A×C … (primary × each)</option></select>
@@ -574,7 +574,8 @@ function renderSynergy(el) {
     try {
       const fluids = Array.from({ length: st.n }, (_, i) => {
         const o = { mode: 'highLow', high: +get('high', i).value, low: +get('low', i).value, levels: Math.floor(+get('levels', i).value), distribution: get('dist', i).value };
-        return { fluidId: +get('fid', i).value, levels: titrationLevels(o), includeZero: get('zero', i).checked, order: get('order', i).value };
+        const includeZero = get('zero', i).checked;
+        return { fluidId: +get('fid', i).value, levels: synergyLevels({ ...o, includeZero }), includeZero, order: get('order', i).value };
       });
       if (new Set(fluids.map((f) => f.fluidId)).size !== fluids.length) throw new Error('Each synergy fluid must be different');
       spec = { type: st.type, fluids, plate: { plateType: $('sPlate').value, assayVolume: +$('sAssay').value * 1000, dmsoLimit: +$('sDmso').value / 100 },

@@ -66,3 +66,18 @@ test('normalization: one group per class per well; removing a plate renumbers we
   removePlate(pr, 1);
   assert.deepEqual(pr.backfills[0].wells, [{ p: 1, r: 0, c: 0 }]);
 });
+
+test('synergy reproduces D300e Control output exactly (T06: 2 fluids, 6 levels each, include 0)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd } = await import('../src/tdd.js');
+  const { synergyLevels } = await import('../src/ops.js');
+  const ref = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't06-synergy.tdd'), 'utf8')).plates[1];
+  const lv = (id, order) => ({ fluidId: id, includeZero: true, order,
+    levels: synergyLevels({ mode: 'highLow', high: 50, low: 0.05, levels: 6, distribution: 'log', includeZero: true }) });
+  const [mine] = buildSynergy({ type: 'ABC', layout: 'single', plate: { plateType: 'Default384', assayVolume: 50000, dmsoLimit: 0.01 },
+    fluids: [lv(0, 'highFirst'), lv(2, 'lowFirst')] });
+  assert.equal(mine.name, 'Synergy');
+  assert.equal(mine.wells.size, ref.wells.size);
+  for (const [k, m] of ref.wells) for (const [id, v] of m) close(mine.wells.get(k)?.get(id), v, 1e-12, `well ${k} fluid ${id}`);
+});
