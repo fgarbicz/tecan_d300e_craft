@@ -113,6 +113,34 @@ function stepRatio(o) {
 }
 const range = (n) => Array.from({ length: n }, (_, i) => i);
 
+// ---------- targeted titration (§3.5) ----------
+/**
+ * Levels (high→low) for a Targeted Titration, logarithmic distribution. Confirmed with
+ * fixtures/reference/t11-targeted.tdd (16 levels, 10 → 0.003 µM, target 0.5 µM, region 8, ±0.25 log):
+ *  - target region: `region` levels geometric from target·10^range down to target·10^-range (both included);
+ *  - remaining levels split between the tails in proportion to their log spans (rounded);
+ *  - high tail: geometric from `high` towards the region top (exclusive); low tail: from below the region
+ *    bottom down to `low` (inclusive).
+ */
+export function targetedLevels({ high, low, levels, target, region, range }) {
+  const top = target * Math.pow(10, range), bottom = target * Math.pow(10, -range);
+  if (!(high > top && bottom > low)) throw new Error('The target range must lie inside the highest and lowest concentrations');
+  if (!(region >= 2 && region <= levels - 2)) throw new Error('Target region must leave at least one level for each end');
+  const rest = levels - region;
+  const spanHi = Math.log10(high / top), spanLo = Math.log10(bottom / low);
+  let nHi = Math.round((rest * spanHi) / (spanHi + spanLo)); // UNVERIFIED: tie rounding
+  nHi = Math.min(Math.max(nHi, 1), rest - 1);
+  const nLo = rest - nHi;
+  const out = [];
+  const rh = Math.pow(high / top, 1 / nHi);
+  for (let k = 0; k < nHi; k++) out.push(k === 0 ? high : high / Math.pow(rh, k));
+  const rr = Math.pow(top / bottom, 1 / (region - 1));
+  for (let k = 0; k < region; k++) out.push(k === region - 1 ? bottom : top / Math.pow(rr, k));
+  const rl = Math.pow(bottom / low, 1 / nLo);
+  for (let k = 1; k <= nLo; k++) out.push(k === nLo ? low : bottom / Math.pow(rl, k));
+  return out;
+}
+
 // ---------- titration placement (§3.4 titration pattern) ----------
 /**
  * The 8 "Titration pattern" choices of D300e Control: levels flow along rows or down columns, starting at a

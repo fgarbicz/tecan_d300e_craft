@@ -177,3 +177,15 @@ test('three-fluid synergy reproduces D300e Control (T07: A×B×C, grids stacked 
     for (const [id, v] of m) close(mine.wells.get(k).get(id), v, 1e-12, `well ${k} fluid ${id}`);
   }
 });
+
+test('targeted titration reproduces D300e Control (T11)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd } = await import('../src/tdd.js');
+  const { targetedLevels } = await import('../src/ops.js');
+  const ref = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't11-targeted.tdd'), 'utf8')).plates.at(-1);
+  const lv = targetedLevels({ high: 10, low: 0.003, levels: 16, target: 0.5, region: 8, range: 0.25 });
+  const p = newPlate({ plateType: 'Default384' });
+  applyTitration(p, Array.from({ length: 16 }, (_, r) => [r, 9]), 0, lv, { pattern: 'colsTL' });
+  for (let r = 0; r < 16; r++) close(p.wells.get(`${r},9`).get(0), ref.wells.get(`${r},9`).get(0), 1e-12, `row ${r}`);
+});
