@@ -12,5 +12,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: exact decimal → f64 parsing. Without it serde_json may land 1 ulp off (seen in the
+# xlsx round-trip check, tools/xlsx_check), and Tauri's IPC decodes command arguments with serde_json.
+serde_json = { version = "1", features = ["float_roundtrip"] }
 d300-core = { path = "../d300-core" }
+# .xlsx export of readout analyses (save_xlsx). Exact pin: the writer's API shifts between 0.x releases.
+rust_xlsxwriter = "=0.102.0"

@@ -7,9 +7,12 @@
 //                 interface and must re-write it byte-identically, otherwise nothing is written.
 //                 Both engines are tested to be identical, so a failure here means a regression
 //                 and must never reach the dispenser;
-//   * save_text — CSV export.
+//   * save_text — CSV export;
+//   * save_xlsx — Excel export of a readout analysis (workbook model from src/analysis.js, see xlsx.rs).
 // Files are written atomically (temporary file + rename) so a failed save never truncates a protocol.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod xlsx;
 
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -99,7 +102,7 @@ async fn save_text(app: AppHandle, suggested: String, text: String, extension: S
     let picked = app
         .dialog()
         .file()
-        .add_filter(&extension.to_uppercase(), &[extension.as_str()])
+        .add_filter(extension.to_uppercase(), &[extension.as_str()])
         .set_file_name(&suggested)
         .blocking_save_file();
     let Some(fp) = picked else { return Ok(None) };
@@ -108,18 +111,69 @@ async fn save_text(app: AppHandle, suggested: String, text: String, extension: S
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+/// Write built workbook bytes atomically: what save_xlsx does after the dialog (tests use the same path).
+fn write_xlsx(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    write_atomic(path, bytes)
+}
+
+#[tauri::command]
+async fn save_xlsx(app: AppHandle, suggested: String, workbook: xlsx::Workbook) -> Result<Option<String>, String> {
+    // Build first: a workbook the writer rejects must fail before the user picks a file.
+    let bytes = xlsx::write_workbook(&workbook)?;
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter("Excel workbook", &["xlsx"])
+        .set_file_name(&suggested)
+        .blocking_save_file();
+    let Some(fp) = picked else { return Ok(None) };
+    let mut path = to_path(fp)?;
+    if path.extension().map(|e| !e.eq_ignore_ascii_case("xlsx")).unwrap_or(true) {
+        path.set_extension("xlsx");
+    }
+    write_xlsx(&path, &bytes)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_text])
+        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_text, save_xlsx])
         .run(tauri::generate_context!())
         .expect("error while running D300 Designer");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::cross_check;
+    use super::{cross_check, write_xlsx, xlsx};
     use std::path::PathBuf;
+
+    #[test]
+    fn write_xlsx_writes_an_xlsx_file() {
+        let wb: xlsx::Workbook = serde_json::from_str(
+            r#"{ "sheets": [{ "name": "Wells", "freeze": [1, 0], "autofilter": true,
+                  "columns": [{ "header": "Well", "width": 6 }, { "header": "Signal", "width": 10 }],
+                  "rows": [["A1", 12345], ["A2", null]] }] }"#,
+        )
+        .unwrap();
+        let dir = std::env::temp_dir().join(format!("d300-save-xlsx-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("out.xlsx");
+        write_xlsx(&path, &xlsx::write_workbook(&wb).unwrap()).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[..2], b"PK");
+        assert!(!dir.join(".out.xlsx.d300tmp").exists(), "temporary file left behind");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Writes a workbook JSON (from tools/xlsx_roundtrip.mjs) to .xlsx for the openpyxl read-back check.
+    /// Runs only when D300_XLSX_JSON and D300_XLSX_OUT are set (tools/xlsx_roundtrip.sh sets them).
+    #[test]
+    fn xlsx_from_json_env() {
+        let (Ok(src), Ok(out)) = (std::env::var("D300_XLSX_JSON"), std::env::var("D300_XLSX_OUT")) else { return };
+        let wb: xlsx::Workbook = serde_json::from_str(&std::fs::read_to_string(src).unwrap()).unwrap();
+        write_xlsx(std::path::Path::new(&out), &xlsx::write_workbook(&wb).unwrap()).unwrap();
+    }
 
     fn reference_files() -> Vec<PathBuf> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/reference");
