@@ -52,7 +52,8 @@ const roundTo = (x, d) => { const m = 10 ** d; return Math.round(x * m) / m; };
 
 /** Load volume (µL) for one head that dispenses `d` µL. */
 export function headLoad(cassette, d, isDmso = true) {
-  if (cassette.type === 'D4+') return roundTo(cassette.slope * d + cassette.dead, 0); // UNVERIFIED for aqueous
+  // the dispensed volume is taken to 0.1 µL first (as the report shows it): probe-25 193.99 → 194.0 → 257.5 → 258
+  if (cassette.type === 'D4+') return roundTo(cassette.slope * roundTo(d, 1) + cassette.dead, 0); // UNVERIFIED for aqueous
   const dead = isDmso ? 0.3 : 2.5, min = isDmso ? 2.0 : 4.0;
   return Math.max(min, roundTo(cassette.slope * d + dead, 1));
 }
@@ -134,7 +135,7 @@ function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst, cap = cas
   };
   if (cas === T8) return fillPlan(itemsRun, total, k, cap, T8) || equal();
   const nextFit = [];
-  for (const it of items) {
+  for (const it of itemsRun) { // whole plates in run order (probe-25: D4+ phase from plate 3 → plates 3+1 | 2)
     const b = nextFit.at(-1);
     if (b && b.amount + it.v <= cap + TOL) { b.amount += it.v; b.plates.add(it.p); continue; }
     nextFit.push({ amount: it.v, plates: new Set([it.p]) });

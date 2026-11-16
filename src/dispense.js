@@ -296,7 +296,14 @@ export function computeProtocol(protocol) {
         result[x.w.p].wells.set(x.key, r);
         continue;
       }
-      // The gap uses the volumes as sized for this group: iterative for ToMaxVolume, A·(1+p) for % of total.
+      if (b.type === 'ToAssayVolumePct') {
+        const { n, sizing: pctSizing } = pctTopUp(x.req, fluids, b, A, b.param, cls);
+        const r = computeWell(x.req, fluids, x.plate, n, pctSizing);
+        r.normalizationRequested = n;
+        result[x.w.p].wells.set(x.key, r);
+        continue;
+      }
+      // (unused since every type has its own model; kept for reference: the earlier one-step rules)
       const r0 = computeWell(x.req, fluids, x.plate, 0, sizing);
       const cr = (r0.classVolumes && r0.classVolumes.get(b.classId)) || 0;
       const ce = (r0.exactClassVolumes && r0.exactClassVolumes.get(b.classId)) || 0;
@@ -375,6 +382,37 @@ function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
     lower = upper;
   }
   return { n: N, t };
+}
+
+/**
+ * "% of assay volume" (class volume = p × total), fitted on D3 plate 9 (308 wells, small volumes) and probe-25
+ * (blind run, 768 wells up to 860 nL of drug): 1076/1076 top-ups and fluid volumes. Iteration from T₀ = A·(1 + p):
+ *   Vᵢ = Σ C·Tᵢ/S (class), Nᵢ = p·Tᵢ − Vᵢ₋₁ (lagged; V₋₁ = V₀), Tᵢ₊₁ = A + Nᵢ + Vᵢ(all fluids)
+ * stop at the first j ≥ 1 with |Vⱼ − Vⱼ₋₁| / Nⱼ < 0.1 % (at most 4), top-up Nⱼ₋₁, fluids sized at Tⱼ. A well whose
+ * fluids already reach the target (top-up < 1 nL) gets none and is sized like an unnormalized well (probe-25 L19+).
+ * (was: fluids at A·(1 + p), target p·A·(1 + p) — exact on D3, one step off on probe-25's largest top-ups.)
+ */
+function pctTopUp(req, fluids, b, A, p, cls) {
+  const cC = [], cAll = [];
+  for (const [id, c] of req) { const f = fluids.get(id); if (!f || f.byVol || !c) continue; cAll.push([c, stockInBase(f)]); if (f.classId === b.classId) cC.push([c, stockInBase(f)]); }
+  const vol = (cs, T) => { let v = 0; for (const [c, S] of cs) v += (c * T) / S; return v; };
+  const Ts = [], Vs = [], Ns = [];
+  let T = A * (1 + p);
+  for (let i = 0; i < 6; i++) {
+    const V = vol(cC, T), N = p * T - (i ? Vs[i - 1] : V);
+    Ts.push(T); Vs.push(V); Ns.push(N);
+    T = A + N + vol(cAll, T);
+  }
+  let j = 4;
+  for (let k = 1; k <= 4; k++) if (Math.abs(Vs[k] - Vs[k - 1]) / Math.max(Math.abs(Ns[k]), 1e-12) < SIZING_TOLERANCE) { j = k; break; }
+  const N = Ns[j - 1];
+  if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, sizing: undefined };
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), sizing: Ts[0] };
+    lower = upper;
+  }
+  return { n: N, sizing: Ts[0] };
 }
 
 /**

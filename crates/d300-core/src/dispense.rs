@@ -769,7 +769,14 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
                 result[x.p].wells.insert(x.key, r);
                 continue;
             }
-            // The gap uses the volumes as sized for this group: iterative for ToMaxVolume, A·(1+p) for % of total.
+            if b.kind == "ToAssayVolumePct" {
+                let (n, sz) = pct_top_up(x.req, &fluids, b, a, b.param.unwrap_or(f64::NAN), cls);
+                let mut r = compute_well(x.req, &fluids, x.plate, n, sz);
+                r.normalization_requested = Some(n);
+                result[x.p].wells.insert(x.key, r);
+                continue;
+            }
+            // (unused: every type has its own model now; the earlier one-step rules, kept for reference)
             let r0 = compute_well(x.req, &fluids, x.plate, 0.0, sizing);
             let cr = or0(r0
                 .class_volumes
@@ -905,6 +912,53 @@ fn iterated_top_up<B: TopUpWell>(
         lower = upper;
     }
     (n, t, None)
+}
+
+/// "% of assay volume": port of pctTopUp in src/dispense.js (D3 plate 9 + probe-25, 1076/1076).
+/// Returns (top-up, sizing total for the fluids; None = sized like an unnormalized well).
+fn pct_top_up(req: &WellFluids, fluids: &FluidLookup, b: &crate::tdd::Backfill, a: f64, p: f64, cls: &FluidClass) -> (f64, Option<f64>) {
+    let (mut c_c, mut c_all): (Vec<(f64, f64)>, Vec<(f64, f64)>) = (vec![], vec![]);
+    for (id, &c) in req {
+        let Some(f) = fluids.get(id) else { continue };
+        if f.by_vol || c == 0.0 || c.is_nan() {
+            continue;
+        }
+        c_all.push((c, stock_in_base(f)));
+        if f.class_id == Some(b.class_id) {
+            c_c.push((c, stock_in_base(f)));
+        }
+    }
+    let vol = |cs: &[(f64, f64)], t: f64| cs.iter().fold(0.0, |v, &(c, s)| v + (c * t) / s);
+    let (mut ts, mut vs, mut ns): (Vec<f64>, Vec<f64>, Vec<f64>) = (vec![], vec![], vec![]);
+    let mut t = a * (1.0 + p);
+    for i in 0..6 {
+        let v = vol(&c_c, t);
+        let n = p * t - if i > 0 { vs[i - 1] } else { v };
+        ts.push(t);
+        vs.push(v);
+        ns.push(n);
+        t = a + n + vol(&c_all, t);
+    }
+    let mut j = 4;
+    for k in 1..=4 {
+        if (vs[k] - vs[k - 1]).abs() / js_max(ns[k].abs(), 1e-12) < SIZING_TOLERANCE {
+            j = k;
+            break;
+        }
+    }
+    let n = ns[j - 1];
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
+        return (0.0, None);
+    }
+    let mut lower = 0.0;
+    for &(upper, inc) in cls.bands {
+        if n <= upper || upper == f64::INFINITY {
+            return (clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), round_half_even_strict(n / inc) * inc)), Some(ts[0]));
+        }
+        lower = upper;
+    }
+    (n, Some(ts[0]))
 }
 
 /// "To total volume": the lagged iteration of totalTopUp in src/dispense.js (probe-23 plate 1).

@@ -73,3 +73,10 @@ DMSO normalization 192.96 193.99 0.00 min well 10.000
 T8+ e1:11.8 e1:10.1 e2:8.2 e2:11.8 e2:6.5 e1:10.9
 D4+ e3:117 e3:220 DMSO normalization:256 DMSO normalization:257
 ```
+
+### probe-25 result
+- T8+ cassette: all 6 heads exactly as predicted (blind) — the revised T8+ rules hold on unseen data.
+- D4+: amounts right but order (e3 220 first) and one load (258 vs 257) differ → whole-plate D4+ packing in run
+  order from the phase's start plate; D4+ load from the dispensed volume rounded to 0.1 µL first.
+- "% of assay volume" top-up: 20 of 330 wells one step off and over-target wells sized wrong → new lagged model
+  (src/dispense.js pctTopUp), 1076/1076 on D3 plate 9 + probe-25; all 1850 probe-25 rows now match.

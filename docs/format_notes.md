@@ -125,6 +125,10 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   g₃ = 556.2445, the smallest wells g₀ ≈ 555.6, and empty wells and the largest well get 556.4 (its dispensed
   volume). No candidate sequence (largest well iterated alone, lagged, overshooting) reproduces this; the engine
   keeps the "to highest" model there (fluids 305/331, top-ups 216/334 on probe-23 plate 2).
-- Cassettes / heads for sub-nL fluids: see src/cassette.js header (probe-22a–o, docs/handoff_probe22_predictions.md).
+- "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at
+  A(1+p); wells already over the target get no top-up and normal sizing (src/dispense.js pctTopUp; D3 plate 9 +
+  probe-25: 1076/1076).
+- Cassettes / heads: see the src/cassette.js header (probe-22a–o, 24, 25; docs/handoff_probe22_predictions.md).
+  T8+ heads in probe-25 were predicted exactly before the run.
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.

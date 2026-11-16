@@ -84,7 +84,10 @@ test('D3 run: normalization on D4+ packs whole plates largest first (head 1 = 26
   const r = plan('fixtures/reference/2026.08.28 synergy D3.tdd');
   const d4 = r.cassettes.find((c) => c.type === 'D4+');
   assert.equal(d4.heads[0].load, 265);
-  assert.deepEqual(d4.heads[0].plates, [0, 1, 2, 4, 5, 8]);
+  // the report shows head 1 dispensing plates 1, 2 and 9 (then aborted); which two of plates 4–6 it also held is
+  // not observable (was asserted as 5, 6 from the older largest-first model; whole plates in run order from
+  // plate 9 give 4, 5 with the same volumes)
+  for (const p of [0, 1, 8]) assert.ok(d4.heads[0].plates.includes(p));
   assert.deepEqual(d4.heads.map((h) => h.load), [265, 224, 196]);
 });
 
@@ -152,4 +155,11 @@ test('probe-24 (4 plates, 4 drugs, ToMaxVolume): every head of all four cassette
     ['T8+', ['d1 9.3', 'd2 9', 'd3 10.6', 'd3 10.6']],
     ['D4+', ['DMSO normalization 265', 'DMSO normalization 104', 'DMSO normalization 265', 'DMSO normalization 265']],
     ['D4+', ['DMSO normalization 254', 'DMSO normalization 254']]]);
+});
+test('probe-25 (blind for the T8+ cassette): every head as D300e loaded it', () => {
+  // T8+ predicted exactly before the run. D4+: whole plates packed in run order from plate 3 (e3 3+1 | 2), and the
+  // D4+ load uses the dispensed volume to 0.1 µL (193.99 → 194.0 → 258) — both revised from this run.
+  assert.deepEqual(heads(plan(R + 'probe-25-blind.tdd')), [
+    ['T8+', ['e1 11.8', 'e1 10.1', 'e2 8.2', 'e2 11.8', 'e2 6.5', 'e1 10.9']],
+    ['D4+', ['e3 220', 'DMSO normalization 256', 'e3 117', 'DMSO normalization 258']]]);
 });
