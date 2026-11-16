@@ -160,7 +160,9 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
 - Fluid sizing of unnormalized wells: convergence check from the first step (k < 0.001 → sized at A); fluid
   rounding = .NET Math.Round(v / inc) in doubles, no tie tolerance (probe-22l, 26).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
-  shows its thumbnail in the recent list.
+  shows its thumbnail in the recent list. The 0.3.0 Windows build's save (revision "Windows\D300 Craft",
+  WebView2 thumbnail; 2026-11-16) opens too: 9 plates, 4 fluids, normalization 511.2 µL as planned.
+  Linux (WebKitGTK) saves differ from the source file only by that revision line and the thumbnail.
 - Plate randomization (probe-28, 2026-11-16, run report): `<Randomize><Well R C ToR ToC/>` — R,C is the well
   dispensed into, ToR,ToC the design ("non-random") well whose contents go there; entries sorted by R,C. 850/850
   report rows (Dispensed Well vs Non-random Well). (was read the other way round; T09 alone cannot tell.)
