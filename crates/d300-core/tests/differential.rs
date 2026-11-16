@@ -39,9 +39,15 @@ const files = JSON.parse(process.env.D300_FILES || '[]');
 "#;
 
 fn node_script(body: &str, files: &[String], extra_env: &[(&str, String)]) -> Option<Value> {
+    // The inputs go into the script (sent on stdin), not into the environment: Linux caps one
+    // environment string at 128 KiB (MAX_ARG_STRLEN, "Argument list too long"), macOS does not.
     let mut env = vec![("D300_FILES", serde_json::to_string(files).unwrap())];
     env.extend(extra_env.iter().cloned());
-    let out = node_eval(&format!("{JS_BITS}\n{body}"), &env)?;
+    let set: String = env
+        .iter()
+        .map(|(k, v)| format!("process.env.{k} = {};\n", serde_json::to_string(v).unwrap()))
+        .collect();
+    let out = node_eval(&format!("{set}{JS_BITS}\n{body}"), &[])?;
     Some(serde_json::from_str(&out).expect("node output is JSON"))
 }
 

@@ -17,6 +17,10 @@ import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
 import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
 import { fluidColor as rootFluidColor, DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapTest } from '../src/dosemap.js';
+// Shortcut glyphs: the interface is written with Mac keys; Windows and Linux show Ctrl / Shift instead.
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const keys = (s) => IS_MAC ? s : String(s).replace(/⇧⌘/g, 'Ctrl+Shift+').replace(/⌘-/g, 'Ctrl-').replace(/⇧-/g, 'Shift-').replace(/⌘/g, 'Ctrl+').replace(/⇧/g, 'Shift+');
+
 
 export const APP_NAME = 'Tecan D300 Craft';
 const APP_VERSION = '0.2.0';
@@ -187,7 +191,7 @@ export function render() {
   $('fileName').textContent = S.fileName;
   $('dirty').hidden = !S.dirty;
   $('btnUndo').disabled = !S.undo.length; $('btnRedo').disabled = !S.redo.length;
-  $('btnUndo').title = S.undo.length ? `Undo ${S.undo.at(-1).label} (⌘Z)` : 'Undo';
+  $('btnUndo').title = S.undo.length ? keys(`Undo ${S.undo.at(-1).label} (⌘Z)`) : 'Undo';
   $('btnPaste').disabled = !S.clip;
   renderFluids(); renderCellLines(); renderPlates(); renderPlateParams(); renderSettings(); renderShowSelect(); renderGrid(); renderInspector(); renderOpPanel(); renderStatus();
 }
@@ -309,7 +313,7 @@ function renderGrid() {
   const frag = document.createDocumentFragment();
   const hdr = (txt, fn, title) => { const d = document.createElement('div'); d.className = 'hdr'; d.textContent = txt; d.onclick = fn; if (title) d.title = title; frag.appendChild(d); };
   hdr('⌗', () => selectRect(0, 0, p.rows - 1, p.cols - 1), 'Select all');
-  for (let c = 0; c < p.cols; c++) hdr(p.cols > 24 && c % 2 ? '' : c + 1, (e) => selectLine('col', c, e), `Column ${c + 1} (⌘-click to add)`);
+  for (let c = 0; c < p.cols; c++) hdr(p.cols > 24 && c % 2 ? '' : c + 1, (e) => selectLine('col', c, e), keys(`Column ${c + 1} (⌘-click to add)`));
   const showId = S.showFluid === 'all' ? null : +S.showFluid;
   const range = showId != null ? fluidRange(p, showId) : null;
   const normSet = new Set(S.protocol.backfills.flatMap((b) => b.wells.filter((w) => w.p === S.plateIdx).map((w) => wellKey(w.r, w.c))));
@@ -393,7 +397,7 @@ function renderRandBar() {
       if (!which) return;
       mutate('de-randomize', () => { for (const x of which === 'all' ? S.protocol.plates : [p]) x.randomization = []; });
     } else mutate('de-randomize', () => { p.randomization = []; });
-    toast('De-randomized: the plate is printed exactly as planned (⌘Z brings the shuffle back)');
+    toast(keys('De-randomized: the plate is printed exactly as planned (⌘Z brings the shuffle back)'));
   };
 }
 function mark(d, t) { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = t; d.appendChild(s); }
@@ -497,7 +501,7 @@ export function warnText(w) {
 function renderStatus() {
   const p = plate();
   const hints = {
-    drugs: 'Drag to select a rectangle · ⇧-click extends · ⌘-click adds wells · click row/column headers for whole lines',
+    drugs: keys('Drag to select a rectangle · ⇧-click extends · ⌘-click adds wells · click row/column headers for whole lines'),
     cells: 'Pick a cell line (left), select wells, then Annotate → Assign. PBS border wells are skipped automatically.',
     roles: 'Roles: treated and vehicle are automatic; mark blanks (medium only) and excluded wells in Annotate.',
     doses: 'Concentration gradients: pale = lowest, dark = highest dose of each drug (log scale, same colours on every plate). Pick one drug under Show, or export the dose map.',
@@ -976,7 +980,7 @@ async function renderResultsTab(el) {
   const pm = S.meta.plates[pi];
   const withData = S.meta.plates.filter((x) => x.readout).length;
   el.innerHTML = `<p class="hint">Paste the plate reader's values for <b>plate ${pi + 1}</b> (${p.rows} × ${p.cols}), e.g. CellTiter-Glo luminescence copied from Excel. Row/column labels and extra lines are fine.</p>
-    <textarea id="rPaste" rows="9" placeholder="Paste here (⌘V)…"></textarea>
+    <textarea id="rPaste" rows="9" placeholder="${keys('Paste here (⌘V)…')}"></textarea>
     <div class="actions"><button id="rRead" class="primary">${icon('check', 15)} Use for plate ${pi + 1}</button>${pm?.readout ? `<button id="rDrop" class="danger">${icon('trash', 15)} Remove</button>` : ''}</div>
     <div id="rMsg"></div>
     <h3>Plates with data: ${withData} / ${S.protocol.plates.length}</h3>
@@ -1112,7 +1116,7 @@ function showStart() {
       <li><b>Read</b><span>e.g. CellTiter-Glo after incubation</span></li>
       <li><b>Results</b><span>paste values: viability, synergy, Excel</span></li>
     </ol>
-    <p class="foot">Tip: hover any button for help. ⌘Z undoes anything.</p></div>`;
+    <p class="foot">Tip: hover any button for help. ${keys('⌘Z')} undoes anything.</p></div>`;
   st.hidden = false;
   $('stWizard').onclick = () => { if (!S.protocol) blankDoc(); hideStart(); startWizard(); };
   $('stOpen').onclick = () => { if (!S.protocol) blankDoc(); openFile(); };
@@ -1158,6 +1162,7 @@ function bind() {
   $('btnSelectNone').onclick = () => { S.sel.clear(); selectionChanged(); };
   $('btnCopy').onclick = copySel; $('btnPaste').onclick = pasteSel;
   $('btnClearSel').onclick = () => S.sel.size ? mutate('clear wells', () => clearWells(plate(), selectedCells())) : toast('Select wells first');
+  if (!IS_MAC) for (const el of document.querySelectorAll('[title]')) el.title = keys(el.title);
   $('opTabs').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) { S.tab = b.dataset.tab; if (S.tab === 'results') S.layer = 'results'; if (S.tab === 'annotate' && S.layer === 'drugs') S.layer = 'cells'; render(); } };
   rememberForm($('opPanel'));
   window.addEventListener('keydown', (e) => {
