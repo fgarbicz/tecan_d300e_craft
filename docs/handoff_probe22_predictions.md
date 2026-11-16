@@ -187,3 +187,10 @@ D4+ DMSO normalization:190.8079→254
 - Dispense rows 2046/2051 as predicted: five top-ups one step low, all wells with a top-up below ~155 nL. New
   stop check for "% of assay volume": first step on the change of the top-up, later steps on the fluid volume →
   2051/2051, probe-25 1850/1850, D3 5752/5752, probe-20 1007/1007 unchanged.
+
+## "Use high-volume cassettes" unticked (probe-9-big: 40 / 60 / 90 µL; prediction before the run, 2026-11-16)
+planRun(..., { highVolume: false }):
+```
+T8+ b1:20→23.3  b1:20→23.3  b2:20→23.3  b2:20→23.3  b2:20→23.3  b3:18→21  b3:18→21  b3:18→21
+T8+ b3:18→21  b3:18→21          (10 T8+ heads, 2 cassettes; totals b1 46.6, b2 69.9, b3 104.9)
+```
