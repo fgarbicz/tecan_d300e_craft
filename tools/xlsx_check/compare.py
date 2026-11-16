@@ -16,9 +16,13 @@ def main():
     with open(args[0], encoding="utf-8") as fh:
         wb = json.load(fh)
     if tamper:
-        sheet = next(s for s in wb["sheets"] if s["name"] == "Wells")
-        row = next(r for r in sheet["rows"] if isinstance(r[-2], (int, float)))
-        row[-2] += 1e-6
+        # a number when the workbook has one (last-digit change), else the first Info value
+        nums = [(r, i) for s in wb["sheets"] for r in s["rows"] for i, x in enumerate(r) if isinstance(x, float)]
+        if nums:
+            r, i = nums[len(nums) // 2]
+            r[i] += 1e-6
+        else:
+            wb["sheets"][0]["rows"][0][1] += "x"
     book = openpyxl.load_workbook(args[1], read_only=False, data_only=True)
     problems = []
     if book.sheetnames != [s["name"] for s in wb["sheets"]]:

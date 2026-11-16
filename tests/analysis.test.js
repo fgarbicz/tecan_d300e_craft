@@ -228,6 +228,32 @@ test('workbook: sheets, headers, shapes, JSON-safe values', () => {
   assert.equal(raw.rows[1][0], 'A'); assert.equal(raw.rows[1][1], null); assert.equal(raw.rows[2][2], meta.plates[0].readout.values[1][1]);
 });
 
+test('workbook: degenerate results (no combinations, no readout) still give valid sheets', () => {
+  const single = buildSynthetic();
+  for (const p of single.protocol.plates) for (const w of p.wells.values()) w.delete(1);
+  const r1 = analyze(single);
+  assert.equal(r1.synergy.length, 0);
+  const wb1 = toWorkbook(r1, single.protocol, single.meta, { appVersion: 'x' });
+  assert.equal(wb1.sheets[3].rows.length, 0);
+  assert.match(wb1.sheets[4].rows[0][0], /No drug pair/);
+  const empty = buildSynthetic();
+  for (const p of empty.meta.plates) p.readout = null;
+  const wb2 = toWorkbook(analyze(empty), empty.protocol, empty.meta);
+  assert.deepEqual(wb2.sheets.map((s) => s.rows.length).slice(1, 4), [0, 0, 0]);
+  assert.equal(wb2.sheets[5].rows.length, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(wb2)), wb2);
+});
+
+test('parse: dot-grouped values next to whole numbers are refused', () => {
+  const g = grid(8, 12, (r, c) => ((r + c) % 2 ? '850' : `${r + 1}.${String(100 + c).padStart(3, '0')}`));
+  assert.throws(() => parseReadout(tsv(g), 8, 12), /thousands separators/);
+  // all values with 3 decimals and no whole numbers: read as decimals, with a warning
+  const g2 = grid(8, 12, (r, c) => `${r + 1}.${String(100 + c).padStart(3, '0')}`);
+  const res = parseReadout(tsv(g2), 8, 12);
+  assert.equal(res.values[0][0], 1.1);
+  assert.ok(res.warnings.some((w) => /1000× too small/.test(w)));
+});
+
 test('sheetName sanitises and de-duplicates', () => {
   const taken = new Set();
   assert.equal(sheetName('a/b:c*d?[e]\\f', taken), 'a_b_c_d__e__f');

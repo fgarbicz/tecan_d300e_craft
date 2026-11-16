@@ -84,6 +84,10 @@ function convertBlock(tokens, sep, warnings) {
       fail(`Values like "${withComma[0]}" are ambiguous: decimal comma or thousands separator? ${THOUSANDS_MSG}; format the readout without a 1000 separator and paste again.`);
     }
     decimalComma = true;
+  } else if (withDot.length && withDot.every((t) => AMBIG_DOT_RE.test(t)) && nums.some((t) => !/[.,eE]/.test(t))) {
+    // "850" next to "12.345": integers below 1000 and dotted values that look like 12 345 — a
+    // dot-grouped export. Reading the dots as decimals would make some wells 1000× too small.
+    fail(`Values like "${withDot[0]}" next to whole numbers look like "." thousands separators; ${THOUSANDS_MSG.toLowerCase()}. Format the readout without a 1000 separator and paste again.`);
   } else if (withDot.length && withDot.every((t) => AMBIG_DOT_RE.test(t))) {
     // Dot decimals are the norm, so these are read as decimals, but say what would go wrong.
     warnings.push(`Every decimal value has exactly 3 digits after the point (e.g. "${withDot[0]}"). They are read as decimals; if your spreadsheet uses "." as a thousands separator the values are 1000× too small.`);

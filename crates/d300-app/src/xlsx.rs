@@ -155,6 +155,8 @@ mod tests {
               { "name": "Wells", "freeze": [1, 2], "autofilter": true,
                 "columns": [{ "header": "Well", "width": 6 }, { "header": "Viability %", "width": 10, "format": "0.0" }],
                 "rows": [["A1", 99.5], ["A2", null], ["A3", -1.25e-7]] },
+              { "name": "Synergy (Bliss)", "freeze": [1, 1], "autofilter": true,
+                "columns": [{ "header": "Cell line" }, { "header": "Bliss excess", "format": "0.000" }], "rows": [] },
               { "name": "Synergy matrix", "header": false, "boldRows": [0], "columns": [{ "header": "", "width": 20 }],
                 "rows": [["Title"], ["x", 1, 2], []] }
             ] }"#,
@@ -168,8 +170,8 @@ mod tests {
         assert!(matches!(wb.sheets[0].rows[1][1], Cell::Text(ref s) if s == "123"));
         assert!(matches!(wb.sheets[1].rows[0][1], Cell::Number(x) if x == 99.5));
         assert!(matches!(wb.sheets[1].rows[1][1], Cell::Empty(())));
-        assert!(wb.sheets[0].header && !wb.sheets[2].header);
-        assert_eq!(wb.sheets[2].bold_rows, vec![0]);
+        assert!(wb.sheets[0].header && !wb.sheets[3].header);
+        assert_eq!(wb.sheets[3].bold_rows, vec![0]);
     }
 
     #[test]
