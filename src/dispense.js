@@ -277,10 +277,8 @@ export function computeProtocol(protocol) {
       const A = x.plate.assayVolume;
       let target, sizing, totalBased = false;
       switch (b.type) {
-        // Target = the largest UNROUNDED class volume of the group (fluids sized as usual, no normalization);
-        // every well's fluids are then sized with the fixed total A + target. Fitted on D3 plates 1-2 (616
-        // wells) and T05 row A plus two one-change copies (72 wells): 688/688 top-ups.
-        // (was: target = largest rounded class volume, iterative sizing incl. N, top-up floored — 637/688)
+        // Target and top-up come from iteratedTopUp (moving target); this target only seeds it.
+        // (was: largest unrounded class volume, fixed sizing A + target, 0.49 rounding — hold-out 888/1007)
         case 'ToMaxVolume': target = maxExactClass; sizing = A + target; break;
         case 'ToVolume': target = b.param; sizing = A + target; break; // UNVERIFIED sizing
         // Fluids are sized with a fixed well volume A·(1+p); the class target is p × that volume, and the

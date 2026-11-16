@@ -676,6 +676,17 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
         req: &'a WellFluids,
         class_vol: f64,
         total_vol: f64,
+        /// Unrounded class / all-fluid volumes, before any well of the group is normalized.
+        exact_class_vol: f64,
+        exact_all: f64,
+    }
+    impl TopUpWell for Base<'_> {
+        fn exact(&self, class_only: bool) -> f64 {
+            if class_only { self.exact_class_vol } else { self.exact_all }
+        }
+        fn req(&self) -> &WellFluids {
+            self.req
+        }
     }
     for b in &protocol.backfills {
         let cls = fluid_class(Some(b.class_id));
@@ -699,6 +710,11 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
                     .class_volumes
                     .as_ref()
                     .and_then(|m| m.get(Some(b.class_id))));
+                let exact_class_vol = or0(r
+                    .exact_class_volumes
+                    .as_ref()
+                    .and_then(|m| m.get(Some(b.class_id))));
+                let exact_all = r.fluids.iter().fold(0.0, |s, f| s + f.exact_volume);
                 Base {
                     p,
                     key,
@@ -706,6 +722,8 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
                     req: plate.wells.get(&key).unwrap_or(&empty_req),
                     class_vol,
                     total_vol: 0.0,
+                    exact_class_vol,
+                    exact_all,
                 }
             })
             .collect();
@@ -738,6 +756,19 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
                 "ToTotalVolume" => (param, Some(param), true),            // UNVERIFIED sizing
                 _ => continue, // unknown type: leave unnormalized
             };
+            if b.kind != "ToAssayVolumePct" {
+                let (n, t) = iterated_top_up(x, &base, b, a, total_based, target, &fluids, cls);
+                // fluids of a normalized well are sized with the group's final target total
+                let sz = match b.kind.as_str() {
+                    "ToMaxVolume" => Some(a + t),
+                    "ToMaxTotalVolume" => Some(t),
+                    _ => sizing,
+                };
+                let mut r = compute_well(x.req, &fluids, x.plate, n, sz);
+                r.normalization_requested = Some(n);
+                result[x.p].wells.insert(x.key, r);
+                continue;
+            }
             // The gap uses the volumes as sized for this group: iterative for ToMaxVolume, A·(1+p) for % of total.
             let r0 = compute_well(x.req, &fluids, x.plate, 0.0, sizing);
             let cr = or0(r0
@@ -767,6 +798,99 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
         }
     }
     result
+}
+
+/// Top-up of the "to volume / to highest / to total" types as D300e Control 4.0.1 computes it; see
+/// iteratedTopUp in src/dispense.js (fitted on D3, T05 ×3, probe-20 hold-out and probe-21 sweep).
+/// Returns (rounded top-up, final target used for sizing).
+pub const TOPUP_TOLERANCE: f64 = 0.0008;
+#[allow(clippy::too_many_arguments)]
+fn iterated_top_up<B: TopUpWell>(
+    x: &B,
+    base: &[B],
+    b: &crate::tdd::Backfill,
+    a: f64,
+    total_based: bool,
+    fixed_target: f64,
+    fluids: &FluidLookup,
+    cls: &FluidClass,
+) -> (f64, f64) {
+    let k_of = |req: &WellFluids, class_only: bool| {
+        let mut k = 0.0;
+        for (id, &c) in req {
+            let Some(f) = fluids.get(id) else { continue };
+            if f.by_vol || c == 0.0 || c.is_nan() {
+                continue;
+            }
+            if class_only && f.class_id != Some(b.class_id) {
+                continue;
+            }
+            k += c / stock_in_base(f);
+        }
+        k
+    };
+    let highest = b.kind == "ToMaxVolume" || b.kind == "ToMaxTotalVolume";
+    let (mut km, mut tv) = (0.0, 0.0);
+    if highest {
+        for y in base {
+            let v = y.exact(!total_based);
+            if v > tv {
+                tv = v;
+                km = k_of(y.req(), !total_based);
+            }
+        }
+    }
+    let k = k_of(x.req(), !total_based);
+    let k_all = k_of(x.req(), false);
+    let mut v = x.exact(!total_based);
+    let mut v_all = x.exact(false);
+    let (mut n_prev, mut n, mut t): (Option<f64>, f64, f64) = (None, 0.0, 0.0);
+    for _ in 0..100 {
+        t = if highest {
+            if total_based { a + tv } else { tv }
+        } else {
+            fixed_target
+        };
+        n = if total_based { t - (a + v) } else { t - v };
+        if let Some(np) = n_prev {
+            if (n - np).abs() / js_max(n.abs(), 1e-12) < TOPUP_TOLERANCE {
+                n = np;
+                break;
+            }
+        }
+        n_prev = Some(n);
+        let tot = a + n + v_all;
+        v = k * tot;
+        v_all = k_all * tot;
+        if highest {
+            tv = km * (a + tv);
+        }
+    }
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
+        return (0.0, t);
+    }
+    let mut lower = 0.0;
+    for &(upper, inc) in cls.bands {
+        if n <= upper || upper == f64::INFINITY {
+            let q = if b.kind == "ToMaxVolume" {
+                (n / inc + 0.49).floor()
+            } else {
+                round_half_even(n / inc)
+            };
+            return (
+                clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), q * inc)),
+                t,
+            );
+        }
+        lower = upper;
+    }
+    (n, t)
+}
+
+trait TopUpWell {
+    fn exact(&self, class_only: bool) -> f64;
+    fn req(&self) -> &WellFluids;
 }
 
 /// Unused in the JS as well (an earlier fixed-point model of % normalization, superseded by the

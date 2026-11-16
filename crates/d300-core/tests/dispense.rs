@@ -166,9 +166,9 @@ fn guide_p89_row_b_to_max_volume_normalization() {
         (2, 0.6309573, 6.4, 93.6, 100100.0),
         (3, 0.1584893, 1.58, 98.4, 100099.98),
         (4, 0.03981072, 0.4, 99.6, 100100.0),
-        // B06: the guide figure (older software) shows 100 nL (nearest step); D300e Control 4.0.1 rounds the
-        // top-up DOWN (see the D3 run-report test), giving 99.6 nL. We follow 4.0.1.
-        (5, 0.01, 0.1, 99.6, 100099.7),
+        // B06: 100 nL as in the guide figure (the iterated top-up, fitted on D3/T05/probe-20/21 reports;
+        // an earlier floor rule gave 99.6).
+        (5, 0.01, 0.1, 100.0, 100100.1),
     ];
     let mut pl = plate(100000.0, 0.01);
     for (c, conc, ..) in rows {
