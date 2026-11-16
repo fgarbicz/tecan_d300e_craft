@@ -326,3 +326,22 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 'probe-25-blind.tdd'), writeTdd(p));
   console.log('wrote probe-25-blind');
 }
+
+// probe-26 (blind check of the D4+ rules revised on probe-25): 3 plates; g1/g2 bulk fluids needing D4+ heads
+// with unequal plate amounts, g3 sub-nL series, ToVolume 900 nL normalization on all wells of plates 1 and 3.
+{
+  const p = newProtocol();
+  const fl = [['g1', 10000], ['g2', 10000], ['g3', 2000]].map(([name, c]) => addFluid(p, { name, concentration: c, concentrationUnit: 'mM', classId: 0 }));
+  for (let pi = 0; pi < 3; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-26 ${pi + 1}`, dmsoLimit: 0.03 }));
+  const wells = [];
+  const series = (top, i, n) => top * Math.pow(10, -3 * i / (n - 1));
+  for (let pi = 0; pi < 3; pi++) for (let r = 0; r < 16; r++) for (let c = 0; c < 24; c++) {
+    if (r < 6) setWell(p.plates[pi], r, c, fl[0].id, +([60, 100, 30][pi] + c).toPrecision(5));
+    else if (r < 10) setWell(p.plates[pi], r, c, fl[1].id, +([120, 40, 90][pi]).toPrecision(5));
+    else setWell(p.plates[pi], r, c, fl[2].id, +series([30, 10, 20][pi], c, 24).toPrecision(5));
+    if (pi !== 1) wells.push({ p: pi, r, c });
+  }
+  addNormalization(p, 0, 'ToVolume', 900, wells);
+  writeFileSync(join(process.argv[2], 'probe-26-blind.tdd'), writeTdd(p));
+  console.log('wrote probe-26-blind');
+}

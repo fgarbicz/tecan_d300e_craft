@@ -80,3 +80,15 @@ D4+ e3:117 e3:220 DMSO normalization:256 DMSO normalization:257
   order from the phase's start plate; D4+ load from the dispensed volume rounded to 0.1 µL first.
 - "% of assay volume" top-up: 20 of 330 wells one step off and over-target wells sized wrong → new lagged model
   (src/dispense.js pctTopUp), 1076/1076 on D3 plate 9 + probe-25; all 1850 probe-25 rows now match.
+
+## probe-26 (blind; prediction at commit a46d2a3, before the run)
+```
+warn wells 0
+g1 52.41 81.18 30.42
+g2 58.64 19.28 43.97
+g3 17.65 5.79 11.76
+DMSO normalization 216.93 0.00 259.47
+D4+ g1:220 g2:167 DMSO normalization:214 DMSO normalization:214
+D4+ DMSO normalization:214
+T8+ g3:11.8 g3:9 g3:11.8 g3:9.1
+```
