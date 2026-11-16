@@ -194,3 +194,16 @@ planRun(..., { highVolume: false }):
 T8+ b1:20→23.3  b1:20→23.3  b2:20→23.3  b2:20→23.3  b2:20→23.3  b3:18→21  b3:18→21  b3:18→21
 T8+ b3:18→21  b3:18→21          (10 T8+ heads, 2 cassettes; totals b1 46.6, b2 69.9, b3 104.9)
 ```
+
+## "Use high-volume cassettes" unticked — result (2026-11-16)
+Summary switched to "10 T8+ Dispenseheads (2 cassettes)", totals 46.6 / 69.9 / 105.0; fill screens 23.3, 23.3 |
+23.3 ×3 | 21.0 ×3 and 21.0 ×2 — as predicted. (The 105.0 total led to the 1.15 slope for T8+ in per-fluid totals.)
+
+## probe-32 (blind; "top-ups are planned from their unrounded volumes", fitted on probe-25 head 4)
+Per plate, dispensed / unrounded top-up sums: 194.0016 / 193.9960, 190.7900 / 190.8016, 197.1976 / 197.2018 µL
+(ties 194.0, 190.8, 197.2).
+```
+D4+ pr1:177.7424→237  DMSO normalization:193.9960→257  DMSO normalization:190.8016→254  pr1:84.5328→121
+D4+ DMSO normalization:197.2018→262
+   (planned from the dispensed volumes instead: 258, 253, 261)
+```
