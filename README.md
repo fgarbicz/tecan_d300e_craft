@@ -31,6 +31,19 @@ Claude uses it through the skill `.claude/skills/d300-plate-design` (linked into
 "design synergy plates for these drugs on these cells" gives a checked plan. Designs go in `experiments/`
 (not in git).
 
+## Manual
+- `docs/manual/demo.html` — interactive guided tour (open in any browser; arrows / space)
+- `docs/manual/tecan-d300-craft-tour.mp4` — the same tour as a video with captions
+- `docs/manual/tecan-d300-craft-manual.pdf` (and `manual.html`) — user manual for technicians
+- Regenerate after interface changes: start `bin/serve.sh`, then in `tools/manual`: `npm ci`,
+  `node record.mjs shots && node record.mjs video && node build.mjs` (needs Google Chrome, ffmpeg, cwebp).
+  The tour itself is `tools/manual/steps.mjs`.
+
+## Installers
+Releases page of the GitHub repository: `.dmg` (Mac, Apple silicon), `.exe` / `.msi` (Windows x64),
+`.deb` / `.rpm` / `.AppImage` (Linux x64). Windows and Linux are built by `.github/workflows/build.yml`
+(run it from the Actions tab or push a `v*` tag); the Mac build is made locally.
+
 ## Desktop app (Mac)
 Tauri 2 shell (`crates/d300-app`) around the interface in `app/`; engine in Rust (`crates/d300-core`).
 - Build: `cd crates/d300-app && cargo tauri build` → `target/release/bundle/macos/Tecan D300 Craft.app` and a `.dmg`

@@ -23,7 +23,7 @@ const keys = (s) => IS_MAC ? s : String(s).replace(/⇧⌘/g, 'Ctrl+Shift+').rep
 
 
 export const APP_NAME = 'Tecan D300 Craft';
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const REVISION_USER = 'Mac\\D300 Craft';
 
 // ---------------- state ----------------
@@ -1008,6 +1008,7 @@ async function renderResultsTab(el) {
 const FIG_FORMATS = ['png', 'pdf', 'svg', 'rds'];
 async function renderSynergySection(el) {
   let A; try { A = await import('../src/analysis.js'); } catch { return; }
+  if (!el.isConnected) return; // the panel was re-rendered while the module loaded; the new one renders itself
   let result; try { result = A.analyze({ protocol: S.protocol, computed: S.computed, meta: S.meta }); } catch (e) { el.innerHTML = `<div class="callout warn">${esc(e.message)}</div>`; return; }
   const mats = synergyMatrices(result);
   if (!mats.length) { el.innerHTML = '<h3>Synergy</h3><p class="hint">No drug pairs with single-agent and combination wells measured yet.</p>'; return; }

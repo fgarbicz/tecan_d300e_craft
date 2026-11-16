@@ -1,0 +1,7 @@
+{
+  "name": "d300-manual",
+  "private": true,
+  "type": "module",
+  "description": "Builds the screenshots, HTML demo, video and PDF manual from the running app (docs/manual).",
+  "devDependencies": { "playwright-core": "1.56.1" }
+}

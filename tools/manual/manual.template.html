@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D300 Craft Manual</title>
+<style>
+:root{--ink:#16202e;--muted:#5d6b7e;--line:#d9e0e8;--accent:#1f6feb;--hi:#ff7a1a;--soft:#f1f5fa;--warn:#a34d00}
+@media screen and (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e6ebf2;--muted:#9aa6b6;--line:#2c3644;--accent:#6aa6ff;--soft:#1b2430;--warn:#ffb070}body{background:#11161d}}
+@page{size:A4;margin:16mm 15mm 18mm}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:#fff;font:10.5pt/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.doc{max-width:860px;margin:0 auto;padding:24px 16px}
+@media print{.doc{max-width:none;padding:0}}
+h1{font-size:26pt;margin:0 0 6px;letter-spacing:-.01em}
+h2{font-size:16pt;margin:28px 0 8px;padding-top:6px;border-top:2px solid var(--ink);break-after:avoid}
+h3{font-size:12pt;margin:18px 0 6px;break-after:avoid}
+p,li{orphans:3;widows:3}
+a{color:var(--accent)}
+code{font:9.5pt/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--soft);padding:1px 4px;border-radius:4px}
+pre{font:9pt/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--soft);padding:10px 12px;border-radius:7px;overflow-x:auto;white-space:pre-wrap}
+table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:9.8pt}
+th,td{text-align:left;vertical-align:top;padding:5px 8px;border-bottom:1px solid var(--line)}
+th{font-weight:650;background:var(--soft)}
+.cover{min-height:240mm;display:flex;flex-direction:column;justify-content:center;break-after:page}
+.cover .kicker{color:var(--accent);font-weight:650;letter-spacing:.08em;text-transform:uppercase;font-size:10pt}
+.cover .lead{font-size:13pt;color:var(--muted);max-width:150mm}
+.cover img{width:100%;border:1px solid var(--line);border-radius:8px;margin:18px 0}
+.cover .meta{color:var(--muted);font-size:9.5pt}
+.toc ol{columns:2;column-gap:28px;padding-left:18px}
+.callout{border-left:4px solid var(--accent);background:var(--soft);padding:9px 12px;border-radius:0 7px 7px 0;margin:10px 0}
+.callout.warn{border-color:var(--hi)}
+.step{break-inside:avoid;margin:12px 0 16px}
+.step .n{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:11px;background:var(--hi);color:#fff;font-weight:700;font-size:9pt;margin-right:6px}
+.step h4{margin:0 0 4px;font-size:11pt}
+.step p{margin:0 0 6px}
+.shot{position:relative;width:86%;margin:0 auto;border:1px solid var(--line);border-radius:6px;overflow:hidden;line-height:0}
+.shot img{width:100%;display:block}
+.shot .ring{position:absolute;border:2.5px solid var(--hi);border-radius:6px;box-shadow:0 0 0 2000px rgba(10,20,40,.10)}
+.shot .tag{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;line-height:22px;border-radius:11px;background:var(--hi);color:#fff;font:700 9pt/22px sans-serif;text-align:center}
+.chapter{break-before:page}
+dl.gloss dt{font-weight:650;margin-top:8px}
+dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
+.os{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.os > div{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+@media (max-width:700px){.os{grid-template-columns:1fr}.toc ol{columns:1}}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body><div class="doc">
+
+<section class="cover">
+  <div class="kicker">User manual · version {{VERSION}}</div>
+  <h1>Tecan D300 Craft</h1>
+  <p class="lead">Design drug-printing experiments for the Tecan D300e digital dispenser on a Mac, Windows or Linux computer: doses, plates, cell lines, the cassettes to load, and — after the plate read — viability and synergy.</p>
+  <img src="shots/24.webp" alt="Craft after the experiment wizard: a randomized 384-well plate and the cassette loading drawing">
+  <p class="meta">{{DATE}} · Screens shown: Craft {{VERSION}}. The guided tour is also available as an interactive page (<code>demo.html</code>) and a video (<code>tecan-d300-craft-tour.mp4</code>).</p>
+</section>
+
+<section class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li>What Craft is — and what it is not</li>
+    <li>Installing</li>
+    <li>Words used in this manual</li>
+    <li>Guided tour: one experiment, start to finish</li>
+    <li>At the D300e</li>
+    <li>Editing plates by hand</li>
+    <li>Results, synergy and Excel</li>
+    <li>Command line and Claude</li>
+    <li>What has been checked against D300e Control</li>
+    <li>Troubleshooting</li>
+  </ol>
+</section>
+
+<h2>1. What Craft is — and what it is not</h2>
+<p>Craft writes the same protocol files (<code>.tdd</code>) as Tecan's D300e Control 4.0.1. You design the experiment on any computer, copy the file to the D300e computer, open it in D300e Control and run it there. Craft never talks to the instrument.</p>
+<p>Next to each <code>.tdd</code> Craft saves an <b>experiment file</b> (<code>name.craft.json</code>) with what the D300e does not need: cell lines, well roles (blank, excluded), the units you prefer for each drug, and the plate-reader values. Keep both files together.</p>
+<div class="callout warn"><b>Always open the protocol in D300e Control and check it before dispensing.</b> D300e Control works out the volumes itself from the doses in the file, so what lands in the wells is decided there. Craft's run plan (cassettes and loads) is a prediction that matched D300e Control on every run it was compared with; compare it once with D300e Control's own loading table on your first run of a new kind of experiment.</div>
+<p>Craft is a clean-room program: it was built from protocol files and run reports saved by D300e Control and from the D300e user guide. It contains no Tecan code.</p>
+
+<h2>2. Installing</h2>
+<div class="os">
+  <div><b>Mac</b><br><code>…_aarch64.dmg</code> (Apple silicon). Open the .dmg and drag the app to Applications. The app is not notarized: the first time, right-click it → <b>Open</b> → <b>Open</b> (or System Settings → Privacy &amp; Security → <b>Open Anyway</b>).</div>
+  <div><b>Windows 10/11</b><br><code>…_x64-setup.exe</code> (installs for the current user, no admin rights needed) or <code>…_x64_en-US.msi</code> (for IT deployment). The installer is not signed: in the SmartScreen window choose <b>More info → Run anyway</b>. Uses Microsoft Edge WebView2, which Windows 10/11 already has; the setup installs it if missing.</div>
+  <div><b>Linux</b><br><code>…_amd64.deb</code> (Ubuntu/Debian: <code>sudo apt install ./file.deb</code>), <code>….rpm</code> (Fedora), or <code>…_amd64.AppImage</code> (any distribution: <code>chmod +x</code>, then run it). Needs WebKitGTK 4.1, which current desktop distributions include.</div>
+</div>
+<p>The installers are on the repository's <b>Releases</b> page. The same interface also runs in a web browser for development (<code>bin/serve.sh</code>, then <code>http://127.0.0.1:8931/app/</code>); in the browser, Save downloads the files instead of writing them in place.</p>
+
+<h2>3. Words used in this manual</h2>
+<dl class="gloss">
+  <dt>Stock</dt><dd>The tube of drug you pipette into a dispense head, e.g. Bortezomib 10 mM in DMSO.</dd>
+  <dt>Dose</dt><dd>The final concentration in the well after printing, e.g. 10 nM. Each drug can be shown in its own unit (mM, µM, nM, pM, or mass units); the file for the D300e always stores the same value.</dd>
+  <dt>Dilution step</dt><dd>How much lower each next dose is: 1:3 means each dose is a third of the one before. Give a step, or a highest and a lowest dose and let Craft work out the step.</dd>
+  <dt>PBS border</dt><dd>The outer row and column of the plate, filled by hand with PBS or medium so the inner wells do not dry out. The D300e does not print there, except priming wells.</dd>
+  <dt>Priming ("scrap") well</dt><dd>A border well that gets at least 30 nL of each drug first, so the head is running properly before the tiny doses (Tecan's recommendation).</dd>
+  <dt>Diluted stock (fluid shift / extend)</dt><dd>When a dose would need less than one drop of the stock, Craft adds a second tube of the same drug, diluted, e.g. <i>Bortezomib - 1:30</i>. <b>Shift</b>: the whole series comes from the diluted tube. <b>Extend</b>: the low doses come from the diluted tube (those that need up to about 180 nL of it), the high doses from the stock. D300e Control does the same and picks the same dilution factors (2–9, 10–90, 100–900, 1000–9000).</dd>
+  <dt>DMSO top-up (normalization)</dt><dd>Plain DMSO added so that every well, the controls included, contains the same amount of solvent. "Same DMSO in every well" tops every well up to the well with the most.</dd>
+  <dt>Cassette and dispense head</dt><dd>T8+: 8 small heads. D4+: 4 high-volume heads, used when a head needs more than a T8+ holds. Each head holds one solution; the run plan says what to pipette into which head and how much (the <i>load</i>, which includes what the head needs beyond the dispensed volume).</dd>
+  <dt>Randomization</dt><dd>The D300e prints each dose into another well of the same cell line, in a random order saved in the protocol. Craft shows the plate <i>as planned</i> (tidy layout, where you edit) or <i>as printed</i> (where each dose really lands). Results are always matched to where the dose was printed.</dd>
+  <dt>Blank / vehicle</dt><dd>Vehicle: cells with DMSO only (100 % viability). Blank: medium without cells (background), marked in Annotate.</dd>
+</dl>
+
+{{WALKTHROUGH}}
+
+<h2 class="chapter">5. At the D300e</h2>
+<ol>
+  <li>Copy the <code>.tdd</code> (and the <code>.craft.json</code>, so the results open later) to the D300e computer, e.g. through OneDrive or a USB stick.</li>
+  <li>In D300e Control: <b>File → Open</b> the <code>.tdd</code>. Look at plate 1: drugs, doses and — on a randomized plate — the scattered layout should match Craft's <i>As printed</i> view.</li>
+  <li>Press <b>Run</b>. D300e Control shows which cassettes to insert and what to load into each head. Compare it with Craft's Run tab (the drawing you printed). If they differ, follow D300e Control and tell the person who looks after Craft.</li>
+  <li>Seed the cells and fill the border with PBS as the <i>Cell lines</i> view shows, then load the plates when the D300e asks.</li>
+  <li>Keep D300e Control's run report (Reports folder): it records what was actually dispensed.</li>
+</ol>
+
+<h2>6. Editing plates by hand</h2>
+<p>Everything the wizard makes can be changed by hand, and Craft opens any protocol saved by D300e Control. Select wells by dragging, Shift-click to extend, Ctrl-click (⌘-click on a Mac) to add wells, or click a row or column header. Then use a tab on the right:</p>
+<table>
+  <tr><th>Tab</th><th>What it does</th></tr>
+  <tr><td>Set</td><td>Give the selected wells one concentration of one drug (or remove it).</td></tr>
+  <tr><td>Titrate</td><td>A series of doses across the selected wells, e.g. 8 doses × 3 wells each = select 24 wells. Highest dose and step, or highest and lowest.</td></tr>
+  <tr><td>Synergy</td><td>D300e Control's synergy builder: a full matrix of two or three drugs on one plate (no replicates; for replicates and cell lines use the wizard).</td></tr>
+  <tr><td>Normalize</td><td>DMSO top-up of the selected wells so they all contain the same amount. Include the no-drug wells: they become the vehicle controls.</td></tr>
+  <tr><td>Annotate</td><td>Cell lines, blanks and excluded wells; randomize or de-randomize a plate or all plates.</td></tr>
+  <tr><td>Check</td><td>Everything the D300e would refuse or warn about, with the wells to look at; DMSO per well; priming.</td></tr>
+  <tr><td>Run</td><td>Cassettes, dispense heads and loads, as a drawing (save it as SVG or PNG) and as tables.</td></tr>
+  <tr><td>Results</td><td>Paste plate-reader values, see viability and synergy, export Excel or a SynergyFinder package.</td></tr>
+</table>
+<p>Copy and Paste carry wells with their drugs, normalization, cell lines and roles. Undo (Ctrl+Z / ⌘Z) undoes any change, including a whole wizard run. The colour theme is chosen with the dots in the top-right corner.</p>
+
+<h2>7. Results, synergy and Excel</h2>
+<ul>
+  <li>Paste each plate's values in the Results tab, copied from the plate reader's Excel export (row and column labels are fine). One paste per plate; switch plates in the list on the left.</li>
+  <li>% of vehicle uses the wells with DMSO only on the same plate and cell line; mark medium-only wells as <b>blank</b> in Annotate to subtract background.</li>
+  <li>Bliss excess (shown in the app) is how much more the pair kills than expected if the two drugs acted independently. For ZIP, HSA and Loewe, <b>Save package</b> writes the data in SynergyFinder's format with an R script; <b>Save + render</b> also runs it (desktop app, needs the <code>synergyfinder</code> conda environment).</li>
+  <li><b>Export Excel</b>: one row per well (plate, well, cell line, role, every drug's concentration in its unit, DMSO %, raw signal, % of vehicle), replicate statistics per condition and the Bliss table.</li>
+</ul>
+<div class="callout">The analysis is checked by Craft's own tests, not against another analysis program. Check your first analysis against a hand calculation before relying on it.</div>
+
+<h2>8. Command line and Claude</h2>
+<p>The repository contains a command-line version of the designer (needs Node.js 20 or newer). It turns a short JSON description into the protocol, the experiment file and a bench plan in Markdown:</p>
+<pre>bin/d300craft example &gt; spec.json        # an example to edit
+bin/d300craft design spec.json --out experiments/my-run
+bin/d300craft plan my-run.tdd             # plan for any protocol
+bin/d300craft check my-run.tdd            # warnings only
+bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
+<p>A spec can give doses as <code>"top": "10 µM", "bottom": "0.1 nM", "levels": 10</code> or with a <code>"dilution": "1:3"</code>, a unit per drug (<code>"unit": "nM"</code>), diluted stocks (on by default) and <code>"randomize": "cellLine"</code>. Claude uses the same tool through the <code>d300-plate-design</code> skill, so you can ask it to "design synergy plates for these drugs on these cells".</p>
+
+<h2>9. What has been checked against D300e Control</h2>
+<p>Every behaviour was compared with D300e Control 4.0.1 running in simulation mode on a Windows computer, never on a physical run.</p>
+<table>
+  <tr><th>Checked</th><th>Result</th></tr>
+  <tr><td>Files: every protocol saved by D300e Control opens and saves back byte-for-byte identical; Craft's files open in D300e Control with the designed doses (including a randomized plate: 850 of 850 rows)</td><td>All files tried</td></tr>
+  <tr><td>Dispensed volumes per well (27 simulated runs)</td><td>26,688 of 26,701 rows identical</td></tr>
+  <tr><td>Cassettes, heads and loads</td><td>Identical on every run compared</td></tr>
+  <tr><td>DMSO top-up "% of assay volume" and "same DMSO in every well"</td><td>Identical</td></tr>
+  <tr><td>Diluted stocks: factors offered, split between stock and diluted stock</td><td>Identical where tested (factors 3, 6, 30, 300)</td></tr>
+</table>
+<p><b>Not yet checked:</b> the minimum load for aqueous solutions; D300e Control's own warnings before a run; 13 wells in runs using "to highest total" normalization, which differ by a rounding tie. Read D300e Control's warnings and loading table before the run.</p>
+
+<h2>10. Troubleshooting</h2>
+<table>
+  <tr><th>Problem</th><th>What to do</th></tr>
+  <tr><td>The wizard says "Not ready yet"</td><td>The message says what does not fit and what would fit (fewer doses, fewer wells per dose, more plates). Change one of them.</td></tr>
+  <tr><td>A dose is "below one drop"</td><td>Keep "Add a diluted stock" ticked in step 1, or lower the stock concentration.</td></tr>
+  <tr><td>Too much DMSO in some wells</td><td>Lower the highest dose, use a more concentrated stock, or raise the DMSO limit if your cells tolerate it.</td></tr>
+  <tr><td>Randomized protocol saved with a version before 0.3.0 prints a different pattern</td><td>Older versions saved the shuffle in the reverse direction. Open the file, press <b>Shuffle again</b> and save.</td></tr>
+  <tr><td>The dose map export shows the tidy layout of a randomized plate</td><td>Expected: it shows the plan. For the printed positions use the <i>As printed</i> view.</td></tr>
+  <tr><td>Mac: "cannot be opened because the developer cannot be verified"</td><td>Right-click → Open → Open, once.</td></tr>
+  <tr><td>Windows: "Windows protected your PC"</td><td>More info → Run anyway.</td></tr>
+  <tr><td>Linux: the AppImage does not start</td><td><code>chmod +x</code> the file; on Ubuntu 24.04 and newer also <code>sudo apt install libfuse2t64</code>, or use the .deb.</td></tr>
+</table>
+</div></body></html>

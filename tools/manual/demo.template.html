@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D300 Craft Tour</title>
+<style>
+:root{--bg:#f4f6f9;--panel:#fff;--ink:#16202e;--muted:#5d6b7e;--line:#dde3ea;--accent:#1f6feb;--hi:#ff7a1a;--cap:#132036;--capInk:#fff;--capHead:#ffb37a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f141b;--panel:#18202b;--ink:#e6ebf2;--muted:#97a3b4;--line:#2a3442;--accent:#5b9dff;--cap:#26364d}}
+:root[data-theme="dark"]{--bg:#0f141b;--panel:#18202b;--ink:#e6ebf2;--muted:#97a3b4;--line:#2a3442;--accent:#5b9dff;--cap:#26364d}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+header h1{font-size:18px;margin:0;font-weight:650}
+header .sub{color:var(--muted);font-size:13px}
+header .links{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+header a{color:var(--accent);text-decoration:none;font-size:14px;border:1px solid var(--line);border-radius:7px;padding:5px 10px}
+main{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;padding:18px 20px;max-width:1700px;margin:0 auto}
+nav.chapters{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;align-self:start;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+nav.chapters h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 8px 8px}
+nav.chapters ol{list-style:none;margin:0;padding:0}
+nav.chapters li button{all:unset;display:block;width:100%;box-sizing:border-box;padding:6px 9px;border-radius:7px;cursor:pointer;font-size:14px}
+nav.chapters li button:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+nav.chapters li button.on{background:var(--accent);color:#fff}
+nav.chapters li small{display:block;color:inherit;opacity:.7;font-size:12px}
+.stage{position:relative;width:100%;aspect-ratio:1440/900;background:#ccd3dc;border-radius:12px;overflow:hidden;box-shadow:0 6px 30px rgba(0,0,0,.18)}
+.stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .35s}
+.stage .ring{position:absolute;border:3px solid var(--hi);border-radius:9px;box-shadow:0 0 0 4000px rgba(10,20,40,.16),0 0 16px rgba(255,122,26,.7);transition:all .5s ease;pointer-events:none}
+.stage .cur{position:absolute;width:24px;height:24px;margin:-3px 0 0 -3px;transition:left .7s cubic-bezier(.4,.1,.2,1),top .7s cubic-bezier(.4,.1,.2,1);pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.stage .rip{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid var(--hi);animation:rip .6s ease-out forwards;pointer-events:none}
+@keyframes rip{from{transform:scale(.2);opacity:1}to{transform:scale(1.4);opacity:0}}
+.cap{position:absolute;width:min(420px,44%);background:var(--cap);color:var(--capInk);padding:12px 15px 13px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:15px;line-height:1.45;transition:left .45s,top .45s,opacity .3s}
+.cap b{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--capHead);margin-bottom:3px}
+.cap .t{display:block;font-weight:650;font-size:17px;margin-bottom:3px}
+.below{display:none;margin-top:12px;background:var(--cap);color:var(--capInk);border-radius:10px;padding:12px 15px}
+.below b{display:block;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--capHead)}
+.below .t{display:block;font-weight:650;font-size:17px;margin:2px 0 4px}
+.controls{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.controls button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer;min-width:44px}
+.controls button.primary{background:var(--accent);border-color:var(--accent);color:#fff;min-width:90px}
+.controls .count{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.controls select{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px}
+.bar{position:relative;flex:1 1 200px;height:10px;background:var(--line);border-radius:5px;cursor:pointer;min-width:160px}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:5px;transition:width .3s}
+.bar .mark{position:absolute;top:-3px;width:2px;height:16px;background:var(--muted);opacity:.6}
+.hint{color:var(--muted);font-size:13px;margin-top:8px}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}nav.chapters{position:static;max-height:none}nav.chapters ol{display:flex;flex-wrap:wrap;gap:4px}nav.chapters li button{width:auto}nav.chapters li small{display:none}
+  .stage .cap{display:none}.below{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tecan D300 Craft — guided tour</h1><span class="sub">One experiment from the start screen to the Excel file, in __N__ steps.</span>
+  <span class="links"><a href="tecan-d300-craft-tour.mp4">Video (MP4)</a><a href="tecan-d300-craft-manual.pdf">Manual (PDF)</a></span>
+</header>
+<main>
+  <nav class="chapters"><h2>Chapters</h2><ol id="chapters"></ol></nav>
+  <section>
+    <div class="stage" id="stage">
+      <img id="imgA" alt=""><img id="imgB" alt="" style="opacity:0">
+      <div class="ring" id="ring"></div>
+      <svg class="cur" id="cur" viewBox="0 0 22 22"><path d="M3 2 L3 18 L7.5 14 L10.5 20.5 L13 19.3 L10 13 L16 13 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <div class="cap" id="cap"></div>
+    </div>
+    <div class="below" id="below"></div>
+    <div class="controls">
+      <button id="prev" title="Previous step (←)">◀</button>
+      <button id="play" class="primary" title="Play / pause (space)">▶ Play</button>
+      <button id="next" title="Next step (→)">▶</button>
+      <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
+      <span class="count" id="count"></span>
+      <select id="speed" title="Playback speed"><option value="1.4">Slow</option><option value="1" selected>Normal</option><option value="0.7">Fast</option></select>
+    </div>
+    <p class="hint">← → step · space play/pause · click the bar to jump. The screenshots are from the app itself; the plate-reader values in the Results chapter are simulated.</p>
+  </section>
+</main>
+<script>
+const DATA = /*STEPS*/null;
+const S = DATA.steps, V = DATA.view;
+const $ = (id) => document.getElementById(id);
+let i = 0, playing = false, timer = null, front = 'A';
+for (const s of S) { const im = new Image(); im.src = `shots/${s.id}.webp`; }
+const chapters = [...new Map(S.map((s, k) => [s.chapter, k])).entries()];
+$('chapters').innerHTML = chapters.map(([c, k]) => `<li><button data-k="${k}">${c}<small>${S.filter((s) => s.chapter === c).length} steps</small></button></li>`).join('');
+$('chapters').onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) go(+b.dataset.k, true); };
+$('bar').innerHTML += chapters.map(([, k]) => `<span class="mark" style="left:${(k / S.length) * 100}%"></span>`).join('');
+const pct = (b) => b && { l: (b.x / V.width) * 100, t: (b.y / V.height) * 100, w: (b.width / V.width) * 100, h: (b.height / V.height) * 100 };
+function capHtml(s) { return `<b>${s.chapter}</b><span class="t">${s.title}</span>${s.text}`; }
+function place(s) {
+  const st = $('stage').getBoundingClientRect(), cap = $('cap'), b = s.box;
+  cap.innerHTML = capHtml(s); $('below').innerHTML = capHtml(s);
+  const cw = cap.offsetWidth, ch = cap.offsetHeight, k = st.width / V.width;
+  let x = 16, y = st.height - ch - 16;
+  if (b) {
+    const bx = b.x * k, by = b.y * k, bw = b.width * k, bh = b.height * k;
+    const below = by + bh + 16, above = by - ch - 16;
+    if (below + ch < st.height - 8) { y = below; x = bx + bw / 2 - cw / 2; }
+    else if (above > 8) { y = above; x = bx + bw / 2 - cw / 2; }
+    else { y = Math.max(12, Math.min(st.height - ch - 12, by)); x = bx + bw + 18 + cw < st.width ? bx + bw + 18 : bx - cw - 18; }
+    x = Math.max(12, Math.min(st.width - cw - 12, x));
+  }
+  cap.style.left = x + 'px'; cap.style.top = y + 'px';
+}
+function go(n, user) {
+  i = Math.max(0, Math.min(S.length - 1, n));
+  const s = S[i], next = front === 'A' ? 'B' : 'A';
+  const im = $('img' + next); im.src = `shots/${s.id}.webp`; im.alt = s.title;
+  im.onload = () => { im.style.opacity = 1; $('img' + front).style.opacity = 0; front = next; };
+  const r = $('ring'), p = pct(s.box);
+  if (p) Object.assign(r.style, { left: `calc(${p.l}% - 6px)`, top: `calc(${p.t}% - 6px)`, width: `calc(${p.w}% + 12px)`, height: `calc(${p.h}% + 12px)`, opacity: 1 });
+  else r.style.opacity = 0;
+  const c = $('cur');
+  if (p) { c.style.left = (p.l + Math.min(p.w / 2, 60 / V.width * 100)) + '%'; c.style.top = (p.t + Math.min(p.h / 2, 18 / V.height * 100)) + '%'; }
+  place(s);
+  $('fill').style.width = ((i + 1) / S.length) * 100 + '%';
+  $('count').textContent = `${i + 1} / ${S.length}`;
+  for (const b of document.querySelectorAll('#chapters button')) b.classList.toggle('on', b.parentElement === [...document.querySelectorAll('#chapters li')][chapters.findIndex(([ch]) => ch === s.chapter)]);
+  try { history.replaceState(null, '', '#' + (i + 1)); } catch {}
+  if (user && playing) schedule();
+}
+function dur(s) { return Math.min(10000, Math.max(3500, s.text.split(/\s+/).length * 250)) * +$('speed').value; }
+function schedule() {
+  clearTimeout(timer);
+  if (!playing) return;
+  const s = S[i];
+  timer = setTimeout(() => {
+    if (s.click && s.box) { const c = $('cur'), rp = document.createElement('div'); rp.className = 'rip'; rp.style.left = c.style.left; rp.style.top = c.style.top; $('stage').appendChild(rp); setTimeout(() => rp.remove(), 700); }
+    setTimeout(() => { if (i < S.length - 1) { go(i + 1); schedule(); } else setPlay(false); }, s.click ? 450 : 0);
+  }, dur(s));
+}
+function setPlay(v) { playing = v; $('play').textContent = v ? '❚❚ Pause' : '▶ Play'; schedule(); }
+$('play').onclick = () => { if (!playing && i === S.length - 1) go(0); setPlay(!playing); };
+$('prev').onclick = () => go(i - 1, true);
+$('next').onclick = () => go(i + 1, true);
+$('bar').onclick = (e) => { const r = $('bar').getBoundingClientRect(); go(Math.floor(((e.clientX - r.left) / r.width) * S.length), true); };
+$('speed').onchange = () => schedule();
+addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') go(i + 1, true); else if (e.key === 'ArrowLeft') go(i - 1, true); else if (e.key === ' ') { e.preventDefault(); $('play').click(); } });
+addEventListener('resize', () => place(S[i]));
+go((parseInt(location.hash.slice(1)) || 1) - 1);
+</script>
+</body>
+</html>
