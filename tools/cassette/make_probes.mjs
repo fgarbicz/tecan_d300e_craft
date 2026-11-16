@@ -28,6 +28,8 @@ function probe(name, { plates = 1, fluids, norm = [], dmso = 0.1 }) {
       const v = perPlate / n;
       for (let i = 0; i < n; i++) { const [r, c] = take(pi); setWell(p.plates[pi], r, c, fl.id, concFor(v)); }
     });
+    // sub-nL fluid: one extra 0.5 nL well first on the first plate (forces the 10 µL standard-cassette mode, p.112)
+    if (f.subnl) for (const pi of f.subnlAll ? onPlates : [onPlates[0]]) { const [r, c] = take(pi); setWell(p.plates[pi], r, c, fl.id, concFor(0.5)); }
   }
   for (const g of norm) {
     const wells = [];
@@ -38,6 +40,24 @@ function probe(name, { plates = 1, fluids, norm = [], dmso = 0.1 }) {
 }
 
 const P = {
+  // Sub-nL fluids (a well < 1 nL → standard cassette, 10 µL per head, guide p.109/112): how heads are filled
+  // and when a D4+ takes over (probe-21 z1: 7 + 1 T8+ heads at 10 µL, rest of plate 2 on a D4+).
+  'probe-22a-sub35': { fluids: [{ name: 'u1', totalUL: 35, subnl: true }] },
+  'probe-22b-sub100': { fluids: [{ name: 'u2', totalUL: 100, subnl: true, maxWellUL: 4 }] },
+  'probe-22c-sub2p': { plates: 2, fluids: [{ name: 'u3', totalUL: 80, plates: [0, 1], subnl: true }] },
+  // Does a sub-nL fluid overflow onto free heads of a D4+ cassette that is in the run anyway?
+  // 22d: the D4+ is there for a bulk fluid (one head used); 22e: same sub-nL fluid without it.
+  'probe-22d-subd4': { fluids: [{ name: 'u4', totalUL: 100, subnl: true, maxWellUL: 4 }, { name: 'b1', totalUL: 100, maxWellUL: 4 }] },
+  'probe-22e-sub130': { fluids: [{ name: 'u5', totalUL: 130, subnl: true, maxWellUL: 4 }] },
+  'probe-22f-sub2x65': { plates: 2, fluids: [{ name: 'u6', totalUL: 130, plates: [0, 1], subnl: true, maxWellUL: 4 }] },
+  'probe-22h-sub2pnorm': { plates: 2, fluids: [{ name: 'u8', totalUL: 130, plates: [0, 1], subnl: true, subnlAll: true, maxWellUL: 4 }], norm: [{ param: 1000, wells: 150 }] },
+  'probe-22i-sub2pall': { plates: 2, fluids: [{ name: 'u9', totalUL: 130, plates: [0, 1], subnl: true, subnlAll: true, maxWellUL: 4 }] },
+  'probe-22j-sub140': { fluids: [{ name: 'v1', totalUL: 140, subnl: true, maxWellUL: 4 }] },
+  'probe-22k-bulk300': { fluids: [{ name: 'v2', totalUL: 300, maxWellUL: 4 }] },
+  // plate boundary inside a head: 22n at 6.0 µL into head 7, 22o at 3.0 µL (22l: 5.45 → new head; 22h: 4.975 → shared)
+  'probe-22n-bound6': { plates: 2, fluids: [{ name: 'w1', totalUL: 132, plates: [0, 1], perPlate: [66, 66], subnl: true, subnlAll: true, maxWellUL: 4 }] },
+  'probe-22o-bound3': { plates: 2, fluids: [{ name: 'w2', totalUL: 126, plates: [0, 1], perPlate: [63, 63], subnl: true, subnlAll: true, maxWellUL: 4 }] },
+  'probe-22g-subnorm': { fluids: [{ name: 'u7', totalUL: 130, subnl: true, maxWellUL: 4 }], norm: [{ param: 1000, wells: 150 }] },
   'probe-1-small': { fluids: [0.2, 1.0, 1.6, 1.8, 2.2, 3, 6, 12].map((t, i) => ({ name: `s${i + 1}`, totalUL: t })) },
   'probe-2-split': { fluids: [14, 16, 18, 19, 20, 21, 23, 26].map((t, i) => ({ name: `m${i + 1}`, totalUL: t })) },
   'probe-3-plates': { plates: 3, fluids: [9, 15, 24, 33].map((t, i) => ({ name: `p${i + 1}`, totalUL: t, plates: [0, 1, 2] })) },

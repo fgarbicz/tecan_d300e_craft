@@ -103,16 +103,43 @@ test('probe-19: a D4+ fluid over 3 plates that no whole-plate packing fits is sp
   assert.deepEqual(heads(plan('fixtures/reference/probes/probe-19-d4equal.tdd')), [['D4+', ['e1 259', 'e1 259']]]);
 });
 
-// KNOWN DIFFERENCES (open). Both runs have large per-well DMSO volumes (up to 556 nL/well, DMSO limit 2–3 %).
-// D300e filled T8+ heads in well order to ≈ 10 µL each (not 20) — z1: 7 heads on plate 1 + 1 head on the first
-// 179 wells of plate 2, the rest of plate 2 on a D4+ head (55.2 µL); h1 (16.2 µL, no D4+ involved) also got one
-// head per plate. Neither the 10 µL cap nor its trigger is explained by the settings, MaxVolume, well counts or
-// the presence of a D4+ (probe-10 has 20 µL T8+ heads next to a D4+). Needs a dedicated probe.
-test('probe-21: z1 over 8 T8+ heads at ≈ 10 µL + one D4+ head (D300e) — planner differs', { todo: 'per-head 10 µL cap not modelled' }, () => {
-  const r = plan('fixtures/reference/probes/probe-21-normsweep.tdd');
-  assert.deepEqual(heads(r).map(([t, h]) => [t, h.length]), [['T8+', 8], ['D4+', 3]]);
+// Sub-nL fluids (a well < 1 nL): 10 µL per T8+ head, plate packing / equal split, cassette overflow re-planned.
+// D300e Control 4.0.1 simulations 2026-11-15/16: fill screens and pre-run summaries (counts), run reports for
+// 20, 21, 22a, 22h, 22l. Predictions were written in docs/handoff_probe22_predictions.md before each run.
+const R = 'fixtures/reference/probes/';
+const loads = (r) => r.cassettes.map((c) => [c.type, c.heads.map((h) => h.load)]);
+const counts = (r) => r.cassettes.map((c) => [c.type, c.heads.length]);
+test('probe-20: h1 (sub-nL, 16.2 µL on 2 plates) gets one 10 µL-cap head per plate: 10.6 | 8.6', () => {
+  assert.deepEqual(heads(plan(R + 'probe-20-normholdout.tdd')), [['T8+', ['h1 10.6', 'h2 6.6', 'h1 8.6']], ['D4+', ['DMSO normalization 145', 'DMSO normalization 161']]]);
 });
-test('probe-20: h1 16.2 µL on two T8+ heads, one per plate (9.0 + 7.2 µL dispensed) — planner differs', { todo: 'per-head 10 µL cap not modelled' }, () => {
-  const r = plan('fixtures/reference/probes/probe-20-normholdout.tdd');
-  assert.equal(r.cassettes[0].heads.filter((h) => h.name === 'h1').length, 2);
+test('probe-21: z1 fills 8 T8+ heads at 10 µL (plate 1, then plate 2), the rest of plate 2 goes to the D4+ loaded for normalization', () => {
+  assert.deepEqual(heads(plan(R + 'probe-21-normsweep.tdd')), [
+    ['T8+', ['z1 11.8', 'z1 11.8', 'z1 11.8', 'z1 11.8', 'z1 11.8', 'z1 11.8', 'z1 6.9', 'z1 11.8']],
+    ['D4+', ['z1 84', 'DMSO normalization 165', 'DMSO normalization 163']]]);
+});
+test('probe-22a: one plate, 35 µL sub-nL → 4 equal heads (10.4 µL loads)', () => {
+  assert.deepEqual(loads(plan(R + 'probe-22a-sub35.tdd')), [['T8+', [10.4, 10.4, 10.4, 10.4]]]);
+});
+test('probe-22b/d/e/g/j: sub-nL fluids stay on T8+ (10, 10, 13, 13, 14 heads), even with a D4+ in the run', () => {
+  assert.deepEqual(counts(plan(R + 'probe-22b-sub100.tdd')), [['T8+', 8], ['T8+', 2]]);
+  assert.deepEqual(counts(plan(R + 'probe-22d-subd4.tdd')), [['T8+', 8], ['T8+', 2], ['D4+', 1]]);
+  assert.deepEqual(counts(plan(R + 'probe-22e-sub130.tdd')), [['T8+', 8], ['T8+', 5]]);
+  assert.deepEqual(counts(plan(R + 'probe-22g-subnorm.tdd')), [['T8+', 8], ['T8+', 5], ['D4+', 1]]);
+  assert.deepEqual(counts(plan(R + 'probe-22j-sub140.tdd')), [['T8+', 8], ['T8+', 6]]);
+});
+test('probe-22c/f: 2 plates — 40+40 µL → 8 heads; 65+65 with the sub-nL well on plate 1 only → 8 at 10 + 3 at 20 µL cap', () => {
+  assert.deepEqual(counts(plan(R + 'probe-22c-sub2p.tdd')), [['T8+', 8]]);
+  assert.deepEqual(counts(plan(R + 'probe-22f-sub2x65.tdd')), [['T8+', 8], ['T8+', 3]]);
+});
+test('probe-22h/o: plate packing would need 14 > 13 heads → 13 equal heads across the plate boundary', () => {
+  const h = plan(R + 'probe-22h-sub2pnorm.tdd');
+  assert.deepEqual(loads(h).slice(0, 2), [['T8+', Array(8).fill(11.8)], ['T8+', Array(5).fill(11.8)]]);
+  assert.deepEqual(loads(plan(R + 'probe-22o-bound3.tdd'))[0], ['T8+', Array(8).fill(11.4)]);
+  assert.equal(plan(R + 'probe-22o-bound3.tdd').cassettes.reduce((s, c) => s + c.heads.length, 0), 13);
+});
+test('probe-22l/n: plate packing fits (14 heads) → heads filled to 10 µL per plate; overflow re-planned (22l: no sub-nL left → 3 × 18.3)', () => {
+  assert.deepEqual(loads(plan(R + 'probe-22l-sweepnonorm.tdd')), [['T8+', [11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 6.6, 11.8]], ['T8+', [21.3, 21.3, 21.3]]]);
+  const n = plan(R + 'probe-22n-bound6.tdd');
+  assert.deepEqual(loads(n)[0], ['T8+', [11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 7.2, 11.8]]);
+  assert.equal(n.cassettes.reduce((s, c) => s + c.heads.length, 0), 14);
 });

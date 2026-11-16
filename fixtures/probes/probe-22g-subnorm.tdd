@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>u7</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name>probe-22g-subnorm 1</Name>
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.1</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="0">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="1">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="2">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="3">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="4">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="5">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="6">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="7">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="8">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="9">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="10">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="11">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="12">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="13">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="14">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="15">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="16">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="17">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="18">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="19">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="20">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="21">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="22">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="0" Col="23">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="0">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="1">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="2">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="3">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="4">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="5">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="6">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="7">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="8">
+            <Fluid ID="0">730.3370786517</Fluid>
+          </Well>
+          <Well Row="1" Col="9">
+            <Fluid ID="0">0.09999900001</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills>
+      <Backfill ClassID="0" Type="ToVolume" Param="1000">
+        <Wells>
+          <Well P="0" R="1" C="10" />
+          <Well P="0" R="1" C="11" />
+          <Well P="0" R="1" C="12" />
+          <Well P="0" R="1" C="13" />
+          <Well P="0" R="1" C="14" />
+          <Well P="0" R="1" C="15" />
+          <Well P="0" R="1" C="16" />
+          <Well P="0" R="1" C="17" />
+          <Well P="0" R="1" C="18" />
+          <Well P="0" R="1" C="19" />
+          <Well P="0" R="1" C="20" />
+          <Well P="0" R="1" C="21" />
+          <Well P="0" R="1" C="22" />
+          <Well P="0" R="1" C="23" />
+          <Well P="0" R="2" C="0" />
+          <Well P="0" R="2" C="1" />
+          <Well P="0" R="2" C="2" />
+          <Well P="0" R="2" C="3" />
+          <Well P="0" R="2" C="4" />
+          <Well P="0" R="2" C="5" />
+          <Well P="0" R="2" C="6" />
+          <Well P="0" R="2" C="7" />
+          <Well P="0" R="2" C="8" />
+          <Well P="0" R="2" C="9" />
+          <Well P="0" R="2" C="10" />
+          <Well P="0" R="2" C="11" />
+          <Well P="0" R="2" C="12" />
+          <Well P="0" R="2" C="13" />
+          <Well P="0" R="2" C="14" />
+          <Well P="0" R="2" C="15" />
+          <Well P="0" R="2" C="16" />
+          <Well P="0" R="2" C="17" />
+          <Well P="0" R="2" C="18" />
+          <Well P="0" R="2" C="19" />
+          <Well P="0" R="2" C="20" />
+          <Well P="0" R="2" C="21" />
+          <Well P="0" R="2" C="22" />
+          <Well P="0" R="2" C="23" />
+          <Well P="0" R="3" C="0" />
+          <Well P="0" R="3" C="1" />
+          <Well P="0" R="3" C="2" />
+          <Well P="0" R="3" C="3" />
+          <Well P="0" R="3" C="4" />
+          <Well P="0" R="3" C="5" />
+          <Well P="0" R="3" C="6" />
+          <Well P="0" R="3" C="7" />
+          <Well P="0" R="3" C="8" />
+          <Well P="0" R="3" C="9" />
+          <Well P="0" R="3" C="10" />
+          <Well P="0" R="3" C="11" />
+          <Well P="0" R="3" C="12" />
+          <Well P="0" R="3" C="13" />
+          <Well P="0" R="3" C="14" />
+          <Well P="0" R="3" C="15" />
+          <Well P="0" R="3" C="16" />
+          <Well P="0" R="3" C="17" />
+          <Well P="0" R="3" C="18" />
+          <Well P="0" R="3" C="19" />
+          <Well P="0" R="3" C="20" />
+          <Well P="0" R="3" C="21" />
+          <Well P="0" R="3" C="22" />
+          <Well P="0" R="3" C="23" />
+          <Well P="0" R="4" C="0" />
+          <Well P="0" R="4" C="1" />
+          <Well P="0" R="4" C="2" />
+          <Well P="0" R="4" C="3" />
+          <Well P="0" R="4" C="4" />
+          <Well P="0" R="4" C="5" />
+          <Well P="0" R="4" C="6" />
+          <Well P="0" R="4" C="7" />
+          <Well P="0" R="4" C="8" />
+          <Well P="0" R="4" C="9" />
+          <Well P="0" R="4" C="10" />
+          <Well P="0" R="4" C="11" />
+          <Well P="0" R="4" C="12" />
+          <Well P="0" R="4" C="13" />
+          <Well P="0" R="4" C="14" />
+          <Well P="0" R="4" C="15" />
+          <Well P="0" R="4" C="16" />
+          <Well P="0" R="4" C="17" />
+          <Well P="0" R="4" C="18" />
+          <Well P="0" R="4" C="19" />
+          <Well P="0" R="4" C="20" />
+          <Well P="0" R="4" C="21" />
+          <Well P="0" R="4" C="22" />
+          <Well P="0" R="4" C="23" />
+          <Well P="0" R="5" C="0" />
+          <Well P="0" R="5" C="1" />
+          <Well P="0" R="5" C="2" />
+          <Well P="0" R="5" C="3" />
+          <Well P="0" R="5" C="4" />
+          <Well P="0" R="5" C="5" />
+          <Well P="0" R="5" C="6" />
+          <Well P="0" R="5" C="7" />
+          <Well P="0" R="5" C="8" />
+          <Well P="0" R="5" C="9" />
+          <Well P="0" R="5" C="10" />
+          <Well P="0" R="5" C="11" />
+          <Well P="0" R="5" C="12" />
+          <Well P="0" R="5" C="13" />
+          <Well P="0" R="5" C="14" />
+          <Well P="0" R="5" C="15" />
+          <Well P="0" R="5" C="16" />
+          <Well P="0" R="5" C="17" />
+          <Well P="0" R="5" C="18" />
+          <Well P="0" R="5" C="19" />
+          <Well P="0" R="5" C="20" />
+          <Well P="0" R="5" C="21" />
+          <Well P="0" R="5" C="22" />
+          <Well P="0" R="5" C="23" />
+          <Well P="0" R="6" C="0" />
+          <Well P="0" R="6" C="1" />
+          <Well P="0" R="6" C="2" />
+          <Well P="0" R="6" C="3" />
+          <Well P="0" R="6" C="4" />
+          <Well P="0" R="6" C="5" />
+          <Well P="0" R="6" C="6" />
+          <Well P="0" R="6" C="7" />
+          <Well P="0" R="6" C="8" />
+          <Well P="0" R="6" C="9" />
+          <Well P="0" R="6" C="10" />
+          <Well P="0" R="6" C="11" />
+          <Well P="0" R="6" C="12" />
+          <Well P="0" R="6" C="13" />
+          <Well P="0" R="6" C="14" />
+          <Well P="0" R="6" C="15" />
+          <Well P="0" R="6" C="16" />
+          <Well P="0" R="6" C="17" />
+          <Well P="0" R="6" C="18" />
+          <Well P="0" R="6" C="19" />
+          <Well P="0" R="6" C="20" />
+          <Well P="0" R="6" C="21" />
+          <Well P="0" R="6" C="22" />
+          <Well P="0" R="6" C="23" />
+          <Well P="0" R="7" C="0" />
+          <Well P="0" R="7" C="1" />
+          <Well P="0" R="7" C="2" />
+          <Well P="0" R="7" C="3" />
+          <Well P="0" R="7" C="4" />
+          <Well P="0" R="7" C="5" />
+          <Well P="0" R="7" C="6" />
+          <Well P="0" R="7" C="7" />
+          <Well P="0" R="7" C="8" />
+          <Well P="0" R="7" C="9" />
+          <Well P="0" R="7" C="10" />
+          <Well P="0" R="7" C="11" />
+          <Well P="0" R="7" C="12" />
+          <Well P="0" R="7" C="13" />
+          <Well P="0" R="7" C="14" />
+          <Well P="0" R="7" C="15" />
+        </Wells>
+      </Backfill>
+    </Backfills>
+    <Revisions />
+  </Protocol>
+</Root>
