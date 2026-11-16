@@ -313,7 +313,8 @@ fn randomization_t09_round_trips_and_randomizing_merges_groups() {
     let txt = read_text(&reference_dir().join("t09-randomize.tdd"));
     let mut p = parse_tdd(&txt).unwrap();
     assert_eq!(p.plates[0].randomization.len(), 24);
-    assert_eq!(dispensed_well(&p.plates[0], 1, 0), (1, 12));
+    // <Well R="1" C="0" ToR="1" ToC="12"/>: design well B13 is dispensed into B1 (direction: probe-28 run report)
+    assert_eq!(dispensed_well(&p.plates[0], 1, 12), (1, 0));
     // rewriting from the semantic list (not the raw node) gives the same bytes
     p.plates[0].randomize_raw = None;
     assert_eq!(write_tdd(&p).unwrap(), txt);

@@ -148,3 +148,8 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   rounding = .NET Math.Round(v / inc) in doubles, no tie tolerance (probe-22l, 26).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.
+- Plate randomization (probe-28, 2026-11-16, run report): `<Randomize><Well R C ToR ToC/>` — R,C is the well
+  dispensed into, ToR,ToC the design ("non-random") well whose contents go there; entries sorted by R,C. 850/850
+  report rows (Dispensed Well vs Non-random Well). (was read the other way round; T09 alone cannot tell.)
+- A diluted stock written by Craft (`<RootFluidID>`, `<DilutionFactor>` after `<Name>`, concentration = root / N,
+  name "Drug - 1:N") opens in D300e Control 4.0.1 with the dilution marker and dispenses like any fluid (probe-28).

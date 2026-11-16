@@ -111,7 +111,12 @@ test('randomization: T09 storage round-trips; randomizing makes a permutation an
   const txt = readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't09-randomize.tdd'), 'utf8');
   const p = parseTdd(txt);
   assert.equal(p.plates[0].randomization.length, 24);
-  assert.deepEqual(dispensedWell(p.plates[0], 1, 0), [1, 12]);
+  // file: <Well R="1" C="0" ToR="1" ToC="12"/> = design well B13 is dispensed into B1 (direction confirmed by probe-28's report)
+  assert.deepEqual(dispensedWell(p.plates[0], 1, 12), [1, 0]);
+  // probe-28 (run in D300e Control): its report lists design well G7 as dispensed into C13, E23 into B2
+  const p28 = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 'probes', 'probe-28-craft-wide.tdd'), 'utf8'));
+  assert.deepEqual(dispensedWell(p28.plates[0], 6, 6), [2, 12]);
+  assert.deepEqual(dispensedWell(p28.plates[0], 4, 22), [1, 1]);
   // rewriting from the semantic list (not the raw node) gives the same bytes
   delete p.plates[0]._randomizeRaw;
   assert.equal(writeTdd(p), txt);

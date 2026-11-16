@@ -138,3 +138,14 @@ T8+ Bortezomib:1.9454→2.5  MEN:1.3359→2  Bortezomib - 1:30:0.0376→2  DMSO 
 ```
 Expected: opens without a message, shows the diluted fluid, wells marked randomized; the report's Dispensed Well for
 each Non-random Well equals the file's <Randomize> map (308 wells); every volume as the engine computes it.
+
+### probe-28 result (2026-11-16)
+- Opens without any message; fluid list shows "Bortezomib - 1:30, DMSO @ 0.33 mM" with the dilution marker; wells
+  carry the "Randomized" tag (tooltip "Plate 1 Well G7 (C13)"); the run screen shows the plate as dispensed.
+- Pre-run summary 4 T8+ heads; loads 2.5, 2.0, 2.0, 19.6 (summary: normalization 20) — as predicted.
+- Dispense rows 850/850 (volumes, totals, concentrations; "to highest" across the stock and its dilution).
+- <Randomize> DIRECTION: the report's Dispensed Well ↔ Non-random Well shows that <Well R C ToR ToC/> means
+  "the D300e dispenses into R,C the contents of design well ToR,ToC" — the inverse of what src/tdd.js assumed.
+  Fixed in the reader/writer (JS + Rust): in memory { r, c } design → { toR, toC } dispensed, as all callers
+  expect. Files written before this fix (incl. probe-28 itself) hold the inverse permutation: still a valid
+  shuffle within each cell line, but Craft < this commit would have mapped readouts back wrongly.
