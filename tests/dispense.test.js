@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { computeWell, roundVolume, FLUID_CLASSES, validRange, computeProtocol } from '../src/dispense.js';
-import { parseTdd } from '../src/tdd.js';
+import { parseTdd, wellName } from '../src/tdd.js';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
 const dmsoFluid = (S, id = 0) => ({ id, name: 'F', byVol: false, concentration: S, classId: 0 });
@@ -28,10 +28,12 @@ test('guide p.89 report example: volumes and dispensed concentrations', () => {
 test('guide p.89 multi-fluid wells: total volume includes all dispensed fluids', () => {
   const plate = { assayVolume: 100000, dmsoLimit: 0.02 };
   const fluids = new Map([[1, dmsoFluid(10000, 1)], [2, dmsoFluid(10000, 2)], [3, dmsoFluid(10000, 3)]]);
-  // A09: two fluids at 50 µM -> 505.2 nL each, total 101010.4, 50.01465196 µM
+  // A09: two fluids at 50 µM. The guide (older software) shows 505.2 nL each; D300e Control 4.0.1 dispenses
+  // 504.8 nL (simulated run report, fixtures/reference/reports/probes/probe-18-guide89.xml): it sizes with
+  // T = 101000 (two steps, see computeWell), 505.0 nL is an exact tie and rounds to even.
   let r = computeWell(new Map([[1, 50], [2, 50]]), fluids, plate);
-  for (const x of r.fluids) { close(x.volume, 505.2, 1e-9, 'A09 volume'); close(x.dispensed, 50.01465196, 5e-9, 'A09 conc'); }
-  close(r.totalVolume, 101010.4, 1e-6, 'A09 total');
+  for (const x of r.fluids) { close(x.volume, 504.8, 1e-9, 'A09 volume'); close(x.dispensed, 49.97544787822, 5e-9, 'A09 conc'); }
+  close(r.totalVolume, 101009.6, 1e-6, 'A09 total');
   // A08: 50 µM + 0.0013 µM -> 502.4 + 0.013 nL, total 100502.413, 49.98884952 µM
   r = computeWell(new Map([[1, 50], [2, 0.0013]]), fluids, plate);
   close(r.totalVolume, 100502.413, 1e-6, 'A08 total');
@@ -127,16 +129,19 @@ test('priming: fluids below 30 nL on a plate are flagged; scrap well values reac
   assert.deepEqual(lack, []);
 });
 
-test('T05 (D300e Control): all five normalization types reproduce the software totals', () => {
-  const p = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 't05-normalize.tdd'), 'utf8'));
-  assert.deepEqual(p.backfills.map((b) => b.type), ['ToMaxVolume', 'ToVolume', 'ToAssayVolumePct', 'ToMaxTotalVolume', 'ToTotalVolume']);
-  const res = computeProtocol(p)[0].wells;
-  const sumRow = (r) => [...Array(24).keys()].reduce((s, c) => s + (res.get(`${r},${c}`)?.normalization || 0), 0) / 1000;
-  // Normalization panel showed DMSO 11.4 µL after row A, 16.2 after B, 22.3 after C, 29.5 after D+E.
-  const a = sumRow(0), b = sumRow(1), c = sumRow(2), d = sumRow(3), e = sumRow(4);
-  close(a, 11.4, 0.05, 'row A'); close(a + b, 16.2, 0.05, 'rows A-B'); close(a + b + c, 22.3, 0.05, 'rows A-C');
-  close(a + b + c + d + e, 29.5, 0.05, 'rows A-E');
-  assert.equal(d, 0); close(e, 7.2, 1e-9, 'row E: 300 nL x 24');
+test('T05 run report (D300e Control 4.0.1 simulation): normalization types', async () => {
+  // Rows B–E (to volume, to % of total, to highest total, to total) match every dispense of the report.
+  // KNOWN MISMATCH, row A ("to highest class volume"): the group's largest well (A10, 100 µM of 10 mM, k = 0.01)
+  // sits on an exact rounding tie (505.0 nL). D300e dispenses 505.2 there and tops the other wells up against it;
+  // this engine gives 504.8, so 13 row-A dispenses differ by 0.4 nL. A rule that fixes T05 breaks D3 (whose
+  // 1,848 to-highest wells all match), so it is left until a probe separates the two.
+  const { execFileSync } = await import('node:child_process');
+  const root = join(import.meta.dirname, '..');
+  const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', 'fixtures/reference/t05-normalize.tdd',
+    'fixtures/reference/reports/probes/t05-normalize.xml'], { cwd: root, encoding: 'utf8' });
+  assert.match(out, /'rows': 107, 'vol_ok': 94/, out.split('\n')[0]);
+  const bad = [...out.matchAll(/\(\(1, '([A-Z])\d+'/g)].map((m) => m[1]);
+  assert.ok(bad.length && bad.every((r) => r === 'A'), `only row A may differ: ${bad.join(',')}`);
 });
 
 test('synergy shares the DMSO limit between its fluids (T06/T07 valid ranges)', () => {
@@ -150,9 +155,27 @@ test('simulated run reports: large per-well volumes (1–4 µL, DMSO and aqueous
   // D300e Control 4.0.1 simulation (2026-11-15). They fix the three-step volume solve (see computeWell).
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
-  for (const [name, n] of [['probe-2-split', 80], ['probe-10-bounds', 212]]) {
+  for (const [name, n] of [['probe-2-split', 80], ['probe-10-bounds', 212], ['probe-15-dmsorule', 216], ['probe-17-converge', 120], ['probe-18-guide89', 6], ['probe-7-norm300', 1]]) {
     const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py',
       `fixtures/reference/probes/${name}.tdd`, `fixtures/reference/reports/probes/${name}.xml`], { cwd: root, encoding: 'utf8' });
     assert.match(out, new RegExp(`'rows': ${n}, 'vol_ok': ${n}, 'total_ok': ${n}, 'conc_ok': ${n}`), out.split('\n')[0]);
   }
+});
+
+test('DMSO limit warning matches D300e Control 4.0.1 on every probe well (limits 0.1–10 %)', () => {
+  // First flagged well per plate as shown by D300e ("DMSO limit exceeded"); wells are filled row-major, so
+  // every earlier well must be unflagged and every later one flagged.
+  const obs = [['probe-12-dmso', 0, 'B7'], ['probe-14-dmsofine', 0, 'C10'], ['probe-15-dmsorule', 0, 'C5'], ['probe-15-dmsorule', 1, 'B6'],
+    ['probe-15-dmsorule', 2, 'B9'], ['probe-16-dmsocurve', 0, 'B13'], ['probe-16-dmsocurve', 1, 'B13'], ['probe-16-dmsocurve', 2, 'B14'], ['probe-16-dmsocurve', 3, 'B22']];
+  for (const [f, pi, first] of obs) {
+    const p = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 'probes', `${f}.tdd`), 'utf8'));
+    const ws = [...computeProtocol(p)[pi].wells.entries()].map(([k, w]) => { const [r, c] = k.split(',').map(Number); return { r, c, name: wellName(r, c), flag: w.warnings.some((x) => x.code === 'dmso_limit') }; })
+      .sort((a, b) => a.r - b.r || a.c - b.c);
+    const i = ws.findIndex((w) => w.name === first);
+    assert.ok(i > 0, `${f}: ${first} present`);
+    ws.forEach((w, j) => assert.equal(w.flag, j >= i, `${f} plate ${pi + 1} ${w.name}`));
+  }
+  // and the real D3 protocol has no DMSO warnings in D300e (wells at 1.0005 % after the % top-up)
+  const d3 = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', '2026.08.28 synergy D3.tdd'), 'utf8'));
+  assert.equal(computeProtocol(d3).reduce((s, { wells }) => s + [...wells.values()].filter((w) => w.warnings.some((x) => x.code === 'dmso_limit')).length, 0), 0);
 });

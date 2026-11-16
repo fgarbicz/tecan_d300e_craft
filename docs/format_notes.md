@@ -83,3 +83,20 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
 - UNVERIFIED: aqueous on D4+; D4+ remainder 20–40 µL; whole-plate packing on D4+; the D3 run's normalization
   heads (that run used a modified, unsaved protocol); behaviour with "Use high-volume cassettes" unticked
   (the summary did not update when unticked).
+
+## Volume sizing and the DMSO warning (simulated runs, 2026-11-15, second session)
+- Fluids are sized by fixed-point iteration V_i = C_i·T/S_i, T = fixed + ΣV_i, from V = 0. D300e stops once the
+  total changes by < 0.1 % between steps (checked from the second step on) and uses the total of the step
+  before. probe-17 (120 wells, k = ΣC/S 0.015–0.095 at 50 and 10 µL): 2 steps below k ≈ 0.032, 3 above;
+  the switch matches the relative rule at both volumes, not an absolute nL tolerance. probe-15 (two-fluid wells,
+  k = 0.02) and probe-18 (guide p.89 A09: 504.8 nL in 4.0.1 vs 505.2 nL in the older guide) confirm it.
+- "DMSO limit exceeded" (tooltip, warning icon; pre-run summary "N wells exceed DMSO limit"): flagged when the
+  UNROUNDED DMSO fraction > limit × 1.001. probe-12/14/15/16 (limits 0.1–10 %, 10/50 µL, one and two fluids)
+  bracket the factor to 1.000999–1.001001. The D3 wells at 1.0005 % (after the % top-up) are not flagged.
+- Pre-run summary also lists "A well of 30 nL or greater is recommended for each fluid on each plate".
+- Cassette order follows the fluids: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first (probe-15).
+- T05 row A ("to highest class volume"): the group's largest well is an exact rounding tie; D300e dispenses
+  505.2 nL and tops the others up against that; this engine gives 504.8 (13 dispenses 0.4 nL off). Rows B–E
+  (other four types) match. A rule fixing T05 breaks D3 (1,848 to-highest wells) — open.
+- An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
+  shows its thumbnail in the recent list.

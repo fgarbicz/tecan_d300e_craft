@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>d1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="1">
+        <Name>d2</Name>
+        <ByVol>False</ByVol>
+        <Concentration>1000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name>probe-14-dmsofine 1</Name>
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.01</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="2" Col="1">
+            <Fluid ID="0">99.87029208</Fluid>
+            <Fluid ID="1">0.021970792</Fluid>
+          </Well>
+          <Well Row="2" Col="3">
+            <Fluid ID="0">99.87024164</Fluid>
+            <Fluid ID="1">0.022475836</Fluid>
+          </Well>
+          <Well Row="2" Col="5">
+            <Fluid ID="0">99.8701912</Fluid>
+            <Fluid ID="1">0.02298088</Fluid>
+          </Well>
+          <Well Row="2" Col="7">
+            <Fluid ID="0">99.87014076</Fluid>
+            <Fluid ID="1">0.023485924</Fluid>
+          </Well>
+          <Well Row="2" Col="9">
+            <Fluid ID="0">99.87009032</Fluid>
+            <Fluid ID="1">0.023990968</Fluid>
+          </Well>
+          <Well Row="2" Col="11">
+            <Fluid ID="0">99.87003988</Fluid>
+            <Fluid ID="1">0.024496012</Fluid>
+          </Well>
+          <Well Row="2" Col="13">
+            <Fluid ID="0">99.86998944</Fluid>
+            <Fluid ID="1">0.025001056</Fluid>
+          </Well>
+          <Well Row="2" Col="15">
+            <Fluid ID="0">99.869939</Fluid>
+            <Fluid ID="1">0.0255061</Fluid>
+          </Well>
+          <Well Row="2" Col="17">
+            <Fluid ID="0">99.86988856</Fluid>
+            <Fluid ID="1">0.026011144</Fluid>
+          </Well>
+          <Well Row="2" Col="19">
+            <Fluid ID="0">99.86983812</Fluid>
+            <Fluid ID="1">0.026516188</Fluid>
+          </Well>
+          <Well Row="2" Col="21">
+            <Fluid ID="0">99.86978768</Fluid>
+            <Fluid ID="1">0.027021232</Fluid>
+          </Well>
+          <Well Row="2" Col="23">
+            <Fluid ID="0">99.86973724</Fluid>
+            <Fluid ID="1">0.027526276</Fluid>
+          </Well>
+          <Well Row="3" Col="1">
+            <Fluid ID="0">99.8696868</Fluid>
+            <Fluid ID="1">0.02803132</Fluid>
+          </Well>
+          <Well Row="3" Col="3">
+            <Fluid ID="0">99.86963636</Fluid>
+            <Fluid ID="1">0.028536364</Fluid>
+          </Well>
+          <Well Row="3" Col="5">
+            <Fluid ID="0">99.86958592</Fluid>
+            <Fluid ID="1">0.029041408</Fluid>
+          </Well>
+          <Well Row="3" Col="7">
+            <Fluid ID="0">99.86953548</Fluid>
+            <Fluid ID="1">0.029546452</Fluid>
+          </Well>
+          <Well Row="3" Col="9">
+            <Fluid ID="0">99.86948504</Fluid>
+            <Fluid ID="1">0.030051496</Fluid>
+          </Well>
+          <Well Row="3" Col="11">
+            <Fluid ID="0">99.8694346</Fluid>
+            <Fluid ID="1">0.03055654</Fluid>
+          </Well>
+          <Well Row="3" Col="13">
+            <Fluid ID="0">99.86938416</Fluid>
+            <Fluid ID="1">0.031061584</Fluid>
+          </Well>
+          <Well Row="3" Col="15">
+            <Fluid ID="0">99.86933372</Fluid>
+            <Fluid ID="1">0.031566628</Fluid>
+          </Well>
+          <Well Row="3" Col="17">
+            <Fluid ID="0">99.86928328</Fluid>
+            <Fluid ID="1">0.032071672</Fluid>
+          </Well>
+          <Well Row="3" Col="19">
+            <Fluid ID="0">99.86923284</Fluid>
+            <Fluid ID="1">0.032576716</Fluid>
+          </Well>
+          <Well Row="3" Col="21">
+            <Fluid ID="0">99.8691824</Fluid>
+            <Fluid ID="1">0.03308176</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills />
+    <Revisions />
+  </Protocol>
+</Root>

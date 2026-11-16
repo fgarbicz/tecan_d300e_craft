@@ -53,9 +53,131 @@ const P = {
     { name: 'k3', totalUL: 135, plates: [0, 1, 2], maxWellUL: 4 },
     { name: 'k4', totalUL: 36, plates: [0, 1, 2], perPlate: [14, 14, 8] },
   ] },
+  // Packing rule for multi-plate splits (next-fit vs largest-first vs balanced), T8+ and D4+, plus D4+
+  // remainders between 20 and 40 µL and an aqueous fluid big enough for D4+.
+  'probe-13-packing2': { plates: 4, fluids: [
+    { name: 'q1', totalUL: 34, plates: [0, 1, 2, 3], perPlate: [5, 16, 4, 9] },
+    { name: 'q2', totalUL: 340, plates: [0, 1, 2, 3], perPlate: [50, 160, 40, 90], maxWellUL: 4 },
+    { name: 'q3', totalUL: 280, plates: [0, 1, 2], perPlate: [120, 60, 100], maxWellUL: 4 },
+    { name: 'q4', totalUL: 230, plates: [3], maxWellUL: 4 },
+    { name: 'q5', totalUL: 100, plates: [3], maxWellUL: 4, classId: 1 },
+  ] },
   'probe-9-big': { fluids: [40, 60, 90].map((t, i) => ({ name: `b${i + 1}`, totalUL: t })) },
 };
 for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], `${name}.tdd`), writeTdd(probe(name, spec)));
   console.log('wrote', name);
+}
+
+// DMSO-limit probe: one DMSO fluid, 1 % limit, wells around the limit (single fluid per well), so the
+// real software's warning threshold and rounding can be read off its tooltips / warnings.
+{
+  const p = newProtocol();
+  const pl = newPlate({ plateType: 'Default384', name: 'probe-12-dmso 1', dmsoLimit: 0.01 });
+  p.plates.push(pl);
+  const f = addFluid(p, { name: 'd1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  // target per-well volumes (nL) on the 0.4 nL grid around 505.05 nL (= exactly 1 % of 50.5 µL)
+  const vols = [500, 504.4, 504.8, 505.2, 505.6, 506.0, 506.4, 507.2, 510, 515.2, 520, 550, 600];
+  vols.forEach((v, i) => setWell(pl, 1, 1 + i, f.id, (v * 10000) / (50000 + v)));
+  writeFileSync(join(process.argv[2], 'probe-12-dmso.tdd'), writeTdd(p));
+  console.log('wrote probe-12-dmso');
+}
+
+// Fine DMSO-limit probe: 504.4 nL of d1 (10 mM) + a small top-up of d2 (1 mM, 0.02 nL grid) so the actual DMSO
+// fraction steps by ~0.00005 % around 1.001 % — separates "rounded % vs limit+0.001" from "fraction > limit·1.001"
+// and requested-vs-actual volumes.
+{
+  const p = newProtocol();
+  const pl = newPlate({ plateType: 'Default384', name: 'probe-14-dmsofine 1', dmsoLimit: 0.01 });
+  p.plates.push(pl);
+  const d1 = addFluid(p, { name: 'd1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const d2 = addFluid(p, { name: 'd2', concentration: 1000, concentrationUnit: 'mM', classId: 0 });
+  const A = 50000;
+  for (let i = 0; i <= 22; i++) {
+    const f = 0.010009 + i * 0.0000005; // 1.0009 % … 1.0020 %
+    const vd = (f * A) / (1 - f), x = vd - 504.4, T = A + vd;
+    const r = 2 + Math.floor(i / 12), c = 1 + (i % 12) * 2;
+    setWell(pl, r, c, d1.id, (504.4 * 10000) / T);
+    setWell(pl, r, c, d2.id, (x * 1000) / T);
+  }
+  writeFileSync(join(process.argv[2], 'probe-14-dmsofine.tdd'), writeTdd(p));
+  console.log('wrote probe-14-dmsofine');
+}
+
+// DMSO threshold, three plates that separate the candidate rules (relative ×1.0011, absolute +0.0011 %-points,
+// or a volume excess of ~0.55 nL): 2 % limit / 50 µL, 1 % / 10 µL, 0.5 % / 50 µL. Fraction steps ~0.0001 %.
+{
+  const p = newProtocol();
+  const d1 = addFluid(p, { name: 'd1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const d2 = addFluid(p, { name: 'd2', concentration: 1000, concentrationUnit: 'mM', classId: 0 });
+  const plates = [[0.02, 50000, 2.0003, 2.0040, 0.0001], [0.01, 10000, 1.0004, 1.0080, 0.0002], [0.005, 50000, 0.50020, 0.50170, 0.00005]];
+  plates.forEach(([lim, A, f0, f1, step], pi) => {
+    const pl = newPlate({ plateType: 'Default384', name: `probe-15 ${pi + 1}`, dmsoLimit: lim, assayVolume: A });
+    p.plates.push(pl);
+    let i = 0;
+    for (let fp = f0; fp <= f1 + 1e-12; fp += step, i++) {
+      const f = fp / 100, vd = (f * A) / (1 - f), T = A + vd;
+      const base = Math.floor((vd - 2) / 0.4) * 0.4, x = vd - base;
+      const r = 1 + Math.floor(i / 22), c = 1 + (i % 22);
+      setWell(pl, r, c, d1.id, (base * 10000) / T);
+      setWell(pl, r, c, d2.id, (x * 1000) / T);
+    }
+  });
+  writeFileSync(join(process.argv[2], 'probe-15-dmsorule.tdd'), writeTdd(p));
+  console.log('wrote probe-15-dmsorule');
+}
+
+// DMSO threshold curve: limits 0.1, 0.25, 5, 10 % (50 µL), actual fraction from the limit up to +0.4 % relative.
+{
+  const p = newProtocol();
+  const d1 = addFluid(p, { name: 'd1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const d2 = addFluid(p, { name: 'd2', concentration: 1000, concentrationUnit: 'mM', classId: 0 });
+  [0.001, 0.0025, 0.05, 0.1].forEach((lim, pi) => {
+    const A = 50000;
+    const pl = newPlate({ plateType: 'Default384', name: `probe-16 ${pi + 1}`, dmsoLimit: lim, assayVolume: A });
+    p.plates.push(pl);
+    for (let i = 0; i < 44; i++) {
+      const f = lim * (1 + 0.0001 * i), vd = (f * A) / (1 - f), T = A + vd;
+      const base = Math.max(0, Math.floor((vd - 2) / 0.4) * 0.4), x = vd - base;
+      const r = 1 + Math.floor(i / 22), c = 1 + (i % 22);
+      if (base > 0) setWell(pl, r, c, d1.id, (base * 10000) / T);
+      setWell(pl, r, c, d2.id, (x * 1000) / T);
+    }
+  });
+  writeFileSync(join(process.argv[2], 'probe-16-dmsocurve.tdd'), writeTdd(p));
+  console.log('wrote probe-16-dmsocurve');
+}
+
+// Volume-solve convergence: single DMSO fluid per well, k = C/S from 0.015 to 0.095, at A = 50 µL and 10 µL.
+// D300e iterates V = C·(A + V)/S from V = 0 and stops once the change is small; this pins the tolerance and
+// whether it is absolute (nL) or relative (the two well volumes separate the two).
+{
+  const p = newProtocol();
+  const d1 = addFluid(p, { name: 'd1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  [[50000, 0.015, 0.045], [10000, 0.02, 0.095]].forEach(([A, k0, k1], pi) => {
+    const pl = newPlate({ plateType: 'Default384', name: `probe-17 ${pi + 1}`, dmsoLimit: 0.2, assayVolume: A });
+    p.plates.push(pl);
+    const n = 60;
+    for (let i = 0; i < n; i++) {
+      const k = k0 + ((k1 - k0) * i) / (n - 1);
+      setWell(pl, 1 + Math.floor(i / 22), 1 + (i % 22), d1.id, k * 10000);
+    }
+  });
+  writeFileSync(join(process.argv[2], 'probe-17-converge.tdd'), writeTdd(p));
+  console.log('wrote probe-17-converge');
+}
+
+// Guide p.89 example (100 µL, 2 % limit): two 10 mM fluids at 50 µM in one well (exact-tie case 505.0 nL),
+// and 50 µM + 0.0013 µM.
+{
+  const p = newProtocol();
+  const a = addFluid(p, { name: 'g1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const b = addFluid(p, { name: 'g2', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const pl = newPlate({ plateType: 'Default384', name: 'probe-18 1', dmsoLimit: 0.02, assayVolume: 100000 });
+  p.plates.push(pl);
+  setWell(pl, 0, 8, a.id, 50); setWell(pl, 0, 8, b.id, 50);
+  setWell(pl, 0, 7, a.id, 50); setWell(pl, 0, 7, b.id, 0.0013);
+  setWell(pl, 1, 1, a.id, 60); setWell(pl, 1, 1, b.id, 60); // scrap-sized
+  writeFileSync(join(process.argv[2], 'probe-18-guide89.tdd'), writeTdd(p));
+  console.log('wrote probe-18-guide89');
 }

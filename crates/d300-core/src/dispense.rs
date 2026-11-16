@@ -294,9 +294,24 @@ pub fn floor_volume(v: f64, cls: &FluidClass) -> f64 {
     v
 }
 
-fn round3(x: f64) -> f64 {
-    js_round(x * 1000.0) / 1000.0
+/// Relative tolerances of D300e Control 4.0.1 (fitted on simulated runs, see src/dispense.js).
+pub const SIZING_TOLERANCE: f64 = 1e-3;
+pub const DMSO_LIMIT_TOLERANCE: f64 = 1e-3;
+
+/// Well total used to size the fluids: fixed-point iteration T_n = fixed + k·T_(n−1) from T_0 = fixed, stopping
+/// (from the second step) once |T_n − T_(n−1)| / T_n < 0.1 %; returns T_(n−1), the total V_n was sized with.
+pub fn iterated_total(fixed: f64, k: f64) -> f64 {
+    let mut prev = fixed;
+    for n in 1..=100 {
+        let next = fixed + k * prev;
+        if n >= 2 && (next - prev).abs() / next < SIZING_TOLERANCE {
+            return prev;
+        }
+        prev = next;
+    }
+    prev
 }
+
 
 /// Nearest integer, ties (within 1e-9) to even.
 pub fn round_half_even(q: f64) -> f64 {
@@ -500,11 +515,10 @@ pub fn compute_well(
             normalization_requested: None,
         };
     }
-    // D300e Control runs three fixed-point steps from V_fluids = 0 instead of solving
-    // V_total = fixed / (1 − k) exactly: T = fixed·(1 + k + k²). Fitted on simulated run reports
-    // (probe-2, probe-10: 1–4 µL per well); identical to the exact solution at D3's small volumes.
-    // (was: let v_total_exact = fixed / (1.0 - k);)
-    let v_total_exact = fixed * (1.0 + k + k * k);
+    // D300e Control iterates V_i = C_i·T/S_i, T = fixed + ΣV_i from V = 0 and stops once the total changes by
+    // < 0.1 % (from the second step on); see iterated_total and src/dispense.js computeWell.
+    // (was: a fixed three steps, fixed·(1 + k + k²); before that the exact solution fixed / (1 − k).)
+    let v_total_exact = iterated_total(fixed, k);
     let mut out: Vec<DispenseItem> = vec![];
     for it in &items {
         let cls = fluid_class(it.f.class_id);
@@ -552,11 +566,19 @@ pub fn compute_well(
     } else {
         0.0
     };
-    // Compared at the precision D300e Control displays DMSO % (3 decimals, guide p.33 tooltip "0.911 %"),
-    // so normalizing to exactly the limit (e.g. 1.0004 % after 400 pL rounding) is not flagged.
-    // UNVERIFIED: the real software's comparison; check with T05.
+    // DMSO limit as D300e Control flags it: unrounded (sized) volumes, 0.1 % relative tolerance
+    // (probe-12/14/15/16; see src/dispense.js computeWell). (was: rounded fraction at 3 decimals of %.)
+    let mut exact_dmso = normalization;
+    let mut exact_total = a + normalization;
+    for x in &out {
+        exact_total += x.exact_volume;
+        if fluid_class(x.class_id).is_dmso {
+            exact_dmso += x.exact_volume;
+        }
+    }
+    let exact_fraction = if exact_total > 0.0 { exact_dmso / exact_total } else { 0.0 };
     if let Some(limit) = plate.dmso_limit {
-        if round3(dmso_fraction * 100.0) > round3(limit * 100.0) {
+        if exact_fraction > limit * (1.0 + DMSO_LIMIT_TOLERANCE) {
             warnings.push(Warning::DmsoLimit {
                 dmso_fraction,
                 limit,

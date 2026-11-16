@@ -103,7 +103,6 @@ export function floorVolume(v, cls) {
   }
   return v;
 }
-const round3 = (x) => Math.round(x * 1000) / 1000;
 export function roundHalfEven(q) {
   const f = Math.floor(q), d = q - f;
   if (Math.abs(d - 0.5) < 1e-9) return f % 2 === 0 ? f : f + 1;
@@ -147,13 +146,15 @@ export function computeWell(requests, fluids, plate, normalization = 0, sizingTo
     warnings.push({ code: 'no_solution' });
     return { fluids: [], totalVolume: NaN, dmsoFraction: NaN, warnings, normalization };
   }
-  // D300e Control does not solve V_total = fixed / (1 − k) exactly: it runs three fixed-point steps from
-  // V_fluids = 0 (V_i = C_i·T/S_i, T = fixed + ΣV_i), i.e. the fluids are sized with T = fixed·(1 + k + k²).
-  // Fitted on simulated run reports (fixtures/reference/reports/probe-2, probe-10: 278/278 DMSO rows with
-  // 1–4 µL per well, where the exact solution is 0.4–1.2 nL too high); identical to the exact solution at
-  // the small volumes of the D3 report. The large-volume fit is on single-fluid wells only; multi-fluid wells are
-  // confirmed only at D3's volumes (≤ 0.5 µL per well). (was: const vTotalExact = fixed / (1 - k);)
-  const vTotalExact = fixed * (1 + k + k * k);
+  // D300e Control does not solve V_total = fixed / (1 − k) exactly. It iterates V_i = C_i·T/S_i with
+  // T = fixed + ΣV_i, starting from V = 0, and stops once the well total changes by less than 0.1 %
+  // (relative to the new total); the fluids are sized with the total of the step before the last.
+  // Fitted on simulated run reports: probe-17 (120 single-fluid wells, k = ΣC/S from 0.015 to 0.095 at
+  // 50 and 10 µL: 2 steps below k ≈ 0.032, 3 above, the switch where k²/(1+k+k²) crosses 0.1 %, which an
+  // absolute nL tolerance cannot fit at both volumes) and probe-15 (two-fluid wells at k = 0.02: 2 steps).
+  // (was: a fixed three steps, T = fixed·(1 + k + k²), which agrees only for k between ~0.032 and ~0.25;
+  // before that: the exact solution fixed / (1 − k).)
+  const vTotalExact = iteratedTotal(fixed, k);
   const out = [];
   for (const it of items) {
     const cls = fluidClass(it.f.classId);
@@ -170,11 +171,32 @@ export function computeWell(requests, fluids, plate, normalization = 0, sizingTo
     if (fluidClass(x.classId).isDmso) dmsoVol += x.volume;
   }
   const dmsoFraction = totalVolume > 0 ? dmsoVol / totalVolume : 0;
-  // Compared at the precision D300e Control displays DMSO % (3 decimals, guide p.33 tooltip "0.911 %"),
-  // so normalizing to exactly the limit (e.g. 1.0004 % after 400 pL rounding) is not flagged.
-  // UNVERIFIED: the real software's comparison; check with T05.
-  if (plate.dmsoLimit != null && round3(dmsoFraction * 100) > round3(plate.dmsoLimit * 100)) warnings.push({ code: 'dmso_limit', dmsoFraction, limit: plate.dmsoLimit });
+  // DMSO limit, as D300e Control 4.0.1 flags it ("DMSO limit exceeded"): on the UNROUNDED (sized) volumes,
+  // with a 0.1 % relative tolerance: exact DMSO fraction > limit × 1.001. Fitted on probe-12/14/15/16
+  // (limits 0.1–10 %, 10 and 50 µL, one- and two-fluid wells; the first flagged and last unflagged wells
+  // bracket 1.000999–1.001001 × limit). Normalized wells use the dispensed (rounded) top-up.
+  // (was: the rounded fraction compared at 3 decimals of %, which flagged D3 plate 7-9 wells at 1.0005 %
+  // that D300e accepts.)
+  let exactDmso = normalization, exactTotal = A + normalization;
+  for (const x of out) { exactTotal += x.exactVolume; if (fluidClass(x.classId).isDmso) exactDmso += x.exactVolume; }
+  const exactFraction = exactTotal > 0 ? exactDmso / exactTotal : 0;
+  if (plate.dmsoLimit != null && exactFraction > plate.dmsoLimit * (1 + DMSO_LIMIT_TOLERANCE)) warnings.push({ code: 'dmso_limit', dmsoFraction, limit: plate.dmsoLimit });
   return { fluids: out, totalVolume, dmsoFraction, warnings, normalization, classVolumes: classVolumes(out), exactClassVolumes: classVolumes(out, 'exactVolume') };
+}
+
+/** Well total used to size the fluids (see computeWell): fixed-point iteration with a 0.1 % stop. */
+export const SIZING_TOLERANCE = 1e-3;
+export const DMSO_LIMIT_TOLERANCE = 1e-3; // relative, see computeWell
+export function iteratedTotal(fixed, k) {
+  let prev = fixed; // T_0: no fluid volume yet
+  for (let n = 1; n <= 100; n++) {
+    const next = fixed + k * prev; // T_n = fixed + V_n, V_n = k·T_(n−1)
+    // The check starts at the second step: at least two steps are always taken (D3 report: MEN-only wells,
+    // k = 0.0003, need V_2 = k·A·(1 + k) for their DMSO top-up to floor to 1.0 nL rather than 1.2 nL).
+    if (n >= 2 && Math.abs(next - prev) / next < SIZING_TOLERANCE) return prev; // V_n was sized with T_(n−1)
+    prev = next;
+  }
+  return prev;
 }
 
 function classVolumes(out, field = 'volume') {
