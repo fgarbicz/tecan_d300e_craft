@@ -149,3 +149,15 @@ each Non-random Well equals the file's <Randomize> map (308 wells); every volume
   Fixed in the reader/writer (JS + Rust): in memory { r, c } design → { toR, toC } dispensed, as all callers
   expect. Files written before this fix (incl. probe-28 itself) hold the inverse permutation: still a valid
   shuffle within each cell line, but Craft < this commit would have mapped readouts back wrongly.
+
+## probe-29 (D300e's own fluid shift / extend, 2026-11-16) — see docs/format_notes.md; no prediction needed
+(factor rule as in suggestShift for every case; level split = extended fluid up to ~180 nL.)
+
+## probe-30 (blind; "to highest total" model at the commit that adds tools/cassette/make_probe30.mjs)
+Three groups the model has not seen: 50 µL / one fluid / largest k = 0.004 + 12 empty wells; 20 µL / two fluids /
+largest k = 0.02; 50 µL / largest well with two fluids.
+```
+T8+ ht1:10.0000→11.8  ht1:4.3128→5.3  ht2:8.6324→10.2  ht1:5.9180→7.1
+D4+ DMSO normalization:154.0100→208
+```
+Dispense rows: the engine as committed (maxTotalTopUp); compare with tools/compare/compare_report.py.
