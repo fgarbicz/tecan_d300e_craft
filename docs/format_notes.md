@@ -100,12 +100,14 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   bracket the factor to 1.000999–1.001001. The D3 wells at 1.0005 % (after the % top-up) are not flagged.
 - Pre-run summary also lists "A well of 30 nL or greater is recommended for each fluid on each plate".
 - Cassette order follows the fluids: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first (probe-15).
-- OPEN — "to highest class volume" (ToMaxVolume): T05 row A and two one-change copies (t05-lim2: limit 2 %;
-  t05-a10-90: A10 90 µM) all differ in 13 row-A dispenses by 0.4 nL, so it is neither the rounding tie nor the
-  DMSO limit. A rule with target = max UNROUNDED class volume, fluids sized with T = A + target and the top-up
-  rounded to nearest on the normal drop grid (0.02 nL below 3.6 nL) matches all three T05 reports (321 rows)
-  but breaks 16 D3 top-ups (L14/M14-type wells: 15.6 vs 15.2 nL); the current rule (target = max rounded class
-  volume, top-up floored to 0.4 nL, ≥ 1 nL) matches all of D3 and misses those 39 T05 rows. Kept: the D3 rule.
-  The real rule must depend on something neither captures (all reports in fixtures/reference/reports/probes).
+- Normalization top-up (ToVolume, ToMaxVolume, ToTotalVolume, ToMaxTotalVolume), fitted on D3, T05 + two
+  one-change copies, probe-20 (random hold-out, all types) and probe-21 (single-fluid k sweep 1e-5 to 0.0105):
+  iterate N = t − V (class) or t − (A + V) (total) from the unnormalized exact volumes; after each step
+  V ← k·(A + N + V_all), and for "highest" types the target well moves too, t_V ← k_max·(A + t_V). Stop when
+  N changed by < 0.08 % of N and keep the previous N. Round: ToMaxVolume floor(steps + 0.49), the others nearest
+  (ties even); none below 1 nL. The fluids are sized with the final A + t (ToMaxVolume) or t (ToMaxTotal).
+  Exact on D3 (5752 rows) and all three T05 files (was: 13 row-A misses each). Hold-outs: ToMax 498/505,
+  ToVolume 66/66 per plate, ToTotal 52/66, ToMaxTotal 44/65 top-ups, every miss one 0.4 nL step (src/dispense.js
+  iteratedTopUp). Still OPEN: the total-volume types (empty wells under ToMaxTotal get 290.4 vs 290).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.
