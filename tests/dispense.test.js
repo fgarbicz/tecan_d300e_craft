@@ -142,6 +142,32 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
   }
 });
 
+test('"to total volume": probe-23 plate 1 sweep and the probe-20 group (two fluids, not used for fitting) match', async () => {
+  // Lagged iteration (src/dispense.js totalTopUp). probe-23 plate 1: 663/664 rows (E21: fluid one step off).
+  const { execFileSync } = await import('node:child_process');
+  const root = join(import.meta.dirname, '..');
+  const plate = (tdd, rep, p) => JSON.parse(execFileSync('python3', ['-I', '-c', `
+import sys,re,json,subprocess
+sys.path.insert(0,'tools/cassette')
+from report_cassettes import sheets
+import xml.etree.ElementTree as ET
+td=sheets(ET.parse(sys.argv[2]).getroot())['Tabular Detail']
+mine=json.loads(subprocess.run(['node','tools/compare/engine_dump.mjs',sys.argv[1]],capture_output=True,text=True).stdout)
+idx={(m['plate'],m['well'],'norm' if m['fluid']=='norm' else m['fluid']):m['volume'] for m in mine}
+rows=[r for r in td[1:] if len(r)>17 and r[1]==sys.argv[3]]
+bad=[]
+for r in rows:
+  w=re.sub(r'([A-Z]+)0*(\\d+)',r'\\1\\2',r[2]); key=(int(r[1]),w,'norm' if r[9].endswith('normalization') else int(r[8]))
+  e=idx.get(key)
+  if e is None or abs(e-float(r[15]))>1e-6: bad.append(w)
+print(json.dumps({'rows':len(rows),'bad':bad}))`, tdd, rep, String(p)], { cwd: root, encoding: 'utf8' }));
+  const p23 = plate('fixtures/reference/probes/probe-23-totalsweep.tdd', 'fixtures/reference/reports/probes/probe-23-totalsweep.xml', 1);
+  assert.deepEqual(p23.bad, ['E21'], JSON.stringify(p23));
+  // probe-20 plate 2 rows I–K are the "to total" group: no misses there
+  const p20 = plate('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml', 2);
+  assert.deepEqual(p20.bad.filter((w) => /^[IJK]\d/.test(w)), []);
+});
+
 test('normalization probes 20 and 21: documented accuracy (regression guard)', async () => {
   // probe-21 (single-fluid k sweep) was used to derive the top-up model; probe-20 (random wells, all types) was
   // not used to derive it but was looked at while fitting earlier versions, so it is not a clean hold-out.
@@ -150,7 +176,7 @@ test('normalization probes 20 and 21: documented accuracy (regression guard)', a
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
   const rows = (tdd, rep) => +execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' }).match(/'vol_ok': (\d+)/)[1];
-  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 977);
+  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 984);
   assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1320);
 });
 

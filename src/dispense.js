@@ -289,9 +289,9 @@ export function computeProtocol(protocol) {
         default: continue; // unknown type: leave unnormalized
       }
       if (b.type !== 'ToAssayVolumePct') {
-        const { n, t } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
+        const { n, t, sizing: totalSizing } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
         // fluids of a normalized well are sized with the group's final target total (A + class target, or the total)
-        const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : b.type === 'ToMaxTotalVolume' ? t : sizing);
+        const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : b.type === 'ToMaxTotalVolume' ? t : totalSizing ?? sizing);
         r.normalizationRequested = n;
         result[x.w.p].wells.set(x.key, r);
         continue;
@@ -352,6 +352,7 @@ function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
     tV = vol(tC, prev);
   }
   const cC = conc(x.req, !totalBased), cAll = conc(x.req, false);
+  if (b.type === 'ToTotalVolume') return totalTopUp(cAll, vol, A, fixedTarget - A, cls);
   let V = vol(cC, A), Vall = vol(cAll, A);
   let Nprev = null, Vprev = null, N = 0, t = 0;
   if (totalBased) { // "total" types: the current total starts at the bare assay volume, one step from V = 0 first
@@ -374,6 +375,32 @@ function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
     lower = upper;
   }
   return { n: N, t };
+}
+
+/**
+ * "To total volume" (gap = target total − A), fitted on probe-23 plate 1 (single-fluid k sweep, 330 wells:
+ * top-ups 330/330, fluid volumes 329/330). A lagged iteration from V = 0, N = 0:
+ *   Tᵢ = A + Nᵢ₋₁ + Vᵢ₋₁,  Vᵢ = Σ C·Tᵢ/S,  Nᵢ = gap − Vᵢ₋₁
+ * stops at the first i with |Vᵢ − Vᵢ₋₁| / Nᵢ < 0.1 % and returns Nᵢ (at most 4 steps, i ≤ 3: the three
+ * largest-k wells stop at i = 3 although their ratio is 0.10–0.11 %). Wells whose fluids add < 0.1 % of the gap
+ * therefore get the whole gap. The fluids are dispensed as sized at step j = min(max(i, 1), 2), i.e. with Tⱼ.
+ * Open: E21 (ratio 0.1048 % at i = 1) has fluid volume V₁ where this gives V₂ (one 0.4 nL step).
+ */
+function totalTopUp(cs, vol, A, gap, cls) {
+  // the sequence (Tᵢ, Vᵢ, Nᵢ) for i = 0…3
+  const Ts = [], Vs = [], Ns = [];
+  let Vp = 0, Np = 0;
+  for (let k = 0; k < 4; k++) { const T = A + Np + Vp, V = vol(cs, T), N = gap - Vp; Ts.push(T); Vs.push(V); Ns.push(N); Vp = V; Np = N; }
+  let i = 3;
+  for (let k = 0; k < 4; k++) if (Math.abs(Vs[k] - (k ? Vs[k - 1] : 0)) / Math.max(Math.abs(Ns[k]), 1e-12) < SIZING_TOLERANCE) { i = k; break; }
+  const N = Ns[i], sizing = Ts[Math.min(Math.max(i, 1), 2)];
+  if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + gap, sizing };
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + gap, sizing };
+    lower = upper;
+  }
+  return { n: N, t: A + gap, sizing };
 }
 
 /** .NET Math.Round(double): nearest, ties (exactly .5 in binary) to even; no tolerance. */

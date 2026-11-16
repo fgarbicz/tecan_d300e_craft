@@ -115,9 +115,16 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   Results: D3 5752/5752, T05 + two copies 107/107 each, probe-21 1320/1321 (L20: 0.0002 steps below a tie),
   probe-20 (not used to derive these rules, but looked at while fitting earlier versions): to-highest 175/175,
   to-volume 66/66, to-total 58/66, to-highest-total 44/65.
-  OPEN — the two total types: some wells come out one 0.4 nL step low (similar wells K8 and K9 fall on opposite
-  sides), and under to-highest-total empty wells get 290.4 nL = the largest well's DISPENSED total while the
-  others follow its exact total. A fresh probe with predictions written down before the run is still needed to
-  call any of this validated.
+- "To total volume" (probe-23 plate 1, single-fluid sweep; hold-out: probe-20's two-fluid group, all 150
+  rows): a LAGGED iteration from V = 0, N = 0 — Tᵢ = A + Nᵢ₋₁ + Vᵢ₋₁, Vᵢ = Σ C·Tᵢ/S, Nᵢ = gap − Vᵢ₋₁ — that stops
+  at the first i with |Vᵢ − Vᵢ₋₁| / Nᵢ < 0.1 % (at most i = 3) and returns Nᵢ; the fluids are dispensed as sized
+  at step min(max(i, 1), 2). The stop thresholds sit exactly at the switches seen (k = 0.000881 → 0.0999 % stops,
+  0.000919 → 0.1048 % goes on; 0.003256 → 0.0975 %, 0.003299 → 0.1005 %). 663/664 rows; open: E21 (fluid V₁ vs V₂).
+- OPEN — "to highest total" (probe-23 plate 2): the fluids follow the same lagged model (326/329), but the target
+  is itself an iterated sequence that depends on more than the largest well: the stop-step-3 wells (176) all imply
+  g₃ = 556.2445, the smallest wells g₀ ≈ 555.6, and empty wells and the largest well get 556.4 (its dispensed
+  volume). No candidate sequence (largest well iterated alone, lagged, overshooting) reproduces this; the engine
+  keeps the "to highest" model there (fluids 305/331, top-ups 216/334 on probe-23 plate 2).
+- Cassettes / heads for sub-nL fluids: see src/cassette.js header (probe-22a–o, docs/handoff_probe22_predictions.md).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.

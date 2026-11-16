@@ -757,12 +757,12 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
                 _ => continue, // unknown type: leave unnormalized
             };
             if b.kind != "ToAssayVolumePct" {
-                let (n, t) = iterated_top_up(x, &base, b, a, total_based, target, &fluids, cls);
+                let (n, t, total_sizing) = iterated_top_up(x, &base, b, a, total_based, target, &fluids, cls);
                 // fluids of a normalized well are sized with the group's final target total
                 let sz = match b.kind.as_str() {
                     "ToMaxVolume" => Some(a + t),
                     "ToMaxTotalVolume" => Some(t),
-                    _ => sizing,
+                    _ => total_sizing.or(sizing),
                 };
                 let mut r = compute_well(x.req, &fluids, x.plate, n, sz);
                 r.normalization_requested = Some(n);
@@ -813,7 +813,7 @@ fn iterated_top_up<B: TopUpWell>(
     fixed_target: f64,
     fluids: &FluidLookup,
     cls: &FluidClass,
-) -> (f64, f64) {
+) -> (f64, f64, Option<f64>) {
     let conc = |req: &WellFluids, class_only: bool| -> Vec<(f64, f64)> {
         let mut out = vec![];
         for (id, &c) in req {
@@ -829,6 +829,10 @@ fn iterated_top_up<B: TopUpWell>(
         out
     };
     let vol = |cs: &[(f64, f64)], t: f64| cs.iter().fold(0.0, |v, &(c, s)| v + (c * t) / s);
+    if b.kind == "ToTotalVolume" {
+        let (n, t, sz) = total_top_up(&conc(x.req(), false), &vol, a, fixed_target - a, cls);
+        return (n, t, Some(sz));
+    }
     let highest = b.kind == "ToMaxVolume" || b.kind == "ToMaxTotalVolume";
     let mut t_c: Vec<(f64, f64)> = vec![];
     let mut tv = 0.0;
@@ -890,17 +894,56 @@ fn iterated_top_up<B: TopUpWell>(
     }
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
-        return (0.0, t);
+        return (0.0, t, None);
     }
     let mut lower = 0.0;
     for &(upper, inc) in cls.bands {
         if n <= upper || upper == f64::INFINITY {
             let q = round_half_even_strict(n / inc);
-            return (clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), q * inc)), t);
+            return (clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), q * inc)), t, None);
         }
         lower = upper;
     }
-    (n, t)
+    (n, t, None)
+}
+
+/// "To total volume": the lagged iteration of totalTopUp in src/dispense.js (probe-23 plate 1).
+/// Returns (top-up, target total, sizing total for the fluids).
+fn total_top_up(cs: &[(f64, f64)], vol: &dyn Fn(&[(f64, f64)], f64) -> f64, a: f64, gap: f64, cls: &FluidClass) -> (f64, f64, f64) {
+    let (mut ts, mut vs, mut ns) = (vec![], vec![], vec![]);
+    let (mut vp, mut np) = (0.0, 0.0);
+    for _ in 0..4 {
+        let t = a + np + vp;
+        let v = vol(cs, t);
+        let n = gap - vp;
+        ts.push(t);
+        vs.push(v);
+        ns.push(n);
+        vp = v;
+        np = n;
+    }
+    let mut i = 3;
+    for k in 0..4 {
+        let prev = if k > 0 { vs[k - 1] } else { 0.0 };
+        if (vs[k] - prev).abs() / js_max(f64::abs(ns[k]), 1e-12) < SIZING_TOLERANCE {
+            i = k;
+            break;
+        }
+    }
+    let n = ns[i];
+    let sizing = ts[i.clamp(1, 2)];
+    #[allow(clippy::neg_cmp_op_on_partial_ord)]
+    if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
+        return (0.0, a + gap, sizing);
+    }
+    let mut lower = 0.0;
+    for &(upper, inc) in cls.bands {
+        if n <= upper || upper == f64::INFINITY {
+            return (clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), round_half_even_strict(n / inc) * inc)), a + gap, sizing);
+        }
+        lower = upper;
+    }
+    (n, a + gap, sizing)
 }
 
 /// .NET Math.Round(double): nearest, exact binary ties to even, no tolerance.

@@ -266,3 +266,22 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 'probe-21-normsweep.tdd'), writeTdd(p));
   console.log('wrote probe-21-normsweep');
 }
+
+// probe-23: the two "total" normalization types as a function of k = C/S (single fluid per well), like probe-21.
+// Plate 1 "to total volume" 50,700 nL; plate 2 "to highest total" (largest well k = 0.011 at P24). Both groups
+// also hold four empty wells (P20–P23).
+{
+  const p = newProtocol();
+  const f = addFluid(p, { name: 't1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  for (let pi = 0; pi < 2; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-23 ${pi + 1}`, dmsoLimit: 0.03 }));
+  const n = 330, ks = Array.from({ length: n }, (_, i) => (i < 110 ? 1e-5 * Math.pow(1e-3 / 1e-5, i / 109) : 1e-3 + ((0.0105 - 1e-3) * (i - 110)) / (n - 111)));
+  for (let pi = 0; pi < 2; pi++) {
+    const wells = [];
+    ks.forEach((k, i) => { const r = Math.floor(i / 22), c = 1 + (i % 22); setWell(p.plates[pi], r, c, f.id, +(k * 10000).toPrecision(6)); wells.push({ p: pi, r, c }); });
+    for (let c = 19; c < 23; c++) wells.push({ p: pi, r: 15, c });
+    if (pi === 1) { setWell(p.plates[1], 15, 23, f.id, 110); wells.push({ p: 1, r: 15, c: 23 }); }
+    addNormalization(p, 0, pi === 0 ? 'ToTotalVolume' : 'ToMaxTotalVolume', pi === 0 ? 50700 : undefined, wells);
+  }
+  writeFileSync(join(process.argv[2], 'probe-23-totalsweep.tdd'), writeTdd(p));
+  console.log('wrote probe-23-totalsweep');
+}
