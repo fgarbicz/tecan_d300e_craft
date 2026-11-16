@@ -1,0 +1,3 @@
+#!/bin/sh
+# Tecan D300 Craft command line (see tools/cli/d300craft.mjs). Needs Node >= 20.
+exec node "$(dirname "$0")/../tools/cli/d300craft.mjs" "$@"
