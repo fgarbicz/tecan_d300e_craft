@@ -14,6 +14,7 @@ import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
 
 export const APP_NAME = 'Tecan D300 Craft';
+const APP_VERSION = '0.2.0';
 const REVISION_USER = 'Mac\\D300 Craft';
 
 // ---------------- state ----------------
@@ -906,7 +907,7 @@ async function exportExcel() {
   let A; try { A = await import('../src/analysis.js'); } catch (e) { return toast('The analysis module is not available in this build'); }
   try {
     const result = A.analyze({ protocol: S.protocol, computed: S.computed, meta: S.meta });
-    const wb = A.toWorkbook(result, S.protocol, S.meta);
+    const wb = A.toWorkbook(result, S.protocol, S.meta, { appVersion: `${APP_NAME} ${APP_VERSION}`, generatedAt: new Date().toISOString() });
     const name = S.fileName.replace(/\.tdd$/, '') + '_results.xlsx';
     if (TAURI) { const p = await invoke('save_xlsx', { suggested: name, workbook: wb }); if (p) toast(`Saved ${p}`); }
     else { for (const sh of wb.sheets) saveCsv(`${name.replace(/\.xlsx$/, '')}_${sh.name.replace(/\W+/g, '_')}.csv`, [sh.columns.map((c) => c.header), ...sh.rows]); toast('In the browser the sheets are saved as CSV files'); }

@@ -1,4 +1,4 @@
-// D300 Designer — desktop shell.
+// Tecan D300 Craft — desktop shell.
 //
 // The interface (web-dist/app) runs the design operations; everything that touches files goes
 // through these Rust commands, which use the d300-core engine:
@@ -7,6 +7,8 @@
 //                 interface and must re-write it byte-identically, otherwise nothing is written.
 //                 Both engines are tested to be identical, so a failure here means a regression
 //                 and must never reach the dispenser;
+//   * save_sidecar — the experiment file "<name>.craft.json" next to the .tdd (cell lines, PBS border, roles,
+//                 readouts); open_tdd returns it when it exists. The .tdd itself never carries this data;
 //   * save_text — CSV export;
 //   * save_xlsx — Excel export of a readout analysis (workbook model from src/analysis.js, see xlsx.rs).
 // Files are written atomically (temporary file + rename) so a failed save never truncates a protocol.
@@ -24,6 +26,14 @@ struct Opened {
     path: String,
     name: String,
     text: String,
+    /// Contents of the experiment file next to the protocol, if there is one.
+    sidecar: Option<String>,
+}
+
+/// "<dir>/<stem>.craft.json" for "<dir>/<stem>.tdd".
+fn sidecar_path(tdd: &Path) -> PathBuf {
+    let stem = tdd.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    tdd.with_file_name(format!("{stem}.craft.json"))
 }
 
 fn to_path(fp: FilePath) -> Result<PathBuf, String> {
@@ -70,7 +80,9 @@ async fn open_tdd(app: AppHandle) -> Result<Option<Opened>, String> {
     let bytes = std::fs::read(&path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
     let text = String::from_utf8(bytes).map_err(|_| format!("{} is not a UTF-8 text file", file_name(&path)))?;
     d300_core::tdd::parse_tdd(&text).map_err(|e| format!("{} is not a valid D300e protocol: {e}", file_name(&path)))?;
-    Ok(Some(Opened { name: file_name(&path), path: path.to_string_lossy().into_owned(), text }))
+    // A missing or unreadable experiment file is not an error: the protocol opens without annotations.
+    let sidecar = std::fs::read_to_string(sidecar_path(&path)).ok();
+    Ok(Some(Opened { name: file_name(&path), path: path.to_string_lossy().into_owned(), text, sidecar }))
 }
 
 #[tauri::command]
@@ -94,7 +106,23 @@ async fn save_tdd(app: AppHandle, path: Option<String>, suggested: String, text:
         }
     };
     write_atomic(&path, text.as_bytes())?;
-    Ok(Some(Opened { name: file_name(&path), path: path.to_string_lossy().into_owned(), text: String::new() }))
+    Ok(Some(Opened { name: file_name(&path), path: path.to_string_lossy().into_owned(), text: String::new(), sidecar: None }))
+}
+
+/// Write the experiment file next to a protocol that was just saved. The text must be a JSON object.
+fn write_sidecar(tdd_path: &Path, text: &str) -> Result<PathBuf, String> {
+    let v: serde_json::Value = serde_json::from_str(text).map_err(|e| format!("Experiment file is not valid JSON: {e}"))?;
+    if !v.is_object() {
+        return Err("Experiment file must be a JSON object".into());
+    }
+    let p = sidecar_path(tdd_path);
+    write_atomic(&p, text.as_bytes())?;
+    Ok(p)
+}
+
+#[tauri::command]
+async fn save_sidecar(tdd_path: String, text: String) -> Result<String, String> {
+    write_sidecar(Path::new(&tdd_path), &text).map(|p| p.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -138,15 +166,28 @@ async fn save_xlsx(app: AppHandle, suggested: String, workbook: xlsx::Workbook) 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_text, save_xlsx])
+        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_sidecar, save_text, save_xlsx])
         .run(tauri::generate_context!())
-        .expect("error while running D300 Designer");
+        .expect("error while running Tecan D300 Craft");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{cross_check, write_xlsx, xlsx};
-    use std::path::PathBuf;
+    use super::{cross_check, sidecar_path, write_sidecar, write_xlsx, xlsx};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn sidecar_sits_next_to_the_protocol_and_must_be_a_json_object() {
+        assert_eq!(sidecar_path(Path::new("/a/b/run 1.tdd")), PathBuf::from("/a/b/run 1.craft.json"));
+        let dir = std::env::temp_dir().join(format!("d300craft-sidecar-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let tdd = dir.join("exp.tdd");
+        let p = write_sidecar(&tdd, "{\"version\":1}").unwrap();
+        assert_eq!(std::fs::read_to_string(&p).unwrap(), "{\"version\":1}");
+        assert!(write_sidecar(&tdd, "[1]").is_err());
+        assert!(write_sidecar(&tdd, "not json").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn write_xlsx_writes_an_xlsx_file() {
