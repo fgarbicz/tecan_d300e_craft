@@ -296,7 +296,7 @@ for (b in blocks) {
     pt <- if (pcol %in% names(pairs)) p_text(pairs[pairs$block_id == b, pcol][1]) else NA_character_
     sub_txt <- paste0("Mean ", method_label[[m]], " synergy score ", sprintf("%.2f", score),
                       if (!is.na(pt)) paste0(" (", pt, ")") else "", SEP, rep_txt)
-    cap <- paste(model_caption[[m]], "Score = observed \u2212 expected % inhibition; > 0 synergy, < 0 antagonism (|score| > 10 is the usual threshold).")
+    cap <- paste(model_caption[[m]], "Score = observed \u2212 expected % inhibition; > 0 synergy, < 0 antagonism (scores beyond \u00b110 are the usual threshold).")
     safely(paste0("synergy_", m, "_heatmap"), b, {
       cells <- syn_cells(b, m)
       p <- heatmap_plot(cells, i, scale_synergy(paste0(m, " score")), paste0(m, " synergy \u2014 ", bt), sub_txt,
@@ -344,7 +344,7 @@ safely("summary_synergy_scores", NA, {
     scale_x_continuous(expand = expansion(mult = 0.25)) +
     labs(x = "Mean synergy score over the dose matrix", y = NULL, title = paste0("Synergy scores \u2014 ", OPTIONS$title),
          subtitle = paste0(length(blocks), " block(s): cell line \u00d7 drug pair"),
-         caption = "Grey band: |score| < 10 (likely additive). * p < 0.05 (bootstrap over replicate wells).") +
+         caption = "Grey band: score within \u00b110 (likely additive). * p < 0.05 (bootstrap over replicate wells).") +
     theme_sf() + theme(legend.position = "none", panel.grid.major.y = element_blank())
   save_figure(p, fig_dir, "summary_synergy_scores", NA, w = max(OPTIONS$width, 2.2 * length(OPTIONS$methods) + 2), h = max(3, 1.2 + 0.45 * length(blocks)))
 })
