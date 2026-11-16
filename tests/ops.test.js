@@ -202,3 +202,14 @@ test('copy/paste carries normalization groups (guide §3.9)', async () => {
   pasteNormalization(p, 1, clip, 5, 4, 16, 24); // (5,4),(5,5),(5,6): (5,5) leaves the % group
   assert.deepEqual(p.backfills.map((b) => b.wells.map((w) => `${w.p}:${w.r},${w.c}`)), [['0:1,1', '0:1,2', '1:5,4', '1:5,5']]);
 });
+
+test('parseDilution reads the usual ways of writing a dilution step', async () => {
+  const { parseDilution } = await import('../src/ops.js');
+  const f = (s) => +parseDilution(s).factor.toPrecision(6);
+  assert.equal(f('3'), 3); assert.equal(f('1:3'), 3); assert.equal(f('÷2'), 2); assert.equal(f('/2'), 2);
+  assert.equal(f('1.5'), 1.5); assert.equal(f('1:1.5'), 1.5); assert.equal(f('1:1,4'), 1.4);
+  assert.equal(f('2/3'), 1.5); assert.equal(f('×0.5'), 2); assert.equal(f('x2/3'), 1.5);
+  assert.equal(f('-33%'), +(1 / 0.67).toPrecision(6)); assert.equal(f('1:0.33'), +(1 / 0.67).toPrecision(6)); // 10 → 6.7
+  assert.equal(f('1:0.333333'), +(1 / (1 - 0.333333)).toPrecision(6));
+  for (const bad of ['', '1', '0', 'abc', '1:1', '×2', '120%']) assert.throws(() => parseDilution(bad), /dilution|decrease|Multiply|Enter/, bad);
+});

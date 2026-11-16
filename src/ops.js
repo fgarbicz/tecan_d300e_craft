@@ -488,3 +488,29 @@ export function plateToTsv(plate, fluid) {
 }
 
 export { wellKey, splitKey };
+
+/**
+ * Read a dilution step as people write it and return the factor each step divides by (> 1):
+ *   "3", "1:3", "÷3", "/3"  → 3          "1.5", "1:1.5"  → 1.5
+ *   "×0.667", "*0.667", "x2/3" → 1/0.667 (multiply each step by the value)
+ *   "2/3"                   → 1.5 (each step is 2/3 of the previous)
+ *   "-33%", "33% less"      → 1/(1−0.33)  (remove a fraction each step)
+ *   "1:0.33" or "0.33"      → 1/(1−0.33)  (a value below 1 after "1:" means "remove this fraction":
+ *                              10 µM → 6.7 µM, as asked for by the user; the preview shows the levels)
+ * Returns { factor, label } or throws with a readable message.
+ */
+export function parseDilution(text) {
+  const t = String(text ?? '').trim().toLowerCase().replace(/,/g, '.').replace(/\s+/g, '');
+  if (!t) throw new Error('Enter a dilution step, e.g. 1:3 or 1.5');
+  const num = (s) => { if (/^\d+(\.\d+)?\/\d+(\.\d+)?$/.test(s)) { const [a, b] = s.split('/').map(Number); return a / b; } const v = Number(s); return Number.isFinite(v) ? v : NaN; };
+  let f, m;
+  if ((m = t.match(/^-?(\d+(?:\.\d+)?)%(less|lower|down|decrease)?$/))) { const p = +m[1] / 100; if (!(p > 0 && p < 1)) throw new Error('The decrease must be between 0 and 100 %'); f = 1 / (1 - p); }
+  else if ((m = t.match(/^[x×*](.+)$/))) { const v = num(m[1]); if (!(v > 0 && v < 1)) throw new Error('Multiply by a value between 0 and 1, e.g. ×0.5'); f = 1 / v; }
+  else if ((m = t.match(/^[÷/](.+)$/))) { f = num(m[1]); }
+  else if ((m = t.match(/^1:(.+)$/))) { const v = num(m[1]); f = v > 1 ? v : v > 0 && v < 1 ? 1 / (1 - v) : NaN; }
+  else if (/^\d+(\.\d+)?\/\d+(\.\d+)?$/.test(t)) { const v = num(t); f = v > 0 && v < 1 ? 1 / v : v; }
+  else { const v = num(t); f = v > 1 ? v : v > 0 && v < 1 ? 1 / (1 - v) : NaN; }
+  if (!(f > 1) || !Number.isFinite(f)) throw new Error(`Could not read "${text}" as a dilution step (e.g. 1:3, 1.5, ×0.5, −33 %)`);
+  const pct = (1 - 1 / f) * 100;
+  return { factor: f, label: `÷${+f.toPrecision(4)} per step (−${+pct.toPrecision(3)} %)` };
+}

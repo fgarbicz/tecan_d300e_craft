@@ -187,23 +187,30 @@ export function buildExperiment(spec, fluids) {
   const prim = spec.primary;
   const pLv = axisLevels(prim);
   const pRep = Math.max(1, prim.replicates || 1);
+  // spec.split: 'rows' (top / bottom halves) or 'cols' (left / right halves) puts the same grid twice on each
+  // plate, e.g. for two cell lines per plate; the copies are blocks' `copies` (regions), in plate order.
+  const split = spec.split === 'rows' || spec.split === 'cols' ? spec.split : null;
+  const innerR = pt.rows - 2 * depth, innerC = pt.cols - 2 * depth;
   const [r0, c0] = spec.origin || [depth, depth];
   const nCols = pLv.length * pRep;
-  if (c0 + nCols > pt.cols - depth) throw new Error(`The ${fl.get(prim.fluidId)?.name ?? 'primary'} axis needs ${nCols} columns; only ${pt.cols - depth - c0} fit inside the border`);
+  const availC = split === 'cols' ? Math.floor(innerC / 2) : pt.cols - depth - c0;
+  if (nCols > availC) throw new Error(`The ${fl.get(prim.fluidId)?.name ?? 'primary'} axis needs ${nCols} columns; only ${availC} fit ${split === 'cols' ? 'in half the plate' : 'inside the border'}`);
   const plates = [], backfills = [], plateMeta = [], blocks = [];
   const nRep = Math.max(1, spec.plateReplicates || 1);
   spec.partners.forEach((part, bi) => {
     const qLv = axisLevels(part), qRep = Math.max(1, part.replicates || 1);
     const nRows = qLv.length * qRep;
-    if (r0 + nRows > pt.rows - depth) throw new Error(`The ${fl.get(part.fluidId)?.name ?? 'partner'} axis needs ${nRows} rows; only ${pt.rows - depth - r0} fit inside the border`);
+    const availR = split === 'rows' ? Math.floor(innerR / 2) : pt.rows - depth - r0;
+    if (nRows > availR) throw new Error(`The ${fl.get(part.fluidId)?.name ?? 'partner'} axis needs ${nRows} rows; only ${availR} fit ${split === 'rows' ? 'in half the plate' : 'inside the border'}`);
+    const origins = !split ? [[r0, c0]] : split === 'rows' ? [[depth, c0], [depth + Math.floor(innerR / 2), c0]] : [[r0, depth], [r0, depth + Math.floor(innerC / 2)]];
     const blockPlates = [];
     for (let rep = 0; rep < nRep; rep++) {
       const p = newPlate({ ...spec.plate });
       // primary first in every well (fluid order inside a well is application order, as D300e writes it)
-      for (let i = 0; i < nRows; i++) for (let j = 0; j < nCols; j++) {
+      for (const [or, oc] of origins) for (let i = 0; i < nRows; i++) for (let j = 0; j < nCols; j++) {
         const a = pLv[Math.floor(j / pRep)], b = qLv[Math.floor(i / qRep)];
-        if (a) setWell(p, r0 + i, c0 + j, prim.fluidId, a);
-        if (b) setWell(p, r0 + i, c0 + j, part.fluidId, b);
+        if (a) setWell(p, or + i, oc + j, prim.fluidId, a);
+        if (b) setWell(p, or + i, oc + j, part.fluidId, b);
       }
       const pm = newPlateMeta();
       if (spec.scrap !== false) placeScrap(p, pm, [prim, part].map((x) => fl.get(x.fluidId)), depth);
@@ -212,7 +219,8 @@ export function buildExperiment(spec, fluids) {
       plates.push(p);
     }
     const grid = [];
-    for (let i = 0; i < nRows; i++) for (let j = 0; j < nCols; j++) grid.push([r0 + i, c0 + j]);
+    for (const [or, oc] of origins) for (let i = 0; i < nRows; i++) for (let j = 0; j < nCols; j++) grid.push([or + i, oc + j]);
+    grid.sort((a, b) => a[0] - b[0] || a[1] - b[1]); // normalization wells row-major, as D300e writes them
     const nz = part.normalization;
     if (nz && nz.type) {
       const groups = nz.scope === 'plate' || nz.type === 'ToAssayVolumePct' && nz.scope !== 'block' ? blockPlates.map((p) => [p]) : [blockPlates];
@@ -220,7 +228,8 @@ export function buildExperiment(spec, fluids) {
     }
     // A partner with fluidId null and only the 0 level makes a single-drug block (dose response, `replicates` rows).
     blocks.push({ name: part.fluidId == null ? `${fl.get(prim.fluidId)?.name}` : `${fl.get(prim.fluidId)?.name} × ${fl.get(part.fluidId)?.name}`, plates: blockPlates, primary: prim.fluidId, partner: part.fluidId,
-      region: { r0, c0, rows: nRows, cols: nCols }, primaryLevels: pLv, partnerLevels: qLv });
+      region: { r0: origins[0][0], c0: origins[0][1], rows: nRows, cols: nCols }, copies: origins.map(([r, c]) => ({ r0: r, c0: c, rows: nRows, cols: nCols })),
+      primaryLevels: pLv, partnerLevels: qLv });
   });
   return { plates, backfills, plateMeta, blocks };
 }

@@ -84,3 +84,18 @@ test('plate operations keep annotations aligned', () => {
   assert.equal(meta.plates[1].cellLines[wellKey(10, 10)], cl.id);
   assert.equal(meta.plates[1].cellLines[wellKey(10, 11)], undefined);
 });
+
+test('split plates: the same grid in the top and bottom halves, for two cell lines per plate', () => {
+  const p = parseTdd(D3);
+  const spec = { ...D3_SPEC, split: 'rows', plateReplicates: 2,
+    partners: [{ fluidId: 1, high: 3, factor: 2, levels: 6, includeZero: true, replicates: 1, normalization: { type: 'ToMaxVolume', scope: 'block' } }] };
+  const built = buildExperiment(spec, p.fluids);
+  assert.equal(built.plates.length, 2);
+  const pl = built.plates[0];
+  // halves of the 14 inner rows: rows B–H and I–O
+  assert.deepEqual(built.blocks[0].copies.map((c) => c.r0), [1, 8]);
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 22; j++) assert.deepEqual(pl.wells.get(`${1 + i},${1 + j}`), pl.wells.get(`${8 + i},${1 + j}`));
+  assert.equal(built.backfills[0].wells.length, 2 * 2 * 7 * 22);
+  // too tall for half a plate
+  assert.throws(() => buildExperiment({ ...spec, partners: [{ ...spec.partners[0], replicates: 2 }] }, p.fluids), /only 7 fit in half the plate/);
+});
