@@ -23,6 +23,14 @@ VM is used as the reference ("oracle") for differential tests.
 - `fixtures/reference/probes`, `fixtures/reference/reports/probes` – probe protocols and the simulated D300e runs of them
 - `docs/` – format notes, spec extracted from the user guide, open questions
 
+## Command line / Claude
+`bin/d300craft design spec.json --out DIR` turns a JSON experiment description into a D300e protocol (.tdd),
+its experiment file (.craft.json) and a bench plan (drugs to prepare, cassettes and per-head loads, cell
+seeding, PBS, warnings). `bin/d300craft example` prints a spec; `plan` / `check` work on any .tdd.
+Claude uses it through the skill `.claude/skills/d300-plate-design` (linked into ~/.claude/skills), so
+"design synergy plates for these drugs on these cells" gives a checked plan. Designs go in `experiments/`
+(not in git).
+
 ## Desktop app (Mac)
 Tauri 2 shell (`crates/d300-app`) around the interface in `app/`; engine in Rust (`crates/d300-core`).
 - Build: `cd crates/d300-app && cargo tauri build` → `target/release/bundle/macos/Tecan D300 Craft.app` and a `.dmg`
