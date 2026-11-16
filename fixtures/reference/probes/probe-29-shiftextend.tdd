@@ -1,0 +1,1039 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>Fluid 1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="1">
+        <Name>Fluid 1 - 1:30</Name>
+        <RootFluidID>0</RootFluidID>
+        <DilutionFactor>30</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>333.3333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="2">
+        <Name>Fluid 2</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="3">
+        <Name>Fluid 2 - 1:3</Name>
+        <RootFluidID>2</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="4">
+        <Name>Fluid 3</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="5">
+        <Name>Fluid 3 - 1:6</Name>
+        <RootFluidID>4</RootFluidID>
+        <DilutionFactor>6</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>1666.666666667</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="6">
+        <Name>Fluid 4</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="7">
+        <Name>Fluid 4 - 1:3</Name>
+        <RootFluidID>6</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="8">
+        <Name>Fluid 5</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="9">
+        <Name>Fluid 5 - 1:300</Name>
+        <RootFluidID>8</RootFluidID>
+        <DilutionFactor>300</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>33.33333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="10">
+        <Name>Fluid 6</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="11">
+        <Name>Fluid 6 - 1:3</Name>
+        <RootFluidID>10</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="12">
+        <Name>Fluid 7</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="13">
+        <Name>Fluid 7 - 1:3</Name>
+        <RootFluidID>12</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="14">
+        <Name>Fluid 8</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="15">
+        <Name>Fluid 8 - 1:3</Name>
+        <RootFluidID>14</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="16">
+        <Name>Fluid 9</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="17">
+        <Name>Fluid 9 - 1:3</Name>
+        <RootFluidID>16</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="18">
+        <Name>Fluid 10</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="19">
+        <Name>Fluid 10 - 1:3</Name>
+        <RootFluidID>18</RootFluidID>
+        <DilutionFactor>3</DilutionFactor>
+        <ByVol>False</ByVol>
+        <Concentration>3333.333333333</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name />
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.01</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="1" Col="0">
+            <Fluid ID="0">10</Fluid>
+          </Well>
+          <Well Row="1" Col="1">
+            <Fluid ID="0">6.061898993498</Fluid>
+          </Well>
+          <Well Row="1" Col="2">
+            <Fluid ID="0">3.674661940737</Fluid>
+          </Well>
+          <Well Row="1" Col="3">
+            <Fluid ID="0">2.227542952</Fluid>
+          </Well>
+          <Well Row="1" Col="4">
+            <Fluid ID="0">1.35031403787</Fluid>
+          </Well>
+          <Well Row="1" Col="5">
+            <Fluid ID="1">0.8185467307069</Fluid>
+          </Well>
+          <Well Row="1" Col="6">
+            <Fluid ID="1">0.4961947603003</Fluid>
+          </Well>
+          <Well Row="1" Col="7">
+            <Fluid ID="1">0.3007882518043</Fluid>
+          </Well>
+          <Well Row="1" Col="8">
+            <Fluid ID="1">0.1823348000868</Fluid>
+          </Well>
+          <Well Row="1" Col="9">
+            <Fluid ID="1">0.1105295141126</Fluid>
+          </Well>
+          <Well Row="1" Col="10">
+            <Fluid ID="1">0.0670018750351</Fluid>
+          </Well>
+          <Well Row="1" Col="11">
+            <Fluid ID="1">0.04061585988377</Fluid>
+          </Well>
+          <Well Row="1" Col="12">
+            <Fluid ID="1">0.02462092401495</Fluid>
+          </Well>
+          <Well Row="1" Col="13">
+            <Fluid ID="1">0.01492495545052</Fluid>
+          </Well>
+          <Well Row="1" Col="14">
+            <Fluid ID="1">0.009047357242349</Fluid>
+          </Well>
+          <Well Row="1" Col="15">
+            <Fluid ID="1">0.005484416576121</Fluid>
+          </Well>
+          <Well Row="1" Col="16">
+            <Fluid ID="1">0.003324597932271</Fluid>
+          </Well>
+          <Well Row="1" Col="17">
+            <Fluid ID="1">0.002015337685942</Fluid>
+          </Well>
+          <Well Row="1" Col="18">
+            <Fluid ID="1">0.001221677348997</Fluid>
+          </Well>
+          <Well Row="1" Col="19">
+            <Fluid ID="1">0.0007405684692262</Fluid>
+          </Well>
+          <Well Row="1" Col="20">
+            <Fluid ID="1">0.0004489251258219</Fluid>
+          </Well>
+          <Well Row="1" Col="21">
+            <Fluid ID="1">0.0002721338768375</Fluid>
+          </Well>
+          <Well Row="1" Col="22">
+            <Fluid ID="1">0.0001649648074098</Fluid>
+          </Well>
+          <Well Row="1" Col="23">
+            <Fluid ID="1">0.0001</Fluid>
+          </Well>
+          <Well Row="2" Col="0">
+            <Fluid ID="1">1</Fluid>
+          </Well>
+          <Well Row="2" Col="1">
+            <Fluid ID="1">0.7405684692262</Fluid>
+          </Well>
+          <Well Row="2" Col="2">
+            <Fluid ID="1">0.5484416576121</Fluid>
+          </Well>
+          <Well Row="2" Col="3">
+            <Fluid ID="1">0.4061585988377</Fluid>
+          </Well>
+          <Well Row="2" Col="4">
+            <Fluid ID="1">0.3007882518043</Fluid>
+          </Well>
+          <Well Row="2" Col="5">
+            <Fluid ID="1">0.2227542952</Fluid>
+          </Well>
+          <Well Row="2" Col="6">
+            <Fluid ID="1">0.1649648074098</Fluid>
+          </Well>
+          <Well Row="2" Col="7">
+            <Fluid ID="1">0.1221677348997</Fluid>
+          </Well>
+          <Well Row="2" Col="8">
+            <Fluid ID="1">0.09047357242349</Fluid>
+          </Well>
+          <Well Row="2" Col="9">
+            <Fluid ID="1">0.0670018750351</Fluid>
+          </Well>
+          <Well Row="2" Col="10">
+            <Fluid ID="1">0.04961947603003</Fluid>
+          </Well>
+          <Well Row="2" Col="11">
+            <Fluid ID="1">0.03674661940737</Fluid>
+          </Well>
+          <Well Row="2" Col="12">
+            <Fluid ID="1">0.02721338768375</Fluid>
+          </Well>
+          <Well Row="2" Col="13">
+            <Fluid ID="1">0.02015337685942</Fluid>
+          </Well>
+          <Well Row="2" Col="14">
+            <Fluid ID="1">0.01492495545052</Fluid>
+          </Well>
+          <Well Row="2" Col="15">
+            <Fluid ID="1">0.01105295141126</Fluid>
+          </Well>
+          <Well Row="2" Col="16">
+            <Fluid ID="1">0.008185467307069</Fluid>
+          </Well>
+          <Well Row="2" Col="17">
+            <Fluid ID="1">0.006061898993498</Fluid>
+          </Well>
+          <Well Row="2" Col="18">
+            <Fluid ID="1">0.004489251258219</Fluid>
+          </Well>
+          <Well Row="2" Col="19">
+            <Fluid ID="1">0.003324597932271</Fluid>
+          </Well>
+          <Well Row="2" Col="20">
+            <Fluid ID="1">0.002462092401495</Fluid>
+          </Well>
+          <Well Row="2" Col="21">
+            <Fluid ID="1">0.001823348000868</Fluid>
+          </Well>
+          <Well Row="2" Col="22">
+            <Fluid ID="1">0.00135031403787</Fluid>
+          </Well>
+          <Well Row="2" Col="23">
+            <Fluid ID="1">0.001</Fluid>
+          </Well>
+          <Well Row="3" Col="0">
+            <Fluid ID="3">1</Fluid>
+          </Well>
+          <Well Row="3" Col="1">
+            <Fluid ID="3">0.7405684692262</Fluid>
+          </Well>
+          <Well Row="3" Col="2">
+            <Fluid ID="3">0.5484416576121</Fluid>
+          </Well>
+          <Well Row="3" Col="3">
+            <Fluid ID="3">0.4061585988377</Fluid>
+          </Well>
+          <Well Row="3" Col="4">
+            <Fluid ID="3">0.3007882518043</Fluid>
+          </Well>
+          <Well Row="3" Col="5">
+            <Fluid ID="3">0.2227542952</Fluid>
+          </Well>
+          <Well Row="3" Col="6">
+            <Fluid ID="3">0.1649648074098</Fluid>
+          </Well>
+          <Well Row="3" Col="7">
+            <Fluid ID="3">0.1221677348997</Fluid>
+          </Well>
+          <Well Row="3" Col="8">
+            <Fluid ID="3">0.09047357242349</Fluid>
+          </Well>
+          <Well Row="3" Col="9">
+            <Fluid ID="3">0.0670018750351</Fluid>
+          </Well>
+          <Well Row="3" Col="10">
+            <Fluid ID="3">0.04961947603003</Fluid>
+          </Well>
+          <Well Row="3" Col="11">
+            <Fluid ID="3">0.03674661940737</Fluid>
+          </Well>
+          <Well Row="3" Col="12">
+            <Fluid ID="3">0.02721338768375</Fluid>
+          </Well>
+          <Well Row="3" Col="13">
+            <Fluid ID="3">0.02015337685942</Fluid>
+          </Well>
+          <Well Row="3" Col="14">
+            <Fluid ID="3">0.01492495545052</Fluid>
+          </Well>
+          <Well Row="3" Col="15">
+            <Fluid ID="3">0.01105295141126</Fluid>
+          </Well>
+          <Well Row="3" Col="16">
+            <Fluid ID="3">0.008185467307069</Fluid>
+          </Well>
+          <Well Row="3" Col="17">
+            <Fluid ID="3">0.006061898993498</Fluid>
+          </Well>
+          <Well Row="3" Col="18">
+            <Fluid ID="3">0.004489251258219</Fluid>
+          </Well>
+          <Well Row="3" Col="19">
+            <Fluid ID="3">0.003324597932271</Fluid>
+          </Well>
+          <Well Row="3" Col="20">
+            <Fluid ID="3">0.002462092401495</Fluid>
+          </Well>
+          <Well Row="3" Col="21">
+            <Fluid ID="3">0.001823348000868</Fluid>
+          </Well>
+          <Well Row="3" Col="22">
+            <Fluid ID="3">0.00135031403787</Fluid>
+          </Well>
+          <Well Row="3" Col="23">
+            <Fluid ID="3">0.001</Fluid>
+          </Well>
+          <Well Row="4" Col="0">
+            <Fluid ID="4">50</Fluid>
+          </Well>
+          <Well Row="4" Col="1">
+            <Fluid ID="4">30.30949496749</Fluid>
+          </Well>
+          <Well Row="4" Col="2">
+            <Fluid ID="4">18.37330970368</Fluid>
+          </Well>
+          <Well Row="4" Col="3">
+            <Fluid ID="4">11.13771476</Fluid>
+          </Well>
+          <Well Row="4" Col="4">
+            <Fluid ID="4">6.751570189349</Fluid>
+          </Well>
+          <Well Row="4" Col="5">
+            <Fluid ID="5">4.092733653535</Fluid>
+          </Well>
+          <Well Row="4" Col="6">
+            <Fluid ID="5">2.480973801501</Fluid>
+          </Well>
+          <Well Row="4" Col="7">
+            <Fluid ID="5">1.503941259022</Fluid>
+          </Well>
+          <Well Row="4" Col="8">
+            <Fluid ID="5">0.9116740004342</Fluid>
+          </Well>
+          <Well Row="4" Col="9">
+            <Fluid ID="5">0.552647570563</Fluid>
+          </Well>
+          <Well Row="4" Col="10">
+            <Fluid ID="5">0.3350093751755</Fluid>
+          </Well>
+          <Well Row="4" Col="11">
+            <Fluid ID="5">0.2030792994188</Fluid>
+          </Well>
+          <Well Row="4" Col="12">
+            <Fluid ID="5">0.1231046200747</Fluid>
+          </Well>
+          <Well Row="4" Col="13">
+            <Fluid ID="5">0.07462477725259</Fluid>
+          </Well>
+          <Well Row="4" Col="14">
+            <Fluid ID="5">0.04523678621175</Fluid>
+          </Well>
+          <Well Row="4" Col="15">
+            <Fluid ID="5">0.02742208288061</Fluid>
+          </Well>
+          <Well Row="4" Col="16">
+            <Fluid ID="5">0.01662298966135</Fluid>
+          </Well>
+          <Well Row="4" Col="17">
+            <Fluid ID="5">0.01007668842971</Fluid>
+          </Well>
+          <Well Row="4" Col="18">
+            <Fluid ID="5">0.006108386744984</Fluid>
+          </Well>
+          <Well Row="4" Col="19">
+            <Fluid ID="5">0.003702842346131</Fluid>
+          </Well>
+          <Well Row="4" Col="20">
+            <Fluid ID="5">0.002244625629109</Fluid>
+          </Well>
+          <Well Row="4" Col="21">
+            <Fluid ID="5">0.001360669384188</Fluid>
+          </Well>
+          <Well Row="4" Col="22">
+            <Fluid ID="5">0.000824824037049</Fluid>
+          </Well>
+          <Well Row="4" Col="23">
+            <Fluid ID="5">0.0005</Fluid>
+          </Well>
+          <Well Row="5" Col="0">
+            <Fluid ID="6">40</Fluid>
+          </Well>
+          <Well Row="5" Col="1">
+            <Fluid ID="6">25.23308940574</Fluid>
+          </Well>
+          <Well Row="5" Col="2">
+            <Fluid ID="6">15.91772002395</Fluid>
+          </Well>
+          <Well Row="5" Col="3">
+            <Fluid ID="7">10.04133131249</Fluid>
+          </Well>
+          <Well Row="5" Col="4">
+            <Fluid ID="7">6.334345269019</Fluid>
+          </Well>
+          <Well Row="5" Col="5">
+            <Fluid ID="7">3.995877512499</Fluid>
+          </Well>
+          <Well Row="5" Col="6">
+            <Fluid ID="7">2.520708363181</Fluid>
+          </Well>
+          <Well Row="5" Col="7">
+            <Fluid ID="7">1.590131487349</Fluid>
+          </Well>
+          <Well Row="5" Col="8">
+            <Fluid ID="7">1.003098249679</Fluid>
+          </Well>
+          <Well Row="5" Col="9">
+            <Fluid ID="7">0.6327816954219</Fluid>
+          </Well>
+          <Well Row="5" Col="10">
+            <Fluid ID="7">0.3991759273724</Fluid>
+          </Well>
+          <Well Row="5" Col="11">
+            <Fluid ID="7">0.2518110466001</Fluid>
+          </Well>
+          <Well Row="5" Col="12">
+            <Fluid ID="7">0.1588492663053</Fluid>
+          </Well>
+          <Well Row="5" Col="13">
+            <Fluid ID="7">0.1002064434679</Fluid>
+          </Well>
+          <Well Row="5" Col="14">
+            <Fluid ID="7">0.06321295367643</Fluid>
+          </Well>
+          <Well Row="5" Col="15">
+            <Fluid ID="7">0.03987645279295</Fluid>
+          </Well>
+          <Well Row="5" Col="16">
+            <Fluid ID="7">0.0251551524627</Fluid>
+          </Well>
+          <Well Row="5" Col="17">
+            <Fluid ID="7">0.01586855527766</Fluid>
+          </Well>
+          <Well Row="5" Col="18">
+            <Fluid ID="7">0.01001031685153</Fluid>
+          </Well>
+          <Well Row="5" Col="19">
+            <Fluid ID="7">0.006314780502357</Fluid>
+          </Well>
+          <Well Row="5" Col="20">
+            <Fluid ID="7">0.00398353552484</Fluid>
+          </Well>
+          <Well Row="5" Col="21">
+            <Fluid ID="7">0.00251292270123</Fluid>
+          </Well>
+          <Well Row="5" Col="22">
+            <Fluid ID="7">0.001585220079746</Fluid>
+          </Well>
+          <Well Row="5" Col="23">
+            <Fluid ID="7">0.001</Fluid>
+          </Well>
+          <Well Row="6" Col="0">
+            <Fluid ID="8">50</Fluid>
+          </Well>
+          <Well Row="6" Col="1">
+            <Fluid ID="8">25.56880546474</Fluid>
+          </Well>
+          <Well Row="6" Col="2">
+            <Fluid ID="8">13.07527625787</Fluid>
+          </Well>
+          <Well Row="6" Col="3">
+            <Fluid ID="8">6.686383900705</Fluid>
+          </Well>
+          <Well Row="6" Col="4">
+            <Fluid ID="8">3.419256984394</Fluid>
+          </Well>
+          <Well Row="6" Col="5">
+            <Fluid ID="8">1.748526333358</Fluid>
+          </Well>
+          <Well Row="6" Col="6">
+            <Fluid ID="8">0.8941545933522</Fluid>
+          </Well>
+          <Well Row="6" Col="7">
+            <Fluid ID="8">0.4572492970565</Fluid>
+          </Well>
+          <Well Row="6" Col="8">
+            <Fluid ID="8">0.2338263665065</Fluid>
+          </Well>
+          <Well Row="6" Col="9">
+            <Fluid ID="9">0.1195732175546</Fluid>
+          </Well>
+          <Well Row="6" Col="10">
+            <Fluid ID="9">0.06114688676895</Fluid>
+          </Well>
+          <Well Row="6" Col="11">
+            <Fluid ID="9">0.03126905705139</Fluid>
+          </Well>
+          <Well Row="6" Col="12">
+            <Fluid ID="9">0.01599024873626</Fluid>
+          </Well>
+          <Well Row="6" Col="13">
+            <Fluid ID="9">0.008177031185403</Fluid>
+          </Well>
+          <Well Row="6" Col="14">
+            <Fluid ID="9">0.004181538393173</Fluid>
+          </Well>
+          <Well Row="6" Col="15">
+            <Fluid ID="9">0.002138338834368</Fluid>
+          </Well>
+          <Well Row="6" Col="16">
+            <Fluid ID="9">0.001093495393473</Fluid>
+          </Well>
+          <Well Row="6" Col="17">
+            <Fluid ID="9">0.0005591874198459</Fluid>
+          </Well>
+          <Well Row="6" Col="18">
+            <Fluid ID="9">0.0002859550871274</Fluid>
+          </Well>
+          <Well Row="6" Col="19">
+            <Fluid ID="9">0.0001462305998882</Fluid>
+          </Well>
+          <Well Row="6" Col="20">
+            <Fluid ID="9">7.477883523069E-05</Fluid>
+          </Well>
+          <Well Row="6" Col="21">
+            <Fluid ID="9">3.824010981787E-05</Fluid>
+          </Well>
+          <Well Row="6" Col="22">
+            <Fluid ID="9">1.955507857767E-05</Fluid>
+          </Well>
+          <Well Row="6" Col="23">
+            <Fluid ID="9">1E-05</Fluid>
+          </Well>
+          <Well Row="7" Col="0">
+            <Fluid ID="10">55.48</Fluid>
+          </Well>
+          <Well Row="7" Col="1">
+            <Fluid ID="10">34.50401628574</Fluid>
+          </Well>
+          <Well Row="7" Col="2">
+            <Fluid ID="10">21.45867231158</Fluid>
+          </Well>
+          <Well Row="7" Col="3">
+            <Fluid ID="10">13.34553675034</Fluid>
+          </Well>
+          <Well Row="7" Col="4">
+            <Fluid ID="11">8.299830882763</Fluid>
+          </Well>
+          <Well Row="7" Col="5">
+            <Fluid ID="11">5.161815067551</Fluid>
+          </Well>
+          <Well Row="7" Col="6">
+            <Fluid ID="11">3.210226228456</Fluid>
+          </Well>
+          <Well Row="7" Col="7">
+            <Fluid ID="11">1.996497802227</Fluid>
+          </Well>
+          <Well Row="7" Col="8">
+            <Fluid ID="11">1.241658123332</Fluid>
+          </Well>
+          <Well Row="7" Col="9">
+            <Fluid ID="11">0.7722096630996</Fluid>
+          </Well>
+          <Well Row="7" Col="10">
+            <Fluid ID="11">0.4802511678369</Fluid>
+          </Well>
+          <Well Row="7" Col="11">
+            <Fluid ID="11">0.29867689467</Fluid>
+          </Well>
+          <Well Row="7" Col="12">
+            <Fluid ID="11">0.1857525673732</Fluid>
+          </Well>
+          <Well Row="7" Col="13">
+            <Fluid ID="11">0.1155228840981</Fluid>
+          </Well>
+          <Well Row="7" Col="14">
+            <Fluid ID="11">0.07184577278832</Fluid>
+          </Well>
+          <Well Row="7" Col="15">
+            <Fluid ID="11">0.04468218663211</Fluid>
+          </Well>
+          <Well Row="7" Col="16">
+            <Fluid ID="11">0.0277886606928</Fluid>
+          </Well>
+          <Well Row="7" Col="17">
+            <Fluid ID="11">0.01728227110857</Fluid>
+          </Well>
+          <Well Row="7" Col="18">
+            <Fluid ID="11">0.01074815724197</Fluid>
+          </Well>
+          <Well Row="7" Col="19">
+            <Fluid ID="11">0.006684473549361</Fluid>
+          </Well>
+          <Well Row="7" Col="20">
+            <Fluid ID="11">0.004157195101095</Fluid>
+          </Well>
+          <Well Row="7" Col="21">
+            <Fluid ID="11">0.002585434885926</Fluid>
+          </Well>
+          <Well Row="7" Col="22">
+            <Fluid ID="11">0.001607928756483</Fluid>
+          </Well>
+          <Well Row="7" Col="23">
+            <Fluid ID="11">0.001</Fluid>
+          </Well>
+          <Well Row="8" Col="0">
+            <Fluid ID="12">54.85</Fluid>
+          </Well>
+          <Well Row="8" Col="1">
+            <Fluid ID="12">34.12915014651</Fluid>
+          </Well>
+          <Well Row="8" Col="2">
+            <Fluid ID="12">21.23607820826</Fluid>
+          </Well>
+          <Well Row="8" Col="3">
+            <Fluid ID="12">13.21366092421</Fluid>
+          </Well>
+          <Well Row="8" Col="4">
+            <Fluid ID="13">8.221896402321</Fluid>
+          </Well>
+          <Well Row="8" Col="5">
+            <Fluid ID="13">5.115885812286</Fluid>
+          </Well>
+          <Well Row="8" Col="6">
+            <Fluid ID="13">3.183242206379</Fluid>
+          </Well>
+          <Well Row="8" Col="7">
+            <Fluid ID="13">1.980699201718</Fluid>
+          </Well>
+          <Well Row="8" Col="8">
+            <Fluid ID="13">1.232444493172</Fluid>
+          </Well>
+          <Well Row="8" Col="9">
+            <Fluid ID="13">0.7668602215992</Fluid>
+          </Well>
+          <Well Row="8" Col="10">
+            <Fluid ID="13">0.4771611238714</Fluid>
+          </Well>
+          <Well Row="8" Col="11">
+            <Fluid ID="13">0.2969025276332</Fluid>
+          </Well>
+          <Well Row="8" Col="12">
+            <Fluid ID="13">0.1847407647124</Fluid>
+          </Well>
+          <Well Row="8" Col="13">
+            <Fluid ID="13">0.1149506890984</Fluid>
+          </Well>
+          <Well Row="8" Col="14">
+            <Fluid ID="13">0.07152542074176</Fluid>
+          </Well>
+          <Well Row="8" Col="15">
+            <Fluid ID="13">0.04450504692412</Fluid>
+          </Well>
+          <Well Row="8" Col="16">
+            <Fluid ID="13">0.0276922411805</Fluid>
+          </Well>
+          <Well Row="8" Col="17">
+            <Fluid ID="13">0.01723085974736</Fluid>
+          </Well>
+          <Well Row="8" Col="18">
+            <Fluid ID="13">0.01072150591561</Fluid>
+          </Well>
+          <Well Row="8" Col="19">
+            <Fluid ID="13">0.006671210304294</Fluid>
+          </Well>
+          <Well Row="8" Col="20">
+            <Fluid ID="13">0.004151007076284</Fluid>
+          </Well>
+          <Well Row="8" Col="21">
+            <Fluid ID="13">0.002582868619248</Fluid>
+          </Well>
+          <Well Row="8" Col="22">
+            <Fluid ID="13">0.001607130554512</Fluid>
+          </Well>
+          <Well Row="8" Col="23">
+            <Fluid ID="13">0.001</Fluid>
+          </Well>
+          <Well Row="9" Col="0">
+            <Fluid ID="14">51.77</Fluid>
+          </Well>
+          <Well Row="9" Col="1">
+            <Fluid ID="14">32.29373259072</Fluid>
+          </Well>
+          <Well Row="9" Col="2">
+            <Fluid ID="14">20.14458498437</Fluid>
+          </Well>
+          <Well Row="9" Col="3">
+            <Fluid ID="14">12.56603903103</Fluid>
+          </Well>
+          <Well Row="9" Col="4">
+            <Fluid ID="15">7.838599656025</Fluid>
+          </Well>
+          <Well Row="9" Col="5">
+            <Fluid ID="15">4.889658898539</Fluid>
+          </Well>
+          <Well Row="9" Col="6">
+            <Fluid ID="15">3.050132063536</Fluid>
+          </Well>
+          <Well Row="9" Col="7">
+            <Fluid ID="15">1.902649202747</Fluid>
+          </Well>
+          <Well Row="9" Col="8">
+            <Fluid ID="15">1.186858114109</Fluid>
+          </Well>
+          <Well Row="9" Col="9">
+            <Fluid ID="15">0.7403530724391</Fluid>
+          </Well>
+          <Well Row="9" Col="10">
+            <Fluid ID="15">0.461826620515</Fluid>
+          </Well>
+          <Well Row="9" Col="11">
+            <Fluid ID="15">0.288083936376</Fluid>
+          </Well>
+          <Well Row="9" Col="12">
+            <Fluid ID="15">0.1797045703112</Fluid>
+          </Well>
+          <Well Row="9" Col="13">
+            <Fluid ID="15">0.1120983453536</Fluid>
+          </Well>
+          <Well Row="9" Col="14">
+            <Fluid ID="15">0.06992609597667</Fluid>
+          </Well>
+          <Well Row="9" Col="15">
+            <Fluid ID="15">0.04361936728962</Fluid>
+          </Well>
+          <Well Row="9" Col="16">
+            <Fluid ID="15">0.02720942984406</Fluid>
+          </Well>
+          <Well Row="9" Col="17">
+            <Fluid ID="15">0.01697303556751</Fluid>
+          </Well>
+          <Well Row="9" Col="18">
+            <Fluid ID="15">0.01058765060595</Fluid>
+          </Well>
+          <Well Row="9" Col="19">
+            <Fluid ID="15">0.006604495990582</Fluid>
+          </Well>
+          <Well Row="9" Col="20">
+            <Fluid ID="15">0.004119834410205</Fluid>
+          </Well>
+          <Well Row="9" Col="21">
+            <Fluid ID="15">0.002569921397744</Fluid>
+          </Well>
+          <Well Row="9" Col="22">
+            <Fluid ID="15">0.001603097438631</Fluid>
+          </Well>
+          <Well Row="9" Col="23">
+            <Fluid ID="15">0.001</Fluid>
+          </Well>
+          <Well Row="10" Col="0">
+            <Fluid ID="16">50.34</Fluid>
+          </Well>
+          <Well Row="10" Col="1">
+            <Fluid ID="16">31.43997572378</Fluid>
+          </Well>
+          <Well Row="10" Col="2">
+            <Fluid ID="16">19.63591723305</Fluid>
+          </Well>
+          <Well Row="10" Col="3">
+            <Fluid ID="16">12.26366231866</Fluid>
+          </Well>
+          <Well Row="10" Col="4">
+            <Fluid ID="17">7.659301660376</Fluid>
+          </Well>
+          <Well Row="10" Col="5">
+            <Fluid ID="17">4.783636437492</Fluid>
+          </Well>
+          <Well Row="10" Col="6">
+            <Fluid ID="17">2.987632369212</Fluid>
+          </Well>
+          <Well Row="10" Col="7">
+            <Fluid ID="17">1.865933435829</Fluid>
+          </Well>
+          <Well Row="10" Col="8">
+            <Fluid ID="17">1.165373498702</Fluid>
+          </Well>
+          <Well Row="10" Col="9">
+            <Fluid ID="17">0.727836998576</Fluid>
+          </Well>
+          <Well Row="10" Col="10">
+            <Fluid ID="17">0.4545724586035</Fluid>
+          </Well>
+          <Well Row="10" Col="11">
+            <Fluid ID="17">0.2839043914023</Fluid>
+          </Well>
+          <Well Row="10" Col="12">
+            <Fluid ID="17">0.1773132136187</Fluid>
+          </Well>
+          <Well Row="10" Col="13">
+            <Fluid ID="17">0.1107414209709</Fluid>
+          </Well>
+          <Well Row="10" Col="14">
+            <Fluid ID="17">0.06916383764289</Fluid>
+          </Well>
+          <Well Row="10" Col="15">
+            <Fluid ID="17">0.04319645165785</Fluid>
+          </Well>
+          <Well Row="10" Col="16">
+            <Fluid ID="17">0.02697845434001</Fluid>
+          </Well>
+          <Well Row="10" Col="17">
+            <Fluid ID="17">0.01684946264432</Fluid>
+          </Well>
+          <Well Row="10" Col="18">
+            <Fluid ID="17">0.01052337498006</Fluid>
+          </Well>
+          <Well Row="10" Col="19">
+            <Fluid ID="17">0.006572400752986</Fluid>
+          </Well>
+          <Well Row="10" Col="20">
+            <Fluid ID="17">0.00410480969648</Fluid>
+          </Well>
+          <Well Row="10" Col="21">
+            <Fluid ID="17">0.002563669392294</Fluid>
+          </Well>
+          <Well Row="10" Col="22">
+            <Fluid ID="17">0.001601146274484</Fluid>
+          </Well>
+          <Well Row="10" Col="23">
+            <Fluid ID="17">0.001</Fluid>
+          </Well>
+          <Well Row="11" Col="0">
+            <Fluid ID="18">49.57</Fluid>
+          </Well>
+          <Well Row="11" Col="1">
+            <Fluid ID="18">30.97982540932</Fluid>
+          </Well>
+          <Well Row="11" Col="2">
+            <Fluid ID="18">19.3615005526</Fluid>
+          </Well>
+          <Well Row="11" Col="3">
+            <Fluid ID="18">12.10038141581</Fluid>
+          </Well>
+          <Well Row="11" Col="4">
+            <Fluid ID="19">7.562390632402</Fluid>
+          </Well>
+          <Well Row="11" Col="5">
+            <Fluid ID="19">4.726276809944</Fluid>
+          </Well>
+          <Well Row="11" Col="6">
+            <Fluid ID="19">2.953787177894</Fluid>
+          </Well>
+          <Well Row="11" Col="7">
+            <Fluid ID="19">1.846032097387</Fluid>
+          </Well>
+          <Well Row="11" Col="8">
+            <Fluid ID="19">1.153717007808</Fluid>
+          </Well>
+          <Well Row="11" Col="9">
+            <Fluid ID="19">0.7210399732431</Fluid>
+          </Well>
+          <Well Row="11" Col="10">
+            <Fluid ID="19">0.4506292613317</Fluid>
+          </Well>
+          <Well Row="11" Col="11">
+            <Fluid ID="19">0.2816303377121</Fluid>
+          </Well>
+          <Well Row="11" Col="12">
+            <Fluid ID="19">0.1760108673046</Fluid>
+          </Well>
+          <Well Row="11" Col="13">
+            <Fluid ID="19">0.1100017336946</Fluid>
+          </Well>
+          <Well Row="11" Col="14">
+            <Fluid ID="19">0.06874792222274</Fluid>
+          </Well>
+          <Well Row="11" Col="15">
+            <Fluid ID="19">0.04296547564483</Fluid>
+          </Well>
+          <Well Row="11" Col="16">
+            <Fluid ID="19">0.02685218749456</Fluid>
+          </Well>
+          <Well Row="11" Col="17">
+            <Fluid ID="19">0.01678184547993</Fluid>
+          </Well>
+          <Well Row="11" Col="18">
+            <Fluid ID="19">0.01048817113202</Fluid>
+          </Well>
+          <Well Row="11" Col="19">
+            <Fluid ID="19">0.006554805538293</Fluid>
+          </Well>
+          <Well Row="11" Col="20">
+            <Fluid ID="19">0.004096565083082</Fluid>
+          </Well>
+          <Well Row="11" Col="21">
+            <Fluid ID="19">0.002560235445871</Fluid>
+          </Well>
+          <Well Row="11" Col="22">
+            <Fluid ID="19">0.001600073575143</Fluid>
+          </Well>
+          <Well Row="11" Col="23">
+            <Fluid ID="19">0.001</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills />
+    <Revisions>
+      <Revision Time="2026-11-16T09:28:27.490-05:00" UserID="PC-workstation\Filip dfci" />
+      <Revision Time="2026-11-16T09:43:41.736-05:00" UserID="PC-workstation\Filip dfci" />
+    </Revisions>
+    <Thumbnail>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</Thumbnail>
+  </Protocol>
+</Root>

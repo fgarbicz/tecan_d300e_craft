@@ -153,3 +153,20 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   report rows (Dispensed Well vs Non-random Well). (was read the other way round; T09 alone cannot tell.)
 - A diluted stock written by Craft (`<RootFluidID>`, `<DilutionFactor>` after `<Name>`, concentration = root / N,
   name "Drug - 1:N") opens in D300e Control 4.0.1 with the dilution marker and dispenses like any fluid (probe-28).
+- Fluid shift / extend in D300e Control's own titration dialog (probe-29 / 29b, 2026-11-16; files saved by D300e):
+  - Offer: "Use Shifted Fluid — Titration can be accomplished with a shifted fluid — Dilution Factor is 1:3 (33%)" /
+    "Do Not Shift"; "Use Extended Fluid — … using an extended fluid in addition to the selected fluid — Dilution
+    Factor is 1:30" / "Do Not Extend — Without fluid extension, the titration will include wells below the minimum
+    dispense volume". Factors seen: 3, 6, 30, 300 — all = smallest candidate ≥ stock minimum / lowest level; shift
+    when the top level is within the diluted fluid's maximum (src/ops.js suggestShift, rule unchanged).
+  - An existing dilution of the fluid is reused when it covers the series (1 → 0.001 µM with "Fluid 1 - 1:30"
+    present: shift 1:30 offered, both fluids shown in the dialog).
+  - Level split after "Use Extended Fluid": a level goes to the extended fluid when it needs ≤ ~180 nL of it
+    (bracket 179.36–181.51 nL), otherwise it stays on the stock — the stock does NOT keep every level it can reach.
+    Independent of the DMSO limit (0.5 %) and the well volume (100 µL). src/ops.js extendThreshold.
+  - Stored as Craft writes it: new fluid right after its root, `<Name>Fluid 1 - 1:30</Name>`, `<RootFluidID>0`,
+    `<DilutionFactor>30`, `<Concentration>333.3333333333` (13 significant digits).
+  - The titration panel shows "Valid range is 0.00260 to 100 µM" (50 µL, 1 %), "0.00260 to 50.0 µM" (0.5 %),
+    "0.00130 to 100 µM" (100 µL) — equal to validRange().
+  - Remote-desktop notes: Shift and Ctrl are dropped (no shift-click, no Ctrl+A): select a row by its header, clear
+    a field with End + Backspace; the plate editor needs APPLY before CLOSE.

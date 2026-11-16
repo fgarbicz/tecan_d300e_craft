@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { titrationLevels, suggestShift, buildSynergy, applyTitration, newPlate, addNormalization, removePlate } from '../src/ops.js';
+import { titrationLevels, suggestShift, extendThreshold, buildSynergy, applyTitration, newPlate, addNormalization, removePlate } from '../src/ops.js';
 import { wellKey } from '../src/tdd.js';
 
 const close = (a, b, rel, msg) => assert.ok(Math.abs(a - b) <= rel * Math.abs(b), `${msg}: ${a} vs ${b}`);
@@ -23,6 +23,15 @@ test('fluid shift / extend: both guide examples (p.29-30)', () => {
   assert.deepEqual(suggestShift(fluid, plate, 1, 0.0001), { kind: 'shift', factor: 4 });
   assert.deepEqual(suggestShift(fluid, plate, 5, 0.00001), { kind: 'extend', factor: 40 });
   assert.equal(suggestShift(fluid, plate, 5, 0.01), null);
+  // D300e Control 4.0.1's own dialog (probe-29): 10 mM DMSO stock, 50 µL, 1 % DMSO
+  const f10 = { byVol: false, concentration: 10000, classId: 0 }, p50 = { assayVolume: 50000, dmsoLimit: 0.01 };
+  for (const [hi, lo, kind, factor] of [[1, 0.001, 'shift', 3], [10, 0.0001, 'extend', 30], [50, 0.0005, 'extend', 6], [40, 0.001, 'extend', 3], [50, 0.00001, 'extend', 300], [55.48, 0.001, 'extend', 3]])
+    assert.deepEqual(suggestShift(f10, p50, hi, lo), { kind, factor }, `${hi} → ${lo}`);
+  assert.deepEqual(suggestShift(f10, { assayVolume: 50000, dmsoLimit: 0.005 }, 30, 0.001), { kind: 'extend', factor: 3 });
+  assert.deepEqual(suggestShift(f10, { assayVolume: 100000, dmsoLimit: 0.01 }, 60, 0.0005), { kind: 'extend', factor: 3 });
+  // an existing dilution that covers the series is reused (row C: "Fluid 1 - 1:30" was already there)
+  assert.deepEqual(suggestShift(f10, p50, 1, 0.001, [30]), { kind: 'shift', factor: 30, existing: true });
+  assert.deepEqual(suggestShift(f10, p50, 10, 0.001, [30]), { kind: 'shift', factor: 3 }); // 1:30 cannot reach 10 µM
 });
 
 test('titration placement with replicates', () => {
@@ -217,4 +226,24 @@ test('parseDilution reads the usual ways of writing a dilution step', async () =
   assert.equal(f('-33%'), +(1 / 0.67).toPrecision(6)); assert.equal(f('1:0.33'), +(1 / 0.67).toPrecision(6)); // 10 → 6.7
   assert.equal(f('1:0.333333'), +(1 / (1 - 0.333333)).toPrecision(6));
   for (const bad of ['', '1', '0', 'abc', '1:1', '×2', '120%']) assert.throws(() => parseDilution(bad), /dilution|decrease|Multiply|Enter/, bad);
+});
+
+test('fluid extension: the level split D300e Control saved (probe-29 / 29b) — extended fluid up to 180 nL', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { parseTdd } = await import('../src/tdd.js');
+  let rows = 0;
+  for (const name of ['probe-29-shiftextend.tdd', 'probe-29b-shiftextend3.tdd']) {
+    const p = parseTdd(readFileSync(join(import.meta.dirname, '..', 'fixtures', 'reference', 'probes', name), 'utf8'));
+    const byId = new Map(p.fluids.map((f) => [f.id, f]));
+    for (const pl of p.plates) for (let r = 0; r < pl.rows; r++) {
+      const row = []; for (let c = 0; c < pl.cols; c++) { const m = pl.wells.get(`${r},${c}`); if (m) for (const [id, v] of m) row.push({ f: byId.get(id), v }); }
+      const dil = row.find((x) => x.f.rootFluidId != null)?.f, stock = row.find((x) => x.f.rootFluidId == null)?.f;
+      if (!dil || !stock) continue; // empty row, or a shifted series (one fluid)
+      const t = extendThreshold(dil.concentration, pl);
+      for (const x of row) assert.equal(x.f === dil, x.v <= t, `${name} row ${r}: ${x.v} µM on ${x.f.name} (threshold ${t})`);
+      rows++;
+    }
+  }
+  assert.equal(rows, 20); // 9 extended rows at 50 µL / 1 % (in both files), one at 0.5 %, one at 100 µL
 });

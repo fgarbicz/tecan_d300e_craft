@@ -183,15 +183,44 @@ export function applyTitration(plate, cells, fluidId, levels, { replicates = 1, 
 const DILUTIONS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900,
   1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000];
 
-/** Suggest a shift (one diluted fluid covers the range) or extension (stock + diluted). INFERRED rule, fits both guide examples. */
-export function suggestShift(fluid, plate, high, low) {
+/**
+ * Suggest a shift (one diluted fluid covers the range) or extension (stock + diluted), as D300e Control's
+ * titration dialog does. CONFIRMED in D300e Control 4.0.1 (probe-29, 2026-11-16; 10 mM DMSO stock, 384-well):
+ *   1 → 0.001 µM: "Use Shifted Fluid, 1:3 (33%)" · 10 → 0.0001: "Use Extended Fluid, 1:30" · 50 → 0.0005: extend
+ *   1:6 (17%) · 40 → 0.001 and 49.6…55.5 → 0.001: extend 1:3 · 50 → 0.00001: extend 1:300 · 0.5 % limit, 30 →
+ *   0.001: extend 1:3 · 100 µL, 60 → 0.0005: extend 1:3. All equal this rule: the smallest candidate
+ *   ≥ stock minimum / lowest level; shift if the highest level is within the diluted fluid's maximum.
+ *   (Candidates 4, 20, 40 and "impossible" come from the guide only; not offered in these runs.)
+ * `existing`: dilution factors of this fluid already in the protocol. D300e reuses one that covers the whole
+ * series instead of proposing a new factor (probe-29 row C: 1 → 0.001 with "Fluid 1 - 1:30" present → shift 1:30).
+ * Whether it also reuses one for an extension is UNTESTED (not done here).
+ */
+export function suggestShift(fluid, plate, high, low, existing = []) {
   const { min, max } = validRange(fluid, plate);
   if (low >= min * (1 - 1e-9)) return null;
   const need = min / low;
+  const reuse = [...existing].sort((a, b) => a - b).find((x) => x >= need * (1 - 1e-9) && high <= (max / x) * (1 + 1e-9));
+  if (reuse) return { kind: 'shift', factor: reuse, existing: true };
   const d = DILUTIONS.find((x) => x >= need * (1 - 1e-9));
   if (!d) return { kind: 'impossible' };
   const dilutedMax = max / d;
   return high <= dilutedMax * (1 + 1e-9) ? { kind: 'shift', factor: d } : { kind: 'extend', factor: d };
+}
+
+/**
+ * Fluid extension: which levels D300e Control dispenses from the extended (diluted) fluid. A level goes to the
+ * extended fluid when it needs at most EXTEND_MAX_VOLUME nL of it (volume = level × assay volume / diluted stock);
+ * higher levels stay on the original stock — NOT "the stock keeps every level it can reach".
+ * probe-29 / 29b (saved by D300e Control after accepting the extension; 24 log levels each): the boundary lies
+ * between 179.36 nL (on the extended fluid: 0.1196 µM of a 1:300) and 181.51 nL (still on the stock: 12.10 µM, 1:3)
+ * at 50 µL / 1 %; it does not scale with the DMSO limit (0.5 %: 117 nL extended, 184 nL stock) nor with the well
+ * volume (100 µL: 142 nL extended, 235 nL stock). 180 nL is the round value inside the bracket; whether exactly
+ * 180.0 goes to the extended fluid is not known.
+ * Returns the highest concentration (base units) that goes to the extended fluid.
+ */
+export const EXTEND_MAX_VOLUME = 180; // nL of the extended fluid; bracket 179.36–181.51
+export function extendThreshold(dilutedStockConcentration, plate) {
+  return (EXTEND_MAX_VOLUME * dilutedStockConcentration) / plate.assayVolume;
 }
 
 // Saved by D300e Control as <RootFluidID> and <DilutionFactor> right after <Name> (T01, fluid "Fluid 1 - 1:300").
