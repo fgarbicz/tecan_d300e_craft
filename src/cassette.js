@@ -61,8 +61,10 @@ export function headLoad(cassette, d, isDmso = true) {
   // 0.004–0.04 µL below a .5 tie (single-plate fluids, a ToVolume normalization head, two-plate heads, equal shares
   // of 2 and 3) all show the lower value: 149.96 → 202.45 → 202, 119.58 → 164, 86.78 → 123, 190.76 → 253,
   // 158.796 → 213. "Dispensed to 0.1 µL first" (which would give 203, 165, 124, 254) is refuted.
-  // probe-25 head 4 (258 for 193.996 µL dispensed) is not a rounding matter: that head is planned from other
-  // top-up volumes than the dispensed ones — see perPlateAmounts ("% of assay volume").
+  // OPEN (one head): probe-25 head 4, a "% of assay volume" normalization head of 193.996 µL (349 dispenses), was
+  // loaded as 258 (257.495 → 257 here). Ruled out on 2026-11-16: d rounded to 0.1 µL first (probe-27a, 12 heads),
+  // next-step top-ups (probe-31, 3 heads), sub-1 nL top-ups (there are none on that plate), unrounded top-ups
+  // (193.999). 0.004 µL short of the tie.
   // (was 2026-11-16 morning: whole-plate heads from d rounded to 0.1 µL, equal shares exact — fitted on that head.)
   if (cassette.type === 'D4+') return roundTo(cassette.slope * d + cassette.dead, 0); // UNVERIFIED for aqueous
   const dead = isDmso ? 0.3 : 2.5, min = isDmso ? 2.0 : 4.0;
@@ -86,11 +88,11 @@ export function perPlateAmounts(protocol, computed) {
       if (r.normalization > 0) {
         const cls = normClass.get(`${p}|${k}`) ?? 0;
         const it = get(`n${cls}`, { key: `n${cls}`, fluidId: null, classId: cls, name: `${fluidClass(cls).short} normalization`, order: 1 });
-        // "% of assay volume": D300e sizes the head from the top-up of the NEXT iteration step (Nⱼ), while it
-        // dispenses Nⱼ₋₁ (dispense.js pctTopUp). probe-25 plate 2: Σ dispensed 193.996 µL, Σ Nⱼ 194.042 µL → the head
-        // was loaded 258 (= 1.25 × 194.04 + 15), not 257. FITTED on that head; D3, T05 and probe-25's other head fit
-        // both readings. Blind check: probe-31.
-        const vn = r.normalizationPlanned ?? r.normalization;
+        // Heads are planned from the dispensed top-ups, also for "% of assay volume": probe-31 (blind, 2026-11-16)
+        // put three such heads between "dispensed" and "next iteration step" sums and all three were loaded for
+        // the dispensed sum (257 / 261 / 253, not 258 / 262 / 254).
+        // (was, for a few hours: planned from the next-step top-ups Nⱼ — fitted on probe-25 head 4, refuted.)
+        const vn = r.normalization;
         it.perPlate[p] += vn / 1000; it.wells.push(well(p, k, vn));
       }
     }

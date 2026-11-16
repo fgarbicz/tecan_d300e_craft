@@ -178,3 +178,12 @@ D4+ pc1:172.0936→230  DMSO normalization:194.0075→258  DMSO normalization:19
 D4+ DMSO normalization:190.8079→254
    (planned from the dispensed volumes instead: 257, 261, 253)
 ```
+
+### probe-31 result (2026-11-16)
+- Heads: pc1 230, normalization 257, 261, pc1 118 | normalization 253 → the "next-step top-ups" prediction (258,
+  262, 254) is REFUTED on all three heads; heads are planned from the dispensed volumes. Pre-run summary: pc1
+  347.9, normalization 772 (5 D4+ heads, 2 cassettes). probe-25 head 4 (258 for 193.996 µL) is an open single case
+  again; also ruled out: d rounded to 0.1 µL (probe-27a), sub-1 nL top-ups (none on that plate), unrounded top-ups.
+- Dispense rows 2046/2051 as predicted: five top-ups one step low, all wells with a top-up below ~155 nL. New
+  stop check for "% of assay volume": first step on the change of the top-up, later steps on the fluid volume →
+  2051/2051, probe-25 1850/1850, D3 5752/5752, probe-20 1007/1007 unchanged.

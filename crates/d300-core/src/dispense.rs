@@ -947,8 +947,10 @@ fn pct_top_up(req: &WellFluids, fluids: &FluidLookup, b: &crate::tdd::Backfill, 
         t = a + n + vol(&c_all, t);
     }
     let mut j = 4;
+    // first step: change of the top-up; later steps: change of the fluid volume (src/dispense.js; probe-31)
     for k in 1..=4 {
-        if (vs[k] - vs[k - 1]).abs() / js_max(ns[k].abs(), 1e-12) < SIZING_TOLERANCE {
+        let d = if k == 1 { ns[1] - ns[0] } else { vs[k] - vs[k - 1] };
+        if d.abs() / js_max(ns[k].abs(), 1e-12) < SIZING_TOLERANCE {
             j = k;
             break;
         }

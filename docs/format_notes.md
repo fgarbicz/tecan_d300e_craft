@@ -132,6 +132,9 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   every fluid at T₂ (open: 7 rows on its 20 µL plate — near-ties, and one well, I15, that fits a further step).
   (earlier notes, kept for the record: the implied gap looked k-dependent — 556.25 → 555.7 → 555.4 → 556.25 —
   because the middle band subtracts X₁, not V₀ or V₁; no single-volume model could fit.)
+- "% of assay volume", stop check revised 2026-11-16 (probe-31): the first step compares the change of the top-up
+  (N₁ − N₀ = p³·A) with 0.1 % of the top-up, later steps the change of the fluid volume. Heads for this type are
+  planned from the dispensed top-ups (probe-31; the "next-step" idea for probe-25 head 4 is refuted).
 - "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at
   A(1+p); wells already over the target get no top-up and normal sizing (src/dispense.js pctTopUp; D3 plate 9 +
   probe-25: 1076/1076).
