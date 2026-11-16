@@ -49,3 +49,16 @@ Open: how such a fluid is split when it needs > 2 heads, and when a D4+ takes pa
 ## Added (predictions: "new head at a plate boundary only if the head is ≥ half full")
 - 22n (plates 66 + 66): cassette 1 head 7 = 6.0 µL (load 7.2), head 8 = plate 2.
 - 22o (plates 63 + 63): cassette 1 head 7 = 10 µL spanning plates (all 8 heads load 11.8).
+
+## probe-24 (validation of the cassette rules; prediction from src/cassette.js at commit 2d2d1e8, before the run)
+- T8+ cassette 1: d1 9.3, d2 9.3, d3 9.1, d4 22.6, d1 9.3, d2 9.3, d3 9.1, d4 22.6
+- T8+ cassette 2: d1 9.3, d2 9.3, d3 9.1, d3 9.1
+- D4+ cassette 3: DMSO normalization 234 ×4; D4+ cassette 4: 234 ×2
+- pre-run summary: 12 T8+ heads (2 cassettes), 6 D4+ heads (2 cassettes)
+
+### probe-24 result
+- Dispense volumes: 3020/3020 rows match the engine (blind check of the top-up model).
+- Cassettes: counts and d1/d4 heads as predicted; d2 (7.0, 11.8 | 9.0), d3 (7.5, 7.5 | 10.6, 10.6) and the D4+
+  normalization (265, 104, 265, 265 | 254, 254) were NOT predicted. Rules revised from this run (fill plan with
+  plate-boundary starts; D4+ planned from the plate its phase starts at; D4+ overflow re-planned) — so probe-24
+  now fits by construction, and the revised rules still need a fresh blind run to count as validated.

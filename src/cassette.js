@@ -91,20 +91,20 @@ const T8_SUB_CAP = 10;
  * Split one fluid's amounts into heads: [{cassette: T8|D4, amount, plates:Set}].
  * `wells` (optional, in dispense order) decides the T8+ cap; without it the 20 µL bulk cap is used.
  */
-export function splitFluid(perPlate, { highVolume = true, wells = null } = {}) {
+export function splitFluid(perPlate, { highVolume = true, wells = null, start = 0 } = {}) {
   const d = perPlate.reduce((s, v) => s + v, 0);
   if (d <= EPS) return [];
   const cap = t8Cap(wells);
   const kT = Math.max(1, Math.ceil((d - TOL) / cap));
   // a fluid with sub-nL wells stays on standard cassettes (a D4+ cannot dispense < 1 nL; probe-22b/d/e/j)
-  if (kT <= 2 || !highVolume || cap < T8.cap) return packOrSplit(perPlate, 0, d, kT, T8, false, cap);
+  if (kT <= 2 || !highVolume || cap < T8.cap) return packOrSplit(perPlate, 0, d, kT, T8, false, cap, start);
   const n = Math.floor(d / D4.cap + EPS), r = d - n * D4.cap;
-  if (r <= EPS) return packOrSplit(perPlate, 0, d, n, D4, true);
+  if (r <= EPS) return packOrSplit(perPlate, 0, d, n, D4, true, D4.cap, start);
   if (r <= T8.cap + EPS && n > 0) {
     // the first 20 µL (in run order) on one T8+ head, the rest on n D4+ heads
     return [{ cassette: T8, amount: T8.cap, plates: platesIn(perPlate, 0, T8.cap) }, ...packOrSplit(perPlate, T8.cap, d - T8.cap, n, D4, true)];
   }
-  return packOrSplit(perPlate, 0, d, n + 1, D4, true);
+  return packOrSplit(perPlate, 0, d, n + 1, D4, true, D4.cap, start);
 }
 
 /** Plates whose dispenses fall in the cumulative range [from, to). */
@@ -120,22 +120,26 @@ function platesIn(perPlate, from, to) {
  * several plates and that needs ≤ k heads; else k equal shares. D4+: whole plates next-fit, then largest-first,
  * then equal shares.
  */
-function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst, cap = cas.cap) {
+function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst, cap = cas.cap, start = 0) {
   // the part of each plate that belongs to this group (after `offset`)
   let cum = 0; const part = perPlate.map((v) => { const a = Math.max(0, Math.min(v, cum + v - offset)); cum += v; return a; });
-  const items = part.map((v, p) => ({ v, p })).filter((x) => x.v > EPS);
-  const equal = () => Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: platesIn(perPlate, offset + (j * total) / k, offset + ((j + 1) * total) / k) }));
+  // plates in run order, from the plate the cassette phase starts at (probe-24: the D4+ cassette starts at plate 4)
+  const n = part.length, ord = Array.from({ length: n }, (_, i) => (start + i) % n);
+  const items = part.map((v, p) => ({ v, p })).filter((x) => x.v > EPS);   // whole-plate packings: plate order
+  const itemsRun = ord.map((p) => ({ v: part[p], p })).filter((x) => x.v > EPS); // fill plan: run order
+  const equal = () => {
+    if (!start) return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: platesIn(perPlate, offset + (j * total) / k, offset + ((j + 1) * total) / k) }));
+    const rot = ord.map((p) => part[p]); // cumulative over the rotated order, mapped back to plate numbers
+    return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: new Set([...platesIn(rot, (j * total) / k, ((j + 1) * total) / k)].map((i) => ord[i])) }));
+  };
+  if (cas === T8) return fillPlan(itemsRun, total, k, cap, T8) || equal();
   const nextFit = [];
   for (const it of items) {
     const b = nextFit.at(-1);
     if (b && b.amount + it.v <= cap + TOL) { b.amount += it.v; b.plates.add(it.p); continue; }
-    if (cas === D4) { nextFit.push({ amount: it.v, plates: new Set([it.p]) }); continue; }
-    let rest = it.v; // T8+: a plate larger than the cap fills heads to the cap in well order
-    while (rest > cap + TOL) { nextFit.push({ amount: cap, plates: new Set([it.p]) }); rest -= cap; }
-    nextFit.push({ amount: rest, plates: new Set([it.p]) });
+    nextFit.push({ amount: it.v, plates: new Set([it.p]) });
   }
   const fits = (bins) => bins.length <= k && bins.every((b) => b.amount <= cap + TOL);
-  if (cas === T8 && items.length < 2) return equal(); // one plate: equal shares (probe-2, probe-22a)
   if (fits(nextFit)) return nextFit.map((b) => ({ cassette: cas, ...b }));
   if (tryLargestFirst) {
     const bins = [];
@@ -146,7 +150,37 @@ function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst, cap = cas
     }
     if (fits(bins)) return bins.map((b) => ({ cassette: cas, ...b }));
   }
+  if (cas === D4) { const g = fillPlan(itemsRun, total, k, cap, D4); if (g) return g; } // probe-24 normalization
   return equal();
+}
+
+/**
+ * Heads for one fluid, plates in run order (T8+: probe-24 and all earlier probes; D4+: after whole-plate
+ * next-fit and largest-first, probe-24's normalization):
+ *  - a plate joins the current head if it fits whole;
+ *  - otherwise a new head starts at the plate boundary if the rest still fits in the remaining heads
+ *    (⌈rest / cap⌉ ≤ heads left of k); if not, the current head is filled to the cap across the boundary;
+ *  - a plate larger than the cap fills heads to the cap.
+ * Used only if at least one head was started at a plate boundary that way; otherwise (and for a single plate)
+ * the fluid is split equally across k heads (returns null).
+ * probe-24 d2 [5.9 ×4] → 5.9 | 10 | 7.6; d1 [7.8, 7.8, 3.9, 3.9] → 7.8 | 7.8 | 7.8; probe-22n 10×6 + 6 | 10…;
+ * probe-22o / 22h: no boundary start possible → equal; D3 IDOTDO 8.7+8.7 | 8.7; probe-11 k4 [14,14,8] → 18 | 18.
+ */
+function fillPlan(items, total, k, cap, cas) {
+  const bins = []; let cur = null, used = 0, resets = 0;
+  for (const it of items) {
+    let rest = it.v;
+    if (cur && cur.amount + rest <= cap + TOL) { cur.amount += rest; cur.plates.add(it.p); cur.parts[it.p] = (cur.parts[it.p] || 0) + rest; used += rest; continue; }
+    if (cur) {
+      const after = total - used, left = k - bins.length;
+      if (Math.ceil((after - TOL) / cap) <= left) { resets++; cur = null; }
+      else { const take = cap - cur.amount; cur.amount = cap; cur.plates.add(it.p); cur.parts[it.p] = (cur.parts[it.p] || 0) + take; used += take; rest -= take; cur = null; }
+    }
+    while (rest > cap + TOL) { bins.push({ amount: cap, plates: new Set([it.p]), parts: { [it.p]: cap } }); used += cap; rest -= cap; }
+    if (rest > EPS) { cur = { amount: rest, plates: new Set([it.p]), parts: { [it.p]: rest } }; bins.push(cur); used += rest; }
+  }
+  if (!resets || bins.length > k) return null;
+  return bins.map((b) => ({ cassette: cas, ...b }));
 }
 
 /** The wells left after the first `offset` µL (a well split at the boundary keeps its remaining part). */
@@ -180,6 +214,15 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
   let current = 0;
   for (let pass = 0; pass < 8 && heads.some((h) => !h.done); pass++) {
     for (const c of types) {
+      if (c === D4) { // D4+-only fluids are planned from the plate the D4+ phase starts at
+        for (const it of items) {
+          const own = heads.filter((h) => h.it === it);
+          if (!own.length || own.some((h) => h.done || h.cassette !== D4)) continue;
+          const seg0 = Math.max(...own.map((h) => h.seg)) + 1, order = own[0].order;
+          for (const h of own) heads.splice(heads.indexOf(h), 1);
+          add(it, order, splitFluid(it.perPlate, { highVolume, wells: it.wells, start: current }), seg0);
+        }
+      }
       for (;;) {
         const remaining = heads.filter((h) => !h.done && h.cassette === c).sort((a, b) => a.order - b.order || a.seg - b.seg);
         if (!remaining.length) break;
@@ -199,6 +242,19 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
             dispensed: h.amount, load: headLoad(c, h.amount, isDmso), plates: [...h.plates].sort((a, b) => a - b) });
         });
         cassettes.push(cas);
+        if (c === D4) { // D4+ overflow: what the next D4+ cassette gets is planned again (probe-24: 2 × 191.2)
+          for (const it of new Set(chosen.map((h) => h.it))) {
+            const left = heads.filter((h) => !h.done && h.it === it && h.cassette === D4);
+            if (!left.length || left.some((h) => !h.parts)) continue;
+            const rest = new Array(nPlates).fill(0);
+            for (const h of left) for (const [p, v] of Object.entries(h.parts)) rest[+p] += v;
+            const d = rest.reduce((a, b) => a + b, 0), k = Math.max(1, Math.ceil((d - TOL) / D4.cap));
+            const seg0 = Math.max(...heads.filter((h) => h.it === it).map((h) => h.seg)) + 1, order = left[0].order;
+            for (const h of left) heads.splice(heads.indexOf(h), 1);
+            add(it, order, packOrSplit(rest, 0, d, k, D4, true, D4.cap, current), seg0);
+          }
+          continue;
+        }
         // T8+ overflow: re-plan what is left of every fluid that got some, but not all, of its heads in this cassette
         if (c !== T8) continue;
         for (const it of new Set(chosen.map((h) => h.it))) {

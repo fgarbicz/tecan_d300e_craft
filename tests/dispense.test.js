@@ -136,7 +136,9 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
   const root = join(import.meta.dirname, '..');
   for (const [tdd, rep] of [['fixtures/reference/t05-normalize.tdd', 'fixtures/reference/reports/probes/t05-normalize.xml'],
     ['fixtures/reference/probes/t05-lim2.tdd', 'fixtures/reference/reports/probes/t05-lim2.xml'],
-    ['fixtures/reference/probes/t05-a10-90.tdd', 'fixtures/reference/reports/probes/t05-a10-90.xml']]) {
+    ['fixtures/reference/probes/t05-a10-90.tdd', 'fixtures/reference/reports/probes/t05-a10-90.xml'],
+    // probe-24: 4 plates of ToMaxVolume, computed before the run (blind check of the top-up model)
+    ['fixtures/reference/probes/probe-24-validate.tdd', 'fixtures/reference/reports/probes/probe-24-validate.xml']]) {
     const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' });
     assert.match(out, /ALL ROWS MATCH/, tdd + ': ' + out.split('\n')[0]);
   }

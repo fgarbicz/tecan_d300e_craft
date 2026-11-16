@@ -143,3 +143,13 @@ test('probe-22l/n: plate packing fits (14 heads) → heads filled to 10 µL per 
   assert.deepEqual(loads(n)[0], ['T8+', [11.8, 11.8, 11.8, 11.8, 11.8, 11.8, 7.2, 11.8]]);
   assert.equal(n.cassettes.reduce((s, c) => s + c.heads.length, 0), 14);
 });
+test('probe-24 (4 plates, 4 drugs, ToMaxVolume): every head of all four cassettes as D300e loaded them', () => {
+  // T8+ fill plan with plate-boundary starts (d1, d2, d3), overflow re-planned (d3 → 2 × 8.96 equal), d4 bulk
+  // equal; D4+ normalization planned from plate 4 (where the D4+ phase starts): 200 | 70.9 | 200 | 200, then the
+  // rest re-planned 2 × 191.2. The run report's dispenses all match the engine too (dispense.test.js).
+  assert.deepEqual(heads(plan(R + 'probe-24-validate.tdd')), [
+    ['T8+', ['d1 9.3', 'd2 7', 'd3 7.5', 'd4 22.6', 'd1 9.3', 'd2 11.8', 'd3 7.5', 'd4 22.6']],
+    ['T8+', ['d1 9.3', 'd2 9', 'd3 10.6', 'd3 10.6']],
+    ['D4+', ['DMSO normalization 265', 'DMSO normalization 104', 'DMSO normalization 265', 'DMSO normalization 265']],
+    ['D4+', ['DMSO normalization 254', 'DMSO normalization 254']]]);
+});

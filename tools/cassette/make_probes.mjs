@@ -285,3 +285,25 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 'probe-23-totalsweep.tdd'), writeTdd(p));
   console.log('wrote probe-23-totalsweep');
 }
+
+// probe-24 (validation, not used for fitting): 4 plates, 4 drugs. d1–d3: dilution series over 3 decades
+// (lowest wells < 1 nL, so 10 µL heads), d4 bulk; ToMaxVolume normalization over everything.
+{
+  const p = newProtocol();
+  const fl = [['d1', 10000], ['d2', 10000], ['d3', 1000], ['d4', 10000]].map(([name, c]) => addFluid(p, { name, concentration: c, concentrationUnit: 'mM', classId: 0 }));
+  for (let pi = 0; pi < 4; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-24 ${pi + 1}`, dmsoLimit: 0.02 }));
+  const wells = [];
+  for (let pi = 0; pi < 4; pi++) {
+    for (let r = 0; r < 16; r++) for (let c = 0; c < 24; c++) {
+      const series = (top, i, n) => top * Math.pow(10, -3 * i / (n - 1));
+      if (r < 5) setWell(p.plates[pi], r, c, fl[0].id, +series(pi < 2 ? 80 : 40, c, 24).toPrecision(5));            // d1 rows A–E
+      else if (r < 10) setWell(p.plates[pi], r, c, fl[1].id, +series(60, c, 24).toPrecision(5));                    // d2 rows F–J
+      else if (r < 14) setWell(p.plates[pi], r, c, fl[2].id, +series(pi === 3 ? 15 : 8, c, 24).toPrecision(5));     // d3 rows K–N
+      else if (pi < 3) setWell(p.plates[pi], r, c, fl[3].id, +(30 + 2 * c).toPrecision(5));                         // d4 rows O–P (bulk)
+      wells.push({ p: pi, r, c });
+    }
+  }
+  addNormalization(p, 0, 'ToMaxVolume', undefined, wells);
+  writeFileSync(join(process.argv[2], 'probe-24-validate.tdd'), writeTdd(p));
+  console.log('wrote probe-24-validate');
+}
