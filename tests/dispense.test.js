@@ -144,3 +144,15 @@ test('synergy shares the DMSO limit between its fluids (T06/T07 valid ranges)', 
   close(validRange(f, plate, 1).max, 100, 1e-12, '1 fluid'); close(validRange(f, plate, 2).max, 50, 1e-12, '2 fluids');
   close(validRange(f, plate, 3).max, 33.3333333333, 1e-9, '3 fluids'); close(validRange(f, plate, 3).min, 0.0026, 1e-6, 'min unchanged');
 });
+
+test('simulated run reports: large per-well volumes (1–4 µL, DMSO and aqueous) are reproduced', async () => {
+  // probe-2 (80 rows, ~1.9 µL/well) and probe-10 (212 rows, 3.4–4 µL/well, incl. a+Tween fluids) were run in
+  // D300e Control 4.0.1 simulation (2026-11-15). They fix the three-step volume solve (see computeWell).
+  const { execFileSync } = await import('node:child_process');
+  const root = join(import.meta.dirname, '..');
+  for (const [name, n] of [['probe-2-split', 80], ['probe-10-bounds', 212]]) {
+    const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py',
+      `fixtures/reference/probes/${name}.tdd`, `fixtures/reference/reports/probes/${name}.xml`], { cwd: root, encoding: 'utf8' });
+    assert.match(out, new RegExp(`'rows': ${n}, 'vol_ok': ${n}, 'total_ok': ${n}, 'conc_ok': ${n}`), out.split('\n')[0]);
+  }
+});

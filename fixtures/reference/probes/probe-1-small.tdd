@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>s1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="1">
+        <Name>s2</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="2">
+        <Name>s3</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="3">
+        <Name>s4</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="4">
+        <Name>s5</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="5">
+        <Name>s6</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="6">
+        <Name>s7</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+      <Fluid ID="7">
+        <Name>s8</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name>probe-1-small 1</Name>
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.1</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="0">
+            <Fluid ID="0">39.8406374502</Fluid>
+          </Well>
+          <Well Row="0" Col="1">
+            <Fluid ID="1">196.0784313725</Fluid>
+          </Well>
+          <Well Row="0" Col="2">
+            <Fluid ID="2">310.0775193798</Fluid>
+          </Well>
+          <Well Row="0" Col="3">
+            <Fluid ID="3">347.4903474903</Fluid>
+          </Well>
+          <Well Row="0" Col="4">
+            <Fluid ID="4">215.2641878669</Fluid>
+          </Well>
+          <Well Row="0" Col="5">
+            <Fluid ID="4">215.2641878669</Fluid>
+          </Well>
+          <Well Row="0" Col="6">
+            <Fluid ID="5">291.2621359223</Fluid>
+          </Well>
+          <Well Row="0" Col="7">
+            <Fluid ID="5">291.2621359223</Fluid>
+          </Well>
+          <Well Row="0" Col="8">
+            <Fluid ID="6">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="9">
+            <Fluid ID="6">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="10">
+            <Fluid ID="6">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="11">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="12">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="13">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="14">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="15">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+          <Well Row="0" Col="16">
+            <Fluid ID="7">384.6153846154</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills />
+    <Revisions />
+  </Protocol>
+</Root>

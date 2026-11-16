@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Protocol>
+    <!--Protocol files are intended for programmatic access.  File format may change without notice.-->
+    <!--Application: Version: 4.0.1, DLL version: 2.182-->
+    <Version>4</Version>
+    <VolumeUnit>nL</VolumeUnit>
+    <MolarityConcentrationUnit>µM</MolarityConcentrationUnit>
+    <MassConcentrationUnit>ng_mL</MassConcentrationUnit>
+    <Fluids>
+      <Fluid ID="0">
+        <Name>n1</Name>
+        <ByVol>False</ByVol>
+        <Concentration>10000</Concentration>
+        <ConcentrationUnit>mM</ConcentrationUnit>
+        <MaxVolume>1000</MaxVolume>
+        <MaxVolumeUnit>nL</MaxVolumeUnit>
+        <ClassID>0</ClassID>
+      </Fluid>
+    </Fluids>
+    <BlockFluidOnCellFail>True</BlockFluidOnCellFail>
+    <ShowCellCountAsDispensed>True</ShowCellCountAsDispensed>
+    <CellDispenseMode>3</CellDispenseMode>
+    <ShakePerFluid>False</ShakePerFluid>
+    <ShakePlateDuration>5</ShakePlateDuration>
+    <ShakePerWell>False</ShakePerWell>
+    <ShakeThresholdVolume>100</ShakeThresholdVolume>
+    <PrioritizeSurfactantFreeCassettes>True</PrioritizeSurfactantFreeCassettes>
+    <FluidOrderRun>False</FluidOrderRun>
+    <BackfillOrder>Mixed</BackfillOrder>
+    <BackfillNoDispense>False</BackfillNoDispense>
+    <Plates>
+      <Plate>
+        <PlateType>Default384</PlateType>
+        <Rows>16</Rows>
+        <Cols>24</Cols>
+        <Name>probe-5-norm40 1</Name>
+        <AssayVolume>50000</AssayVolume>
+        <DMSOLimit>0.1</DMSOLimit>
+        <DontShake>True</DontShake>
+        <Deionize>True</Deionize>
+        <PromptPlateLoad>True</PromptPlateLoad>
+        <Wells>
+          <Well Row="0" Col="0">
+            <Fluid ID="0">196.0784313725</Fluid>
+          </Well>
+        </Wells>
+        <Randomize />
+      </Plate>
+    </Plates>
+    <HPDDPlates />
+    <Backfills>
+      <Backfill ClassID="0" Type="ToVolume" Param="1000">
+        <Wells>
+          <Well P="0" R="0" C="1" />
+          <Well P="0" R="0" C="2" />
+          <Well P="0" R="0" C="3" />
+          <Well P="0" R="0" C="4" />
+          <Well P="0" R="0" C="5" />
+          <Well P="0" R="0" C="6" />
+          <Well P="0" R="0" C="7" />
+          <Well P="0" R="0" C="8" />
+          <Well P="0" R="0" C="9" />
+          <Well P="0" R="0" C="10" />
+          <Well P="0" R="0" C="11" />
+          <Well P="0" R="0" C="12" />
+          <Well P="0" R="0" C="13" />
+          <Well P="0" R="0" C="14" />
+          <Well P="0" R="0" C="15" />
+          <Well P="0" R="0" C="16" />
+          <Well P="0" R="0" C="17" />
+          <Well P="0" R="0" C="18" />
+          <Well P="0" R="0" C="19" />
+          <Well P="0" R="0" C="20" />
+          <Well P="0" R="0" C="21" />
+          <Well P="0" R="0" C="22" />
+          <Well P="0" R="0" C="23" />
+          <Well P="0" R="1" C="0" />
+          <Well P="0" R="1" C="1" />
+          <Well P="0" R="1" C="2" />
+          <Well P="0" R="1" C="3" />
+          <Well P="0" R="1" C="4" />
+          <Well P="0" R="1" C="5" />
+          <Well P="0" R="1" C="6" />
+          <Well P="0" R="1" C="7" />
+          <Well P="0" R="1" C="8" />
+          <Well P="0" R="1" C="9" />
+          <Well P="0" R="1" C="10" />
+          <Well P="0" R="1" C="11" />
+          <Well P="0" R="1" C="12" />
+          <Well P="0" R="1" C="13" />
+          <Well P="0" R="1" C="14" />
+          <Well P="0" R="1" C="15" />
+          <Well P="0" R="1" C="16" />
+        </Wells>
+      </Backfill>
+    </Backfills>
+    <Revisions />
+  </Protocol>
+</Root>

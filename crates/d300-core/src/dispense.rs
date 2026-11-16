@@ -500,7 +500,11 @@ pub fn compute_well(
             normalization_requested: None,
         };
     }
-    let v_total_exact = fixed / (1.0 - k);
+    // D300e Control runs three fixed-point steps from V_fluids = 0 instead of solving
+    // V_total = fixed / (1 − k) exactly: T = fixed·(1 + k + k²). Fitted on simulated run reports
+    // (probe-2, probe-10: 1–4 µL per well); identical to the exact solution at D3's small volumes.
+    // (was: let v_total_exact = fixed / (1.0 - k);)
+    let v_total_exact = fixed * (1.0 + k + k * k);
     let mut out: Vec<DispenseItem> = vec![];
     for it in &items {
         let cls = fluid_class(it.f.class_id);
