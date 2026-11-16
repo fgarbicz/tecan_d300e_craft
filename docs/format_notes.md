@@ -123,15 +123,14 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   total still changes by ≥ 0.1 % between steps 1 and 2 (|T₂ − T₁| / T₂, i.e. from k ≈ 0.001), then at T₂ — the
   convergence check of an ordinary well, independent of where the top-up stops. probe-27b (blind, gaps 400 / 700 /
   1000 nL, 924 wells, k 0.00075–0.001): 1848/1848 rows; probe-23 plate 1 664/664.
-- OPEN — "to highest total" (probe-23 plate 2). 2026-11-16: for each well, the gap g that reproduces its top-up and
-  fluid under the lagged model drifts with k inside one stop group (stop-1 wells: ≈556.25 for k < 4.9e-4, ≈555.7 up
-  to 6.3e-4, ≈555.4 above; stop-2: ≈555.95 → 556.3 → 556.5; stop-3: 556.245–556.28), so no single target sequence
-  fits; the target likely depends on each well (or N is rounded differently). Not fixable from this run; needs a
-  probe that varies only the largest well. Earlier notes: the fluids follow the same lagged model (326/329), but the target
-  is itself an iterated sequence that depends on more than the largest well: the stop-step-3 wells (176) all imply
-  g₃ = 556.2445, the smallest wells g₀ ≈ 555.6, and empty wells and the largest well get 556.4 (its dispensed
-  volume). No candidate sequence (largest well iterated alone, lagged, overshooting) reproduces this; the engine
-  keeps the "to highest" model there (fluids 305/331, top-ups 216/334 on probe-23 plate 2).
+- "To highest total" (src/dispense.js maxTotalTopUp; fitted 2026-11-16 on probe-23 plate 2, checked on probe-20's
+  two-fluid group, validation: probe-30). Target: the largest well is sized as a "to total" well whose gap is its
+  own plain sizing s; its fluid volume at that total is the target gap g (probe-23: s = 556.05, g = 556.2504).
+  Every well: N = g − X with X stepping X₀ = V(A) → X₁ = V(A + 2g) → X₂ = V(T₂), stopping when the step changes
+  X by < 0.1 % of the top-up; fluids at T₁ = A + g + X₀, or T₂ once X₂ is used. probe-23 plate 2 660/665 (five
+  near-ties within 0.013 steps: G3, I19, K6, N4 fluids, L8 top-up), probe-20 1007/1007.
+  (earlier notes, kept for the record: the implied gap looked k-dependent — 556.25 → 555.7 → 555.4 → 556.25 —
+  because the middle band subtracts X₁, not V₀ or V₁; no single-volume model could fit.)
 - "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at
   A(1+p); wells already over the target get no top-up and normal sizing (src/dispense.js pctTopUp; D3 plate 9 +
   probe-25: 1076/1076).

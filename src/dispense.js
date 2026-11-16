@@ -292,7 +292,7 @@ export function computeProtocol(protocol) {
       if (b.type !== 'ToAssayVolumePct') {
         const { n, t, sizing: totalSizing } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
         // fluids of a normalized well are sized with the group's final target total (A + class target, or the total)
-        const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : b.type === 'ToMaxTotalVolume' ? t : totalSizing ?? sizing);
+        const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : totalSizing ?? (b.type === 'ToMaxTotalVolume' ? t : sizing));
         r.normalizationRequested = n;
         result[x.w.p].wells.set(x.key, r);
         continue;
@@ -361,6 +361,7 @@ function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
   }
   const cC = conc(x.req, !totalBased), cAll = conc(x.req, false);
   if (b.type === 'ToTotalVolume') return totalTopUp(cAll, vol, A, fixedTarget - A, cls);
+  if (b.type === 'ToMaxTotalVolume') return maxTotalTopUp(tC, cAll, vol, A, tV, cls);
   let V = vol(cC, A), Vall = vol(cAll, A);
   let Nprev = null, Vprev = null, N = 0, t = 0;
   if (totalBased) { // "total" types: the current total starts at the bare assay volume, one step from V = 0 first
@@ -449,6 +450,43 @@ function totalTopUp(cs, vol, A, gap, cls) {
     lower = upper;
   }
   return { n: N, t: A + gap, sizing };
+}
+
+/**
+ * "To highest total volume". Fitted on probe-23 plate 2 (single-fluid sweep, k = 1e-5 … 0.011, 331 wells) on
+ * 2026-11-16 after probe-27b had pinned the "to total" rules it builds on; probe-20's two-fluid group is the check.
+ *  - Target: the group's largest well. Its plain sizing (convergence check from the first step) gives a seed
+ *    s = Σ C·T/S; the well is then sized like a "to total" well with gap s — T₁ = A + s + V₀, T₂ = A + (s − V₀) + V₁,
+ *    T₂ if the total still moves by ≥ 0.1 % — and the target gap g is its fluid volume at that total
+ *    (probe-23: s = 556.05, g = 556.2504; the well dispenses 556.4 nL, empty wells get 556.4 nL).
+ *  - Every well: top-up N = g − X, where X runs through X₀ = V(A), X₁ = V(A + 2g), X₂ = V(T₂) with the lagged
+ *    T₂ = A + (g − X₀) + V(A + g + X₀), and stops at the first step whose change is < 0.1 % of the top-up:
+ *    |X₁ − X₀| / (g − X₀) → X₀;  |X₂ − X₁| / (g − X₁) → X₁;  else X₂ (no further step: wells with 27 nL of top-up
+ *    still use X₂). On probe-23 the switches sit at k = 4.67e-4 | 4.88e-4 and 8.81e-4 | 9.19e-4, exactly where
+ *    these two ratios cross 0.1 %. (X₁'s total A + 2g counts the first top-up twice — N₀ + N₁ + V₀ — which is what
+ *    the reported volumes show: 15/15 wells of that band; g − V₁ fits 4.)
+ *  - Fluids: sized at T₁ = A + g + X₀ while the top-up uses X₀ or X₁, at T₂ once it uses X₂.
+ *  Result: probe-23 plate 2 660/665 rows, probe-20 1007/1007 (all five types). Left on probe-23: four fluid
+ *  volumes 0.0004–0.006 steps below a rounding tie (G3, I19, K6, N4) and one top-up 0.013 steps above one (L8).
+ * (was: the "to highest" class model with a moving target — fluids 305/331, top-ups 216/334 on that plate.)
+ */
+function maxTotalTopUp(cT, cAll, vol, A, s, cls) {
+  const tT0 = vol(cT, A), tT1 = A + s + tT0, tT2 = A + (s - tT0) + vol(cT, tT1);
+  const g = vol(cT, Math.abs(tT2 - tT1) / tT2 >= SIZING_TOLERANCE ? tT2 : tT1);
+  const X0 = vol(cAll, A), T1 = A + g + X0, T2 = A + (g - X0) + vol(cAll, T1);
+  const X1 = vol(cAll, A + 2 * g), X2 = vol(cAll, T2);
+  const small = (d, n) => Math.abs(d) / Math.max(Math.abs(n), 1e-12) < SIZING_TOLERANCE;
+  const X = small(X1 - X0, g - X0) ? X0 : small(X2 - X1, g - X1) ? X1 : X2;
+  // fluids: T₂ exactly when the top-up went on to X₂, else T₁ (probe-23 E23 / F2, k = 0.001: top-up from X₂ and
+  // fluid V₂ although |T₂ − T₁| / T₂ is 0.098 %; the "to total" total-change rule would keep T₁ there)
+  const N = g - X, sizing = X === X2 && X2 !== X1 ? T2 : T1;
+  if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + g, sizing };
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + g, sizing };
+    lower = upper;
+  }
+  return { n: N, t: A + g, sizing };
 }
 
 /** .NET Math.Round(double): nearest, ties (exactly .5 in binary) to even; no tolerance. */

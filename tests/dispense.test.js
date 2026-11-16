@@ -190,7 +190,10 @@ test('normalization probes 20 and 21: documented accuracy (regression guard)', a
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
   const rows = (tdd, rep) => +execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' }).match(/'vol_ok': (\d+)/)[1];
-  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 984);
+  // probe-20: every row since the "to highest total" model of 2026-11-16 (it was not used to derive that model)
+  assert.equal(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml'), 1007);
+  // probe-23: plate 1 "to total" 664/664, plate 2 "to highest total" 660/665 (five near-ties within 0.013 steps)
+  assert.ok(rows('fixtures/reference/probes/probe-23-totalsweep.tdd', 'fixtures/reference/reports/probes/probe-23-totalsweep.xml') >= 1324);
   assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1320);
 });
 
