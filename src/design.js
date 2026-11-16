@@ -22,6 +22,7 @@ import { computeProtocol, primingIssues, MOLARITY_UNITS, MASS_UNITS, fromDisplay
 import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole } from './experiment.js';
 
 import { planRun } from './cassette.js';
+import { doseLevels, scrapTest } from './dosemap.js';
 
 const UNIT_ALIASES = { um: 'µM', 'μm': 'µM', 'µm': 'µM', mm: 'mM', nm: 'nM', pm: 'pM', m: 'M', 'mg/ml': 'mg_mL', 'ug/ml': 'µg_mL', 'µg/ml': 'µg_mL', 'ng/ml': 'ng_mL', 'pg/ml': 'pg_mL' };
 /** "10 mM" → { value: 10, unit: 'mM' } (units as in dispense.js). */
@@ -143,6 +144,7 @@ export function makePlan(protocol, meta, spec = {}) {
     seeding, pbs: { wells: pbsWells, volumePerWellUL: pbsUL, totalML: round((pbsWells * pbsUL * 1.1) / 1000, 2) },
     maxDmsoPct: round(maxDmso * 100, 4), maxDmsoScrapPct: round(maxDmsoScrap * 100, 4), unusedInnerWells: unused,
     vehicleDmsoPct: vehicleDmsoByBlock(protocol, meta, computed),
+    doses: doseLevels(protocol, { skip: scrapTest(protocol, meta, wellRole) }),
     warnings: Object.entries(byCode).map(([code, list]) => ({ code, count: list.length, examples: list.slice(0, 8).map((x) => `P${x.plate} ${x.well}${x.fluid ? ' ' + x.fluid : ''}`) })),
     priming,
   };
@@ -185,6 +187,12 @@ export function planMarkdown(plan, { files = [] } = {}) {
   if (vd.length > 1) L.push('', `⚠ The plate sets have different vehicle DMSO (${vd.join(' vs ')} %): compare viabilities within a set, or normalize all sets to the same DMSO.`);
   L.push('', 'Outer row/column = PBS (evaporation barrier) unless noted; scrap (priming) wells: ' + ([...new Set(plan.plates.flatMap((p) => p.scrapWells))].join(', ') || 'none') + '.'
     + (plan.unusedInnerWells ? ` ${plan.unusedInnerWells} inner wells are not part of a grid: no cells, fill with medium.` : ''), '');
+  if (plan.doses && plan.doses.length) {
+    const svg = files.find((f) => /_dosemap\.svg$/.test(f));
+    L.push('## Dose gradients', '', `Concentrations per drug (scrap wells left out)${svg ? `; colour map of every plate: \`${svg.split(/[\\/]/).pop()}\`` : ''}.`, '', '| Drug | Levels | Range | Fold | Plates |', '|---|---|---|---|---|');
+    for (const d of plan.doses) L.push(`| ${d.drug} | ${d.levels.length}: ${d.levels.map(fmtLevel).join(', ')} | ${fmtLevel(d.min)}–${fmtLevel(d.max)} ${d.unit} | ${d.foldRange}× | ${d.plates.join(', ')} |`);
+    L.push('');
+  }
   L.push('## 1. Prepare the drug stocks', '', '| Drug | Stock | Dispensed | Load into heads | Prepare | Powder per 1 mL stock |', '|---|---|---|---|---|---|');
   for (const d of plan.prepare) L.push(`| ${d.name} | ${d.stock} | ${d.dispensedUL} µL | ${d.loadUL.toFixed(1)} µL (${d.heads} head${d.heads > 1 ? 's' : ''}) | **${d.prepareUL} µL** | ${d.massMg == null ? '–' : d.massMg < 0.1 ? +(d.massMg * 1000).toPrecision(3) + ' µg' : d.massMg + ' mg'} |`);
   L.push('', '"Dispensed" includes the priming (scrap) wells. "Prepare" = what the heads take + 10 % + 2 µL for pipetting; take it from your stock. "Powder per 1 mL" only if you make the stock fresh (needs a molecular weight).', '');

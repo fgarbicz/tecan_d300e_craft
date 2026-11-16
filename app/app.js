@@ -13,6 +13,7 @@ import { planRun } from '../src/cassette.js';
 import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
 import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
+import { DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapBySignature } from '../src/dosemap.js';
 
 export const APP_NAME = 'Tecan D300 Craft';
 const APP_VERSION = '0.2.0';
@@ -25,7 +26,7 @@ export const S = {
   undo: [], redo: [], computed: null, clip: null, tab: 'set', form: {}, metaStale: false, resultsMetric: 'viability',
 };
 export const $ = (id) => document.getElementById(id);
-const PALETTE = ['#2f6fde', '#d9480f', '#2b8a3e', '#ae3ec9', '#e8590c', '#1098ad', '#c2255c', '#5c940d', '#f08c00', '#3b5bdb', '#862e9c', '#0b7285'];
+const PALETTE = DRUG_PALETTE; // shared with the dose maps (src/dosemap.js)
 export const fluidColor = (f) => PALETTE[f.id % PALETTE.length];
 export const plate = () => S.protocol.plates[S.plateIdx];
 export const fluidById = (id) => S.protocol.fluids.find((f) => f.id === id);
@@ -279,7 +280,7 @@ function renderShowSelect() {
   sel.innerHTML = `<option value="all">All drugs</option>` + S.protocol.fluids.map((f) => `<option value="${f.id}" ${String(f.id) === String(S.showFluid) ? 'selected' : ''}>${esc(f.name)}</option>`).join('');
   if (S.showFluid !== 'all' && !fluidById(+S.showFluid)) S.showFluid = 'all';
   sel.value = String(S.showFluid);
-  $('showFluidBox').hidden = S.layer !== 'drugs';
+  $('showFluidBox').hidden = S.layer !== 'drugs' && S.layer !== 'doses';
   for (const b of $('layerSeg').children) b.classList.toggle('on', b.dataset.layer === S.layer);
 }
 
@@ -307,6 +308,8 @@ function renderGrid() {
   const normSet = new Set(S.protocol.backfills.flatMap((b) => b.wells.filter((w) => w.p === S.plateIdx).map((w) => wellKey(w.r, w.c))));
   const pm = S.meta.plates[S.plateIdx];
   const res = S.layer === 'results' ? resultsScale(S.plateIdx) : null;
+  const doseSkip = S.layer === 'doses' ? doseScrap() : null;
+  const doses = doseSkip ? drugScales(S.protocol, { skip: doseSkip }) : null;
   for (let r = 0; r < p.rows; r++) {
     hdr(rowLabel(r), (e) => selectLine('row', r, e), `Row ${rowLabel(r)}`);
     for (let c = 0; c < p.cols; c++) {
@@ -328,6 +331,11 @@ function renderGrid() {
         }
         if (role === 'scrap') mark(d, 'S');
         if ($('showNorm').checked && normSet.has(k)) { const n = document.createElement('span'); n.className = 'norm'; d.appendChild(n); }
+      } else if (S.layer === 'doses') {
+        const bg = wellBackground(m, doses, showId);
+        if (bg) d.style.background = bg;
+        if (role === 'scrap' || doseSkip(S.plateIdx, k)) { d.classList.add('scrap-ring'); mark(d, 'S'); }
+        else if (role === 'vehicle') mark(d, 'V');
       } else if (S.layer === 'cells') {
         const cl = pm?.cellLines[k] && cellLineById(pm.cellLines[k]);
         if (cl) d.style.background = tint(cl.color, m && m.size ? 0.85 : 0.45);
@@ -345,16 +353,38 @@ function renderGrid() {
     }
   }
   g.replaceChildren(frag);
-  renderLegend(showId, range, res);
+  renderLegend(showId, range, res, doses);
 }
 function mark(d, t) { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = t; d.appendChild(s); }
 
-function renderLegend(showId, range, res) {
+// Dose scales over the whole protocol (same colour = same concentration on every plate), scrap wells left out.
+function doseScrap() {
+  const sig = scrapBySignature(S.protocol);
+  return (pi, key) => { const [r, c] = key.split(',').map(Number); return wellRole(S.meta, S.protocol.plates[pi], pi, r, c) === 'scrap' || sig(pi, key); };
+}
+function doseScales() { return drugScales(S.protocol, { skip: doseScrap() }); }
+function exportDoseMap(format) {
+  const roleOf = (pi, r, c) => wellRole(S.meta, S.protocol.plates[pi], pi, r, c);
+  const base = S.fileName.replace(/\.tdd$/, '');
+  return exportFigure(doseMapSvg(S.protocol, { title: `${base} — dose map`, roleOf }), `${base}_dosemap`, format, saveBlob);
+}
+
+function renderLegend(showId, range, res, doses) {
   const L = $('legend');
+  if (S.layer === 'doses') {
+    const here = [...doses.values()].filter((sc) => sc.plates.has(S.plateIdx) && (showId == null || sc.fluid.id === showId));
+    L.innerHTML = (here.length ? here.map((sc) => `<span class="dose-key"><b>${esc(sc.fluid.name)}</b><span>${fmt(sc.min, 3)}</span><span class="bar" style="background:${rampCss(sc.color)}"></span><span>${fmt(sc.max, 3)} ${esc(unitLabel(sc.unit))}</span><span class="muted">${sc.levels.length} level${sc.levels.length === 1 ? '' : 's'}</span></span>`).join('')
+      : '<span>No drugs on this plate.</span>') +
+      '<span class="muted">log scale, same colours on every plate · two drugs: left / right half · S = scrap well (off scale)</span>' +
+      `<span class="spacer"></span><button class="small" id="doseSvg">${icon('save', 13)} Dose map SVG</button><button class="small" id="dosePng">PNG</button>`;
+    $('doseSvg').onclick = () => exportDoseMap('svg');
+    $('dosePng').onclick = () => exportDoseMap('png');
+    return;
+  }
   if (S.layer === 'drugs') {
     if (showId != null && range) {
       const f = fluidById(showId);
-      L.innerHTML = `<span>${esc(f.name)}</span><span>${fmt(range.min)}</span><span class="bar" style="background:linear-gradient(90deg, ${tint(fluidColor(f), 0.12)}, ${fluidColor(f)})"></span><span>${fmt(range.max)} ${esc(unitLabel(wellUnit(f)))} (log scale)</span>`;
+      L.innerHTML = `<span>${esc(f.name)}</span><span>${fmt(range.min)}</span><span class="bar" style="background:${rampCss(fluidColor(f))}"></span><span>${fmt(range.max)} ${esc(unitLabel(wellUnit(f)))} (log scale)</span>`;
     } else L.innerHTML = S.protocol.fluids.map((f) => `<span><span class="swatch" style="background:${fluidColor(f)}"></span> ${esc(f.name)}</span>`).join('') + legendCommon();
   } else if (S.layer === 'cells') {
     L.innerHTML = S.meta.cellLines.map((c) => `<span><span class="sw" style="background:${c.color}"></span>${esc(c.name)}</span>`).join('') + (S.meta.cellLines.length ? '' : '<span>Add a cell line on the left, select wells, then Annotate → Assign.</span>') + legendCommon();
@@ -374,7 +404,7 @@ function fluidRange(p, id) {
 }
 function heat(f, v, rg) {
   const t = rg.max > rg.min ? (Math.log(v) - Math.log(rg.min)) / (Math.log(rg.max) - Math.log(rg.min)) : 1;
-  return tint(fluidColor(f), 0.12 + 0.88 * t);
+  return rampColor(fluidColor(f), t);
 }
 export function tint(hex, a) {
   if (hex === 'transparent') return hex;
@@ -432,6 +462,7 @@ function renderStatus() {
     drugs: 'Drag to select a rectangle · ⇧-click extends · ⌘-click adds wells · click row/column headers for whole lines',
     cells: 'Pick a cell line (left), select wells, then Annotate → Assign. PBS border wells are skipped automatically.',
     roles: 'Roles: treated and vehicle are automatic; mark blanks (medium only) and excluded wells in Annotate.',
+    doses: 'Concentration gradients: pale = lowest, dark = highest dose of each drug (log scale, same colours on every plate). Pick one drug under Show, or export the dose map.',
     results: 'Paste plate-reader values in the Results tab; the map shows them as a heatmap.',
   };
   $('statusHint').textContent = hints[S.layer];

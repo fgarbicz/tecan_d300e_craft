@@ -9,6 +9,8 @@
 //   d300craft plan <file.tdd> [--spec spec.json] [--json]
 //                                             plan for an existing protocol (+ its .craft.json if present)
 //   d300craft check <file.tdd>                warnings only; exit status 1 if there are any
+//   d300craft dosemap <file.tdd> [--out FILE.svg]
+//                                             colour map of every drug's concentration gradient (SVG)
 //
 // Exit status: 0 ok, 1 warnings (check) , 2 bad input.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -19,7 +21,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const src = (m) => import(join(here, '..', '..', 'src', m));
 const { designAndPlan, makePlan, planMarkdown } = await src('design.js');
 const { parseTdd } = await src('tdd.js');
-const { parseMeta, reconcileMeta, sidecarName } = await src('experiment.js');
+const { parseMeta, reconcileMeta, sidecarName, wellRole } = await src('experiment.js');
+const { doseMapSvg, doseSummary, scrapTest } = await src('dosemap.js');
 
 const EXAMPLE = {
   name: 'MM synergy example',
@@ -55,7 +58,7 @@ function loadProtocol(file) {
 
 const { pos, opt } = args(process.argv.slice(2));
 const cmd = pos[0];
-if (!cmd || cmd === 'help' || opt.help) { process.stdout.write(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 14).map((l) => l.replace(/^\/\/ ?/, '')).join('\n') + '\n'); process.exit(0); }
+if (!cmd || cmd === 'help' || opt.help) { process.stdout.write(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 15).map((l) => l.replace(/^\/\/ ?/, '')).join('\n') + '\n'); process.exit(0); }
 if (cmd === 'example') { process.stdout.write(JSON.stringify(EXAMPLE, null, 2) + '\n'); process.exit(0); }
 
 if (cmd === 'design') {
@@ -65,11 +68,12 @@ if (cmd === 'design') {
   const out = resolve(opt.out || '.');
   mkdirSync(out, { recursive: true });
   let r; try { r = designAndPlan(spec, base); } catch (e) { die(e.message); }
-  const files = [`${base}.tdd`, `${base}.craft.json`, `${base}_plan.md`, `${base}_plan.json`].map((f) => join(out, f));
+  const files = [`${base}.tdd`, `${base}.craft.json`, `${base}_plan.md`, `${base}_plan.json`, `${base}_dosemap.svg`].map((f) => join(out, f));
   for (const f of files.slice(0, 2)) if (existsSync(f) && !opt.force) die(`${f} exists (use --force to overwrite)`);
   writeFileSync(files[0], r.tdd);
   writeFileSync(files[1], r.sidecar);
-  const md = planMarkdown(r.plan, { files: files.slice(0, 2) });
+  writeFileSync(files[4], doseMapSvg(r.protocol, { title: `${base} — dose map`, roleOf: (pi, rr, c) => wellRole(r.meta, r.protocol.plates[pi], pi, rr, c) }));
+  const md = planMarkdown(r.plan, { files: [files[0], files[1], files[4]] });
   writeFileSync(files[2], md);
   writeFileSync(files[3], JSON.stringify(r.plan, null, 2) + '\n');
   process.stdout.write(opt.json ? JSON.stringify({ files, plan: r.plan }, null, 2) + '\n' : md + '\n');
@@ -90,4 +94,14 @@ if (cmd === 'plan' || cmd === 'check') {
   process.stdout.write(opt.json ? JSON.stringify(plan, null, 2) + '\n' : planMarkdown(plan) + '\n');
   process.exit(0);
 }
-die(`unknown command "${cmd}" (design, plan, check, example)`);
+if (cmd === 'dosemap') {
+  if (!pos[1]) die('dosemap needs a .tdd file');
+  const { protocol, meta, note } = loadProtocol(pos[1]);
+  if (note) process.stderr.write(`note: ${note}\n`);
+  const out = resolve(opt.out || pos[1].replace(/\.tdd$/i, '') + '_dosemap.svg');
+  const name = basename(pos[1]).replace(/\.tdd$/i, '');
+  writeFileSync(out, doseMapSvg(protocol, { title: `${name} — dose map`, roleOf: meta ? (pi, r, c) => wellRole(meta, protocol.plates[pi], pi, r, c) : null }));
+  process.stdout.write(doseSummary(protocol, { skip: scrapTest(protocol, meta, wellRole) }).join('\n') + `\nwrote ${out}\n`);
+  process.exit(0);
+}
+die(`unknown command "${cmd}" (design, plan, check, dosemap, example)`);

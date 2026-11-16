@@ -38,7 +38,8 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
    (`bin/d300craft example` prints a complete example; format documented at the top of `src/design.js`).
 
 3. **Run** from the repo: `bin/d300craft design experiments/<dir>/spec.json --out experiments/<dir>`
-   It writes `<name>.tdd`, `<name>.craft.json`, `<name>_plan.md`, `<name>_plan.json` and prints the plan.
+   It writes `<name>.tdd`, `<name>.craft.json`, `<name>_plan.md`, `<name>_plan.json`, `<name>_dosemap.svg`
+   (colour map of every drug's concentration gradient on every plate) and prints the plan.
    Errors (grid does not fit, unknown drug, bad unit) are plain sentences: fix the spec or ask the user.
 
 4. **Check the plan before presenting it.** If it lists warnings (DMSO over the limit, below the smallest drop,
@@ -47,8 +48,9 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
 
 5. **Present**: the plate layout table and the concentration levels per axis, drugs to prepare (take the
    volumes from existing stocks; "powder per 1 mL" only matters for making a stock fresh), cassettes and the
-   bold per-head loads, cell seeding (cells/mL, mL of suspension, total cells per line), PBS, warnings, and the
-   file paths. Keep the plan's numbers exactly as printed.
+   bold per-head loads, cell seeding (cells/mL, mL of suspension, total cells per line), PBS, warnings, the
+   dose gradients (levels, range, fold) and the file paths, including the dose map SVG. Keep the plan's numbers
+   exactly as printed.
 
 6. **Offer next steps** (ask first, these leave the repo): copy the .tdd + .craft.json to the D300e PC's
    protocols folder (OneDrive `Documents/DispenseControl/Protocols`), or open them in the desktop app
@@ -57,6 +59,8 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
 
 ## Existing protocols
 
+`bin/d300craft dosemap <file.tdd> [--out FILE.svg]` draws the dose map of any protocol (scrap wells are
+recognised even without an experiment file).
 `bin/d300craft plan <file.tdd> [--spec spec.json] [--json]` gives the same plan for any .tdd (its
 `.craft.json` next to it supplies cell lines; `--spec` supplies seeding parameters and MWs).
 
