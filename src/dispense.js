@@ -298,9 +298,10 @@ export function computeProtocol(protocol) {
         continue;
       }
       if (b.type === 'ToAssayVolumePct') {
-        const { n, sizing: pctSizing } = pctTopUp(x.req, fluids, b, A, b.param, cls);
+        const { n, sizing: pctSizing, planned } = pctTopUp(x.req, fluids, b, A, b.param, cls);
         const r = computeWell(x.req, fluids, x.plate, n, pctSizing);
         r.normalizationRequested = n;
+        if (n > 0 && planned > 0) r.normalizationPlanned = planned;
         result[x.w.p].wells.set(x.key, r);
         continue;
       }
@@ -411,10 +412,10 @@ function pctTopUp(req, fluids, b, A, p, cls) {
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, sizing: undefined };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), sizing: Ts[0] };
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), sizing: Ts[0], planned: Ns[j] };
     lower = upper;
   }
-  return { n: N, sizing: Ts[0] };
+  return { n: N, sizing: Ts[0], planned: Ns[j] };
 }
 
 /**
