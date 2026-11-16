@@ -1,0 +1,23 @@
+# Conda environment for the SynergyFinder analysis (analysis.R).
+# Create it with:
+#   conda env create -f environment.yml        (or: mamba env create -f environment.yml)
+# then run:
+#   conda run -n synergyfinder Rscript analysis.R
+# Resolved on macOS arm64 (osx-arm64), 2026-11-15, from:
+#   mamba create -n synergyfinder -c conda-forge -c bioconda --strict-channel-priority \
+#     bioconductor-synergyfinder=3.18.0 r-base=4.5 r-ggplot2 r-svglite r-ragg r-scales r-plotly
+name: synergyfinder
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.5.3
+  - bioconductor-synergyfinder=3.18.0
+  - r-ggplot2=4.0.4
+  - r-svglite=2.2.2
+  - r-ragg=1.5.2
+  - r-scales=1.4.0
+  - r-plotly=4.12.1
+  - r-htmlwidgets=1.6.4
+  - r-lattice=0.23_1
+  - r-drc=3.0_1
