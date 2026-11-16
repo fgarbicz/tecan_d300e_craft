@@ -16,10 +16,11 @@
 //   "pbsVolumeUL": 50
 // }
 
-import { newProtocol, writeTdd, wellName } from './tdd.js';
+import { newProtocol, writeTdd, wellName, parseTdd } from './tdd.js';
 import { addFluid, parseDilution, PLATE_TYPES } from './ops.js';
 import { computeProtocol, primingIssues, MOLARITY_UNITS, MASS_UNITS, fromDisplay, FLUID_CLASSES, unitLabel } from './dispense.js';
-import { buildExperiment, applyExperiment, newMeta, addCellLine, assignCellLine, isBorder, serializeMeta, wellRole } from './experiment.js';
+import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole } from './experiment.js';
+
 import { planRun } from './cassette.js';
 
 const UNIT_ALIASES = { um: 'µM', 'μm': 'µM', 'µm': 'µM', mm: 'mM', nm: 'nM', pm: 'pM', m: 'M', 'mg/ml': 'mg_mL', 'ug/ml': 'µg_mL', 'µg/ml': 'µg_mL', 'ng/ml': 'ng_mL', 'pg/ml': 'pg_mL' };
@@ -83,18 +84,8 @@ export function designExperiment(spec) {
   if (arrangement === 'same' && lines.length > 1) throw new Error(`arrangement "same" puts one cell line on every plate, but ${lines.length} were given: use "perLine", "splitRows" or "splitCols"`);
   for (const set of sets) {
     const built = buildExperiment(bspec, protocol.fluids);
-    const at = applyExperiment(protocol, meta, built);
-    for (let i = at; i < protocol.plates.length; i++) {
-      const p = protocol.plates[i], d = border || 0, innerR = p.rows - 2 * d, innerC = p.cols - 2 * d;
-      set.forEach((cl, half) => {
-        const cellsIn = [];
-        for (let r = d; r < p.rows - d; r++) for (let c = d; c < p.cols - d; c++) {
-          const h = !split ? 0 : split === 'rows' ? (r - d < Math.floor(innerR / 2) ? 0 : 1) : (c - d < Math.floor(innerC / 2) ? 0 : 1);
-          if (h === half) cellsIn.push([r, c]);
-        }
-        assignCellLine(meta, p, i, cellsIn, cl.id);
-      });
-    }
+    applyExperiment(protocol, meta, built);
+    seedBlocks(meta, protocol, meta.blocks.slice(-built.blocks.length), set);
     for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = set.map((c) => c.name).join(' / ');
   }
   return { protocol, meta, spec };
@@ -107,8 +98,11 @@ const fmtConc = (v) => (v >= 100 ? v.toFixed(0) : v >= 1 ? +v.toPrecision(3) : +
 export function makePlan(protocol, meta, spec = {}) {
   const computed = computeProtocol(protocol);
   const run = planRun(protocol, computed);
-  const issues = []; let maxDmso = 0;
-  computed.forEach(({ wells }, pi) => { for (const [k, w] of wells) { if (Number.isFinite(w.dmsoFraction)) maxDmso = Math.max(maxDmso, w.dmsoFraction); for (const x of w.warnings) issues.push({ plate: pi + 1, well: wellName(...k.split(',').map(Number)), code: x.code, fluid: x.fluidId != null ? protocol.fluids.find((f) => f.id === x.fluidId)?.name : null }); } });
+  const issues = []; let maxDmso = 0, maxDmsoScrap = 0;
+  const vehicleDmso = new Map(); // block name → DMSO % of its vehicle (0/0) wells
+  computed.forEach(({ wells }, pi) => { for (const [k, w] of wells) {
+    const scrap = meta.plates[pi]?.roles[k] === 'scrap';
+    if (Number.isFinite(w.dmsoFraction)) { if (scrap) maxDmsoScrap = Math.max(maxDmsoScrap, w.dmsoFraction); else maxDmso = Math.max(maxDmso, w.dmsoFraction); } for (const x of w.warnings) issues.push({ plate: pi + 1, well: wellName(...k.split(',').map(Number)), code: x.code, fluid: x.fluidId != null ? protocol.fluids.find((f) => f.id === x.fluidId)?.name : null }); } });
   const priming = primingIssues(protocol, computed).filter((x) => x.lacking.length).map((x) => ({ plate: x.plate + 1, fluids: x.lacking.map((l) => protocol.fluids.find((f) => f.id === l.fluidId)?.name) }));
   const mwOf = new Map((spec.drugs || []).map((d) => [d.name, d.mw ?? null]));
   // drugs to prepare: what the cassette heads take, plus a pipetting margin
@@ -118,7 +112,7 @@ export function makePlan(protocol, meta, spec = {}) {
     const stock = fl ? `${fmtConc(fl.concentration / (MOLARITY_UNITS[fl.concentrationUnit] || MASS_UNITS[fl.concentrationUnit] || 1))} ${unitLabel(fl.concentrationUnit)}` : 'pure DMSO';
     const mw = fl ? mwOf.get(fl.name) : null;
     const molar = fl && fl.concentrationUnit in MOLARITY_UNITS;
-    const massMg = mw && molar ? (fl.concentration * 1e-6) * (prep * 1e-6) * mw * 1e3 : null; // µM→M × L × g/mol → g → mg
+    const massMg = mw && molar ? (fl.concentration * 1e-6) * 1e-3 * mw * 1e3 : null; // powder for 1 mL of stock: µM→M × 1 mL × g/mol → mg
     return { name: f.name, stock, dispensedUL: round(f.dispensed, 2), loadUL: round(f.load, 1), heads: f.heads.length, prepareUL: prep, massMg: massMg != null ? +massMg.toPrecision(3) : null };
   });
   // cells
@@ -130,11 +124,11 @@ export function makePlan(protocol, meta, spec = {}) {
     const wells = wellsPerLine.get(cl.id) || 0;
     const plates = meta.plates.map((pm, i) => (Object.values(pm.cellLines).includes(cl.id) ? i + 1 : null)).filter(Boolean);
     const out = { cellLine: cl.name, plates, wells, seedingVolumeUL: seedUL, suspensionML: round((wells * seedUL * (1 + over)) / 1000, 2) };
-    if (c.cellsPerWell) Object.assign(out, { cellsPerWell: c.cellsPerWell, cellsPerML: Math.round((c.cellsPerWell / seedUL) * 1000), totalCells: Math.ceil(wells * c.cellsPerWell * (1 + over)) });
+    if (c.cellsPerWell) { const perML = Math.round((c.cellsPerWell / seedUL) * 1000); Object.assign(out, { cellsPerWell: c.cellsPerWell, cellsPerML: perML, totalCells: Math.round(perML * out.suspensionML) }); }
     return out;
   });
-  let pbsWells = 0;
-  protocol.plates.forEach((p, i) => { for (let r = 0; r < p.rows; r++) for (let col = 0; col < p.cols; col++) if (wellRole(meta, p, i, r, col) === 'pbs') pbsWells++; });
+  let pbsWells = 0, unused = 0;
+  protocol.plates.forEach((p, i) => { for (let r = 0; r < p.rows; r++) for (let col = 0; col < p.cols; col++) { const role = wellRole(meta, p, i, r, col); if (role === 'pbs') pbsWells++; else if (role === 'empty') unused++; } });
   const pbsUL = spec.pbsVolumeUL ?? seedUL;
   const plates = protocol.plates.map((p, i) => ({ plate: i + 1, type: PLATE_TYPES[p.plateType]?.label || p.plateType, wellVolumeUL: p.assayVolume / 1000, dmsoLimitPct: p.dmsoLimit * 100,
     cellLines: [...new Set(Object.values(meta.plates[i]?.cellLines || {}))].map((id) => meta.cellLines.find((x) => x.id === id)?.name),
@@ -147,10 +141,25 @@ export function makePlan(protocol, meta, spec = {}) {
       region: b.copies ? b.copies.map((r) => `${wellName(r.r0, r.c0)}–${wellName(r.r0 + r.rows - 1, r.c0 + r.cols - 1)}`) : [], primaryLevels: b.primaryLevels, partnerLevels: b.partnerLevels })),
     prepare, cassettes: run.cassettes.map((c2) => ({ index: c2.index, type: c2.type, heads: c2.heads.map((h) => ({ head: h.head, fluid: h.name, dispensedUL: round(h.dispensed, 3), loadUL: h.load })) })),
     seeding, pbs: { wells: pbsWells, volumePerWellUL: pbsUL, totalML: round((pbsWells * pbsUL * 1.1) / 1000, 2) },
-    maxDmsoPct: round(maxDmso * 100, 4),
+    maxDmsoPct: round(maxDmso * 100, 4), maxDmsoScrapPct: round(maxDmsoScrap * 100, 4), unusedInnerWells: unused,
+    vehicleDmsoPct: vehicleDmsoByBlock(protocol, meta, computed),
     warnings: Object.entries(byCode).map(([code, list]) => ({ code, count: list.length, examples: list.slice(0, 8).map((x) => `P${x.plate} ${x.well}${x.fluid ? ' ' + x.fluid : ''}`) })),
     priming,
   };
+}
+
+const fmtLevel = (v) => (v === 0 ? '0' : +v.toPrecision(3) + '');
+function vehicleDmsoByBlock(protocol, meta, computed) {
+  const out = {};
+  for (const b of meta.blocks || []) {
+    let v = null;
+    for (const pi of b.plates) for (const reg of b.copies || [b.region]) for (let r = reg.r0; r < reg.r0 + reg.rows; r++) for (let c = reg.c0; c < reg.c0 + reg.cols; c++) {
+      const m = protocol.plates[pi].wells.get(`${r},${c}`); if (m && m.size) continue;
+      const w = computed[pi].wells.get(`${r},${c}`); if (w && Number.isFinite(w.dmsoFraction)) v = Math.max(v ?? 0, w.dmsoFraction);
+    }
+    out[b.name] = v == null ? 0 : round(v * 100, 4);
+  }
+  return out;
 }
 
 const WARN_TEXT = { dmso_limit: 'DMSO above the plate limit', below_min_volume: 'below the smallest drop (lower top concentration or use a diluted stock)', above_max_volume: 'above 10 µL per fluid per well', no_solution: 'concentrations cannot be reached', above_stock: 'requested ≥ stock concentration' };
@@ -159,7 +168,7 @@ const WARN_TEXT = { dmso_limit: 'DMSO above the plate limit', below_min_volume: 
 export function planMarkdown(plan, { files = [] } = {}) {
   const L = [];
   L.push(`# ${plan.name || 'D300e experiment'} — plan`, '');
-  L.push(`**${plan.plates.length} plate${plan.plates.length > 1 ? 's' : ''}** · highest DMSO ${plan.maxDmsoPct} % · ${plan.cassettes.length} cassette${plan.cassettes.length > 1 ? 's' : ''} (${[...new Set(plan.cassettes.map((c) => c.type))].map((t) => `${plan.cassettes.filter((c) => c.type === t).length} × ${t}`).join(', ')})`, '');
+  L.push(`**${plan.plates.length} plate${plan.plates.length > 1 ? 's' : ''}** · highest DMSO in assay wells ${plan.maxDmsoPct} %${plan.maxDmsoScrapPct ? ` (priming wells ${plan.maxDmsoScrapPct} %)` : ''} · ${plan.cassettes.length} cassette${plan.cassettes.length > 1 ? 's' : ''} (${[...new Set(plan.cassettes.map((c) => c.type))].map((t) => `${plan.cassettes.filter((c) => c.type === t).length} × ${t}`).join(', ')})`, '');
   if (plan.warnings.length || plan.priming.length) {
     L.push('## ⚠ Check before printing', '');
     for (const w of plan.warnings) L.push(`- ${w.count} well${w.count > 1 ? 's' : ''}: ${WARN_TEXT[w.code] || w.code} (${w.examples.join(', ')}${w.count > w.examples.length ? ', …' : ''})`);
@@ -168,10 +177,17 @@ export function planMarkdown(plan, { files = [] } = {}) {
   } else L.push('✓ No dispense warnings: every well is within the DMSO limit and above the smallest drop.', '');
   L.push('## Layout', '', '| Plates | Design | Cell line(s) | Grid |', '|---|---|---|---|');
   for (const b of plan.blocks) L.push(`| ${b.plates.join(', ')} | ${b.name} | ${b.cellLine || '–'} | ${b.region.join(' and ')} |`);
-  L.push('', 'Outer row/column = PBS (evaporation barrier) unless noted; scrap (priming) wells: ' + ([...new Set(plan.plates.flatMap((p) => p.scrapWells))].join(', ') || 'none') + '.', '');
-  L.push('## 1. Prepare the drug stocks', '', '| Drug | Stock | Dispensed | Load into heads | Prepare | Mass |', '|---|---|---|---|---|---|');
+  for (const b of plan.blocks) {
+    const [pa, pb] = b.name.split(' × ');
+    L.push('', `**${b.name}** (plates ${b.plates.join(', ')}): ${pa} along the columns ${b.primaryLevels.map(fmtLevel).join(', ')}` + (pb ? `; ${pb} along the rows ${b.partnerLevels.map(fmtLevel).join(', ')}` : '') + ` (µM; replicates in adjacent wells). Vehicle DMSO ${plan.vehicleDmsoPct[b.name] ?? '–'} %.`);
+  }
+  const vd = [...new Set(Object.values(plan.vehicleDmsoPct))];
+  if (vd.length > 1) L.push('', `⚠ The plate sets have different vehicle DMSO (${vd.join(' vs ')} %): compare viabilities within a set, or normalize all sets to the same DMSO.`);
+  L.push('', 'Outer row/column = PBS (evaporation barrier) unless noted; scrap (priming) wells: ' + ([...new Set(plan.plates.flatMap((p) => p.scrapWells))].join(', ') || 'none') + '.'
+    + (plan.unusedInnerWells ? ` ${plan.unusedInnerWells} inner wells are not part of a grid: no cells, fill with medium.` : ''), '');
+  L.push('## 1. Prepare the drug stocks', '', '| Drug | Stock | Dispensed | Load into heads | Prepare | Powder per 1 mL stock |', '|---|---|---|---|---|---|');
   for (const d of plan.prepare) L.push(`| ${d.name} | ${d.stock} | ${d.dispensedUL} µL | ${d.loadUL.toFixed(1)} µL (${d.heads} head${d.heads > 1 ? 's' : ''}) | **${d.prepareUL} µL** | ${d.massMg == null ? '–' : d.massMg < 0.1 ? +(d.massMg * 1000).toPrecision(3) + ' µg' : d.massMg + ' mg'} |`);
-  L.push('', '"Prepare" = what the heads take + 10 % + 2 µL for pipetting. "Mass" = powder for that volume at the stock concentration (only when a molecular weight is given).', '');
+  L.push('', '"Dispensed" includes the priming (scrap) wells. "Prepare" = what the heads take + 10 % + 2 µL for pipetting; take it from your stock. "Powder per 1 mL" only if you make the stock fresh (needs a molecular weight).', '');
   L.push('## 2. Seed the cells', '');
   if (plan.seeding.length) {
     L.push('| Cell line | Plates | Wells | Cells/well | Density | Suspension (+overage) | Total cells |', '|---|---|---|---|---|---|---|');
@@ -193,7 +209,8 @@ export function planMarkdown(plan, { files = [] } = {}) {
 export function designAndPlan(spec, baseName = 'experiment') {
   const { protocol, meta } = designExperiment(spec);
   const tdd = writeTdd(protocol);
-  const sidecar = serializeMeta(meta, protocol, `${baseName}.tdd`);
+  // fingerprint the protocol as written (13 significant digits), so reopening the files is not "stale"
+  const sidecar = serializeMeta(meta, parseTdd(tdd), `${baseName}.tdd`);
   const plan = makePlan(protocol, meta, spec);
   return { protocol, meta, tdd, sidecar, plan };
 }

@@ -18,13 +18,20 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
      top concentration, dilution step (any of "1:3", "1.5", "÷2", "×0.667", "-33%"; "1:0.33" = remove a third),
      number of non-zero levels, replicates (adjacent wells), include 0 (default yes: gives single agents and
      vehicle). A single-drug dose response = a partner with `"drug": null` and `replicates` = rows;
-   - plates: type (384 default), well volume before printing (medium + cells, µL; default 50), DMSO limit %
+   - replicates: in `primary` = adjacent columns per level, in a partner = adjacent rows per level;
+     `plate.replicates` = identical plates per layout;
+   - plates: type (384 default), `wellVolumeUL` = what is in the well when the D300e prints (medium + cells;
+     usually = `cells.seedingVolumeUL`, set both), DMSO limit %
      (default 1), PBS border (1 = outer row/column, default), plate replicates (default 3);
    - cells: cell lines; arrangement `same` (one line), `perLine` (a plate set per line), `splitRows` / `splitCols`
      (two lines per plate, top/bottom or left/right halves — the grid must fit in half the plate);
-     cells per well, seeding volume (µL), overage % (default 15).
+     cells per well, seeding volume (µL), overage % (default 15). Cells go only on the drug grids; other
+     inner wells are reported as unused (medium). `pbsVolumeUL` (default = seeding volume) is the PBS per
+     border well.
    - normalization (per partner): `block` (DMSO to the highest, across the plate set; default), `plate`
-     (DMSO to the limit, % of total, per plate) or `none`.
+     (DMSO to the limit, % of total, per plate) or `none`. With several partners, `block` gives each plate set its
+   own vehicle DMSO; the plan warns when they differ — use `plate` for all partners if the sets must share one
+   DMSO level.
    Inside a 1-well PBS border a 384 plate has 14 rows × 22 columns; columns = (levels + zero) × replicates.
 
 2. **Write the spec** to `~/R projects/d300_designer/experiments/<YYYY-MM-DD>_<slug>/spec.json`
@@ -38,7 +45,8 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
    missing priming wells), propose a concrete fix (lower top concentration, a diluted stock as a second fluid,
    fewer levels) and re-run. Re-run `bin/d300craft check <file.tdd>` after edits (exit 1 = warnings).
 
-5. **Present**: the plate layout table, drugs to prepare (with masses if MWs were given), cassettes and the
+5. **Present**: the plate layout table and the concentration levels per axis, drugs to prepare (take the
+   volumes from existing stocks; "powder per 1 mL" only matters for making a stock fresh), cassettes and the
    bold per-head loads, cell seeding (cells/mL, mL of suspension, total cells per line), PBS, warnings, and the
    file paths. Keep the plan's numbers exactly as printed.
 

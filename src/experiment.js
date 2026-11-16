@@ -254,6 +254,22 @@ function placeScrap(plate, pm, fluids, depth) {
   }
 }
 
+/** Seed cell lines on the drug grids of the given blocks: set[i] goes into copy i (split plates: one line per
+ *  half; otherwise set[0] into the single grid). Only grid wells get cells — the plan reports the other inner
+ *  wells as unused, so nobody seeds (and counts) cells that receive no drug. */
+export function seedBlocks(meta, protocol, blocks, set) {
+  for (const b of blocks) for (const pi of b.plates) {
+    const p = protocol.plates[pi];
+    (b.copies || [b.region]).forEach((reg, i) => {
+      const cl = set[i] ?? (b.copies?.length > 1 ? null : set[0]);
+      if (!cl) return;
+      const cells = [];
+      for (let r = reg.r0; r < reg.r0 + reg.rows; r++) for (let c = reg.c0; c < reg.c0 + reg.cols; c++) cells.push([r, c]);
+      assignCellLine(meta, p, pi, cells, cl.id);
+    });
+  }
+}
+
 /** Apply a buildExperiment() result to a protocol (appends plates, backfills, meta). Returns the first new index. */
 export function applyExperiment(protocol, meta, built) {
   const first = protocol.plates.length;

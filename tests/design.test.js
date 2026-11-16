@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { parseTdd, writeTdd } from '../src/tdd.js';
 import { designExperiment, makePlan, planMarkdown, parseAmount, designAndPlan } from '../src/design.js';
 
@@ -82,4 +82,22 @@ test('CLI: design writes .tdd + .craft.json + plan; the .tdd re-opens; check rep
   writeFileSync(specPath, JSON.stringify(bad));
   execFileSync(join(root, 'bin/d300craft'), ['design', specPath, '--out', dir], { encoding: 'utf8' });
   assert.throws(() => execFileSync(join(root, 'bin/d300craft'), ['check', join(dir, 'bad.tdd')], { encoding: 'utf8' }), (e) => e.status === 1 && /dmso_limit/.test(e.stdout));
+});
+
+test('QA fixes: no stale note right after design; priming wells excluded from the DMSO headline; cells only on grids', () => {
+  const spec = { name: 'small', plate: { type: 384, wellVolumeUL: 40, replicates: 1 },
+    drugs: [{ name: 'A', stock: '1 mM', mw: 400 }, { name: 'B', stock: '10 mM' }],
+    design: { primary: { drug: 'A', top: '20 nM', dilution: '1:1.5', levels: 8, replicates: 1 }, partners: [{ drug: 'B', top: '1 µM', dilution: '1:2', levels: 5, replicates: 1 }] },
+    cells: { lines: ['X', 'Y'], arrangement: 'splitRows', cellsPerWell: 1500, seedingVolumeUL: 40 } };
+  const dir = mkdtempSync(join(tmpdir(), 'd300craft-'));
+  writeFileSync(join(dir, 'spec.json'), JSON.stringify(spec));
+  execFileSync(join(root, 'bin/d300craft'), ['design', join(dir, 'spec.json'), '--out', dir], { encoding: 'utf8' });
+  const r = spawnSync(join(root, 'bin/d300craft'), ['check', join(dir, 'small.tdd')], { encoding: 'utf8' });
+  assert.equal(r.stderr, '', 'no stale-fingerprint note');
+  const plan = JSON.parse(readFileSync(join(dir, 'small_plan.json'), 'utf8'));
+  assert.ok(plan.maxDmsoScrapPct > plan.maxDmsoPct, 'scrap wells reported separately');
+  assert.deepEqual(plan.seeding.map((s) => s.wells), [6 * 9, 6 * 9]); // grid only, not the whole half
+  assert.equal(plan.unusedInnerWells, 14 * 22 - 2 * 6 * 9);
+  assert.equal(plan.seeding[0].totalCells, Math.round(plan.seeding[0].cellsPerML * plan.seeding[0].suspensionML));
+  assert.equal(plan.prepare.find((d) => d.name === 'A').massMg, 0.4); // 1 mM × 1 mL × 400 g/mol
 });

@@ -61,7 +61,7 @@ if (cmd === 'example') { process.stdout.write(JSON.stringify(EXAMPLE, null, 2) +
 if (cmd === 'design') {
   if (!pos[1]) die('design needs a spec file (see: d300craft example)');
   const spec = readJson(pos[1]);
-  const base = (opt.name || spec.name || basename(pos[1], '.json')).replace(/[^\w.\- ]+/g, '_').trim().replace(/\s+/g, '-');
+  const base = (opt.name || spec.name || basename(pos[1], '.json')).replace(/[^\w.\-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   const out = resolve(opt.out || '.');
   mkdirSync(out, { recursive: true });
   let r; try { r = designAndPlan(spec, base); } catch (e) { die(e.message); }

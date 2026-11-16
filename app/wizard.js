@@ -5,7 +5,7 @@
 import { newProtocol, wellKey } from '../src/tdd.js';
 import { PLATE_TYPES, addFluid, titrationLevels, parseDilution } from '../src/ops.js';
 import { computeProtocol, validRange, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitLabel, fromDisplay, toDisplay } from '../src/dispense.js';
-import { buildExperiment, applyExperiment, newMeta, addCellLine, assignCellLine, isBorder } from '../src/experiment.js';
+import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, isBorder } from '../src/experiment.js';
 import { planRun } from '../src/cassette.js';
 import { icon } from './icons.js';
 
@@ -232,19 +232,8 @@ function preview(ctx) {
     : [W.cellMode === 'none' || !lines[0] ? [] : [lines[0]]];
   for (const set of sets) {
     const built = buildExperiment(spec, protocol.fluids);
-    const at = applyExperiment(protocol, meta, built);
-    for (let i = at; i < protocol.plates.length; i++) {
-      const p = protocol.plates[i], d = W.border || 0;
-      const innerR = p.rows - 2 * d, innerC = p.cols - 2 * d;
-      set.forEach((cl, half) => {
-        const cells = [];
-        for (let r = d; r < p.rows - d; r++) for (let c = d; c < p.cols - d; c++) {
-          const h = !split ? 0 : split === 'rows' ? (r - d < Math.floor(innerR / 2) ? 0 : 1) : (c - d < Math.floor(innerC / 2) ? 0 : 1);
-          if (h === half) cells.push([r, c]);
-        }
-        assignCellLine(meta, p, i, cells, cl.id);
-      });
-    }
+    applyExperiment(protocol, meta, built);
+    seedBlocks(meta, protocol, meta.blocks.slice(-built.blocks.length), set);
     for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = set.map((c) => c.name).join(' / ');
   }
   const computed = computeProtocol(protocol);
