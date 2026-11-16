@@ -77,43 +77,6 @@ fn assert_same(rust: &Value, js: &Value, what: &str) {
     }
 }
 
-/// Dose levels built with `js_pow`. Bit-exact against node on macOS, where js_pow's model of V8's
-/// Math.pow was measured (0 mismatches in 590 000 inputs, src/jsnum.rs). On Linux, node's Math.pow and
-/// glibc's pow (Rust's powf) differ in the last bit for a few inputs (seen on GitHub's ubuntu-24.04
-/// runner: titrationLevels[108][3] …b715 vs …b716), so there the levels may differ by at most 1 ulp.
-/// The desktop app computes doses in JS only; d300-core is used there just to re-check saved files.
-fn assert_levels(rust: &Value, js: &Value, what: &str) {
-    if cfg!(target_os = "macos") {
-        return assert_same(rust, js, what);
-    }
-    fn walk(a: &Value, b: &Value, path: &str, n: &mut usize) {
-        match (a, b) {
-            (Value::Array(x), Value::Array(y)) if x.len() == y.len() => {
-                for (i, (p, q)) in x.iter().zip(y).enumerate() {
-                    walk(p, q, &format!("{path}[{i}]"), n);
-                }
-            }
-            (Value::String(x), Value::String(y)) if x != y => {
-                let (p, q) = (u64::from_str_radix(x, 16), u64::from_str_radix(y, 16));
-                match (p, q) {
-                    (Ok(p), Ok(q)) if (p >> 63) == (q >> 63) && p.abs_diff(q) == 1 => *n += 1,
-                    _ => panic!("Rust and JS differ: {path}: {x} (rust) vs {y} (js)"),
-                }
-            }
-            _ => {
-                if let Some(d) = first_diff(a, b, path) {
-                    panic!("Rust and JS differ: {d}");
-                }
-            }
-        }
-    }
-    let mut n = 0;
-    walk(rust, js, what, &mut n);
-    if n > 0 {
-        eprintln!("{what}: {n} value(s) 1 ulp apart (system pow vs V8 Math.pow on this platform)");
-    }
-}
-
 fn file_list() -> Vec<String> {
     reference_tdd_files().iter().map(|p| rel(p)).collect()
 }
@@ -491,14 +454,14 @@ process.stdout.write(JSON.stringify({ titr, syn, targeted, scrap, scrap10, tsv, 
         .collect();
     let n_ok = titr.iter().filter(|v| v.is_array()).count();
     assert!(n_ok > 1000, "only {n_ok} successful titrations");
-    assert_levels(&Value::Array(titr), &out["titr"], "titrationLevels");
-    assert_levels(&Value::Array(syn), &out["syn"], "synergyLevels");
+    assert_same(&Value::Array(titr), &out["titr"], "titrationLevels");
+    assert_same(&Value::Array(syn), &out["syn"], "synergyLevels");
     let tl: Vec<Value> = targeted.iter().map(|o| lvls(targeted_levels(o))).collect();
     assert!(
         tl.iter().filter(|v| v.is_array()).count() > 300,
         "too few successful targeted titrations"
     );
-    assert_levels(&Value::Array(tl), &out["targeted"], "targetedLevels");
+    assert_same(&Value::Array(tl), &out["targeted"], "targetedLevels");
 
     let protos: Vec<_> = files.iter().map(|f| load(f)).collect();
     let scrap: Vec<Value> = protos
