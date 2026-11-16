@@ -101,3 +101,19 @@ T8+ g3:11.8 g3:9 g3:11.8 g3:9.1
   (k < 0.001 → T = A; also fixes probe-22l E14), (b) fluid volumes round like .NET Math.Round on v/inc in doubles
   with no tie tolerance, and A·(1+p) is computed as A + A·p. All 1920 rows now match; probe-25 and D3 still exact.
 - OPEN: D4+ load at exact .5 — probe-25 257.495 → 258, probe-26 213.499 → 213 (tests: todo).
+
+## probe-27a / 27b (blind; prediction at commit 7c1212b + tools/cassette/make_probe27.mjs, before the runs, 2026-11-16)
+Validates two rules fitted on one datapoint each: D4+ load at an exact .5 (whole-plate head: d to 0.1 µL first;
+equal share: exact), and the "to total" fluid sizing step (|Vⱼ − Vⱼ₋₁| / Nⱼ₋₁ < 0.1 %).
+```
+== probe-27a-d4ties.tdd warn wells 0
+D4+ h1:149.9600→203  h2:119.5800→165  h3:86.7800→124  h4:190.7600→254
+D4+ e2:149.9600→202  e2:149.9600→202  e3:158.7960→213  e3:158.7960→213
+D4+ e3:158.7960→213  m1:149.9600→203  m2:149.9600→203  DMSO normalization:149.9600→203
+   ("exact d everywhere" would give 202, 164, 123, 253 | 202, 202, 213 ×3 | 202, 202, 202;
+    "0.1 µL everywhere" 203, 165, 124, 254 | 203, 203, 214 ×3 | 203, 203, 203; m2 per-plate rounding → 202)
+== probe-27b-totalstep.tdd warn wells 0
+D4+ tt:41.0156→66  DMSO normalization:195.3576→259 ×3
+T8+ DMSO normalization:20.0000→23.3
+   dispense rows: engine as committed (totalTopUp with the previous-top-up sizing check)
+```
