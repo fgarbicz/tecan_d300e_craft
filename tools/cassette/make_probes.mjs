@@ -307,3 +307,22 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 'probe-24-validate.tdd'), writeTdd(p));
   console.log('wrote probe-24-validate');
 }
+
+// probe-25 (blind validation of the revised cassette rules): 3 plates; e1/e2 sub-nL dilution series with unequal
+// plate amounts, e3 bulk needing a D4+ (~250 µL), ToAssayVolumePct 1.5 % normalization on plates 1–2.
+{
+  const p = newProtocol();
+  const fl = [['e1', 10000], ['e2', 5000], ['e3', 10000]].map(([name, c]) => addFluid(p, { name, concentration: c, concentrationUnit: 'mM', classId: 0 }));
+  for (let pi = 0; pi < 3; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-25 ${pi + 1}`, dmsoLimit: 0.03 }));
+  const wells = [];
+  const series = (top, i, n) => top * Math.pow(10, -3.5 * i / (n - 1));
+  for (let pi = 0; pi < 3; pi++) for (let r = 0; r < 16; r++) for (let c = 0; c < 24; c++) {
+    if (r < 6) setWell(p.plates[pi], r, c, fl[0].id, +series([120, 60, 90][pi], c, 24).toPrecision(5));
+    else if (r < 11) setWell(p.plates[pi], r, c, fl[1].id, +series([40, 70, 20][pi], c, 24).toPrecision(5));
+    else setWell(p.plates[pi], r, c, fl[2].id, +(100 + 3 * c).toPrecision(5));
+    if (pi < 2) wells.push({ p: pi, r, c });
+  }
+  addNormalization(p, 0, 'ToAssayVolumePct', 0.015, wells);
+  writeFileSync(join(process.argv[2], 'probe-25-blind.tdd'), writeTdd(p));
+  console.log('wrote probe-25-blind');
+}

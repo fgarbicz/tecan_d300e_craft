@@ -62,3 +62,14 @@ Open: how such a fluid is split when it needs > 2 heads, and when a D4+ takes pa
   normalization (265, 104, 265, 265 | 254, 254) were NOT predicted. Rules revised from this run (fill plan with
   plate-boundary starts; D4+ planned from the plate its phase starts at; D4+ overflow re-planned) — so probe-24
   now fits by construction, and the revised rules still need a fresh blind run to count as validated.
+
+## probe-25 (blind; prediction from src/cassette.js at commit 0f46f4e, before the run)
+```
+warn wells 0
+e1 12.35 6.18 9.18 min well 0.100
+e2 6.87 12.02 3.39 min well 0.060
+e3 81.91 81.91 81.81 min well 504.800
+DMSO normalization 192.96 193.99 0.00 min well 10.000
+T8+ e1:11.8 e1:10.1 e2:8.2 e2:11.8 e2:6.5 e1:10.9
+D4+ e3:117 e3:220 DMSO normalization:256 DMSO normalization:257
+```
