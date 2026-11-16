@@ -178,3 +178,38 @@ D4+ pc1:172.0936→230  DMSO normalization:194.0075→258  DMSO normalization:19
 D4+ DMSO normalization:190.8079→254
    (planned from the dispensed volumes instead: 257, 261, 253)
 ```
+
+### probe-31 result (2026-11-16)
+- Heads: pc1 230, normalization 257, 261, pc1 118 | normalization 253 → the "next-step top-ups" prediction (258,
+  262, 254) is REFUTED on all three heads; heads are planned from the dispensed volumes. Pre-run summary: pc1
+  347.9, normalization 772 (5 D4+ heads, 2 cassettes). probe-25 head 4 (258 for 193.996 µL) is an open single case
+  again; also ruled out: d rounded to 0.1 µL (probe-27a), sub-1 nL top-ups (none on that plate), unrounded top-ups.
+- Dispense rows 2046/2051 as predicted: five top-ups one step low, all wells with a top-up below ~155 nL. New
+  stop check for "% of assay volume": first step on the change of the top-up, later steps on the fluid volume →
+  2051/2051, probe-25 1850/1850, D3 5752/5752, probe-20 1007/1007 unchanged.
+
+## "Use high-volume cassettes" unticked (probe-9-big: 40 / 60 / 90 µL; prediction before the run, 2026-11-16)
+planRun(..., { highVolume: false }):
+```
+T8+ b1:20→23.3  b1:20→23.3  b2:20→23.3  b2:20→23.3  b2:20→23.3  b3:18→21  b3:18→21  b3:18→21
+T8+ b3:18→21  b3:18→21          (10 T8+ heads, 2 cassettes; totals b1 46.6, b2 69.9, b3 104.9)
+```
+
+## "Use high-volume cassettes" unticked — result (2026-11-16)
+Summary switched to "10 T8+ Dispenseheads (2 cassettes)", totals 46.6 / 69.9 / 105.0; fill screens 23.3, 23.3 |
+23.3 ×3 | 21.0 ×3 and 21.0 ×2 — as predicted. (The 105.0 total led to the 1.15 slope for T8+ in per-fluid totals.)
+
+## probe-32 (blind; "top-ups are planned from their unrounded volumes", fitted on probe-25 head 4)
+Per plate, dispensed / unrounded top-up sums: 194.0016 / 193.9960, 190.7900 / 190.8016, 197.1976 / 197.2018 µL
+(ties 194.0, 190.8, 197.2).
+```
+D4+ pr1:177.7424→237  DMSO normalization:193.9960→257  DMSO normalization:190.8016→254  pr1:84.5328→121
+D4+ DMSO normalization:197.2018→262
+   (planned from the dispensed volumes instead: 258, 253, 261)
+```
+
+### probe-32 result (2026-11-16)
+- Heads pr1 237, normalization 257, 254, pr1 121 | normalization 262 — exactly the "unrounded top-ups" prediction on
+  all three heads, in both directions (dispensed sums would give 258, 253, 261). Summary: 5 D4+ heads, pr1 357.9,
+  normalization 772. Dispense rows 2081/2081 as predicted (also a blind pass for the revised "% of assay volume"
+  stop check). probe-25 head 4 (258) is thereby explained: 194.0006 µL of unrounded top-ups.

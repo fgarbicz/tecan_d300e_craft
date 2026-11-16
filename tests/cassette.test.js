@@ -31,7 +31,8 @@ test('probe-3: whole plates per head when they fit, else equal split; heads orde
 });
 
 test('probe-4: aqueous classes have 2.5 µL dead volume and a 4 µL minimum', () => {
-  assert.deepEqual(plan('fixtures/reference/probes/probe-4-classes.tdd').fluids.map((f) => f.load), [4.0, 16.3, 4.0, 16.3, 25.5, 8.2, 8.2, 6.0]);
+  // per-head loads from the fill screen (one head per fluid; the per-fluid TOTAL has its own slope, see below)
+  assert.deepEqual(plan('fixtures/reference/probes/probe-4-classes.tdd').cassettes.flatMap((c) => c.heads.map((h) => h.load)), [4.0, 16.3, 4.0, 16.3, 25.5, 8.2, 8.2, 6.0]);
 });
 
 test('probe-5/6/7: normalization on T8+ up to 40 µL, then D4+ (1.25·d + 15, 200 µL per head)', () => {
@@ -42,7 +43,7 @@ test('probe-5/6/7: normalization on T8+ up to 40 µL, then D4+ (1.25·d + 15, 20
 
 test('probe-8: ten fluids need two T8+ cassettes', () => {
   const r = plan('fixtures/reference/probes/probe-8-tenfluids.tdd');
-  assert.deepEqual(r.fluids.map((f) => f.load), [2.0, 2.6, 3.7, 4.9, 6.0, 7.2, 8.3, 9.5, 10.6, 11.8]);
+  assert.deepEqual(r.cassettes.flatMap((c) => c.heads.map((h) => h.load)), [2.0, 2.6, 3.7, 4.9, 6.0, 7.2, 8.3, 9.5, 10.6, 11.8]);
   assert.deepEqual(r.cassettes.map((c) => c.heads.length), [8, 2]);
 });
 
@@ -179,7 +180,12 @@ test('D4+ load uses the exact head volume: probe-27a, 12 heads just below a .5 t
     ['D4+', ['tt 66', 'DMSO normalization 259', 'DMSO normalization 259', 'DMSO normalization 259']],
     ['T8+', ['DMSO normalization 23.3']]]);
 });
-test('"% of assay volume" heads are planned from the next-step top-ups: probe-25 head 4 loads 258', () => {
+test('"% of assay volume" heads: probe-31 (blind) 257 / 261 / 253 — not the next-step top-ups (258 / 262 / 254)', () => {
+  assert.deepEqual(heads(plan(R + 'probe-31-pctplan.tdd')), [
+    ['D4+', ['pc1 230', 'DMSO normalization 257', 'DMSO normalization 261', 'pc1 118']],
+    ['D4+', ['DMSO normalization 253']]]);
+});
+test('top-ups are planned unrounded: probe-25 head 4 loads 258 (193.996 µL dispensed, 194.0006 µL requested)', () => {
   assert.deepEqual(plan(R + 'probe-25-blind.tdd').cassettes[1].heads.map((h) => `${h.name} ${h.load}`),
     ['e3 220', 'DMSO normalization 256', 'e3 117', 'DMSO normalization 258']);
 });
@@ -197,4 +203,25 @@ test('probe-30 (blind): heads and loads of a three-plate "to highest total" run'
   assert.deepEqual(heads(plan(R + 'probe-30-maxtotal.tdd')), [
     ['T8+', ['ht1 11.8', 'ht1 5.3', 'ht2 10.2', 'ht1 7.1']],
     ['D4+', ['DMSO normalization 208']]]);
+});
+
+test('"Use high-volume cassettes" unticked: probe-9 on T8+ heads only (run in D300e Control, 2026-11-16)', () => {
+  const p = parseTdd(readFileSync(join(root, R + 'probe-9-big.tdd'), 'utf8'));
+  const r = planRun(p, computeProtocol(p), { highVolume: false });
+  assert.deepEqual(heads(r), [
+    ['T8+', ['b1 23.3', 'b1 23.3', 'b2 23.3', 'b2 23.3', 'b2 23.3', 'b3 21', 'b3 21', 'b3 21']],
+    ['T8+', ['b3 21', 'b3 21']]]);
+  assert.deepEqual(r.fluids.map((f) => f.load), [46.6, 69.9, 105]); // pre-run summary and report totals
+});
+test('per-fluid totals of T8+ fluids use slope 1.15 (probe-22l z1, probe-24 d3 / d4, probe-2 m4)', () => {
+  const tot = (rel) => Object.fromEntries(plan(R + rel).fluids.map((f) => [f.name, f.load]));
+  assert.equal(tot('probe-22l-sweepnonorm.tdd').z1, 153.2);
+  const p24 = tot('probe-24-validate.tdd'); assert.equal(p24.d3, 36.3); assert.equal(p24.d4, 45.2); assert.equal(p24.d2, 27.9);
+  const p2 = tot('probe-2-split.tdd'); assert.equal(p2.m4, 22.1); assert.equal(p2.m6, 24.7); assert.equal(p2.m8, 30.5);
+});
+
+test('probe-32 (blind): top-ups planned from their unrounded volumes — 257 / 254 / 262 (dispensed sums would give 258 / 253 / 261)', () => {
+  assert.deepEqual(heads(plan(R + 'probe-32-rawplan.tdd')), [
+    ['D4+', ['pr1 237', 'DMSO normalization 257', 'DMSO normalization 254', 'pr1 121']],
+    ['D4+', ['DMSO normalization 262']]]);
 });

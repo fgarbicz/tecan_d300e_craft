@@ -148,6 +148,10 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
     // fluids sized at T₁ unless the well total still moves by ≥ 0.1 %), both blind runs of 2026-11-16
     ['fixtures/reference/probes/probe-27a-d4ties.tdd', 'fixtures/reference/reports/probes/probe-27a-d4ties.xml'],
     ['fixtures/reference/probes/probe-27b-totalstep.tdd', 'fixtures/reference/reports/probes/probe-27b-totalstep.xml'],
+    // probe-31 (blind): "% of assay volume" at 1.40–1.46 % with up to 600 nL of drug; first-step check on the top-up
+    ['fixtures/reference/probes/probe-31-pctplan.tdd', 'fixtures/reference/reports/probes/probe-31-pctplan.xml'],
+    // probe-32 (blind): "% of assay volume" again, 2081 rows as predicted with the stop rule revised by probe-31
+    ['fixtures/reference/probes/probe-32-rawplan.tdd', 'fixtures/reference/reports/probes/probe-32-rawplan.xml'],
     // probe-28: written by Craft's wizard/CLI — a diluted stock (RootFluidID / DilutionFactor) for the low levels and
     // a <Randomize> map within each cell line; the comparison also checks every row's Dispensed Well
     ['fixtures/reference/probes/probe-28-craft-wide.tdd', 'fixtures/reference/reports/probes/probe-28-craft-wide.xml']]) {

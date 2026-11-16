@@ -50,10 +50,14 @@ const TOL = 0.005;
 // nudge and slope 1.15, which put 1.15 × 3 + 0.3 at 3.8 where the real software shows 3.7.)
 const roundTo = (x, d) => { const m = 10 ** d; return Math.round(x * m) / m; };
 
-/** Unrounded load of one head (µL); the T8+ minimum applies before any rounding. */
+/** Unrounded load of one head as it enters the per-fluid total (µL); the T8+ minimum applies before any rounding.
+ *  T8+ heads enter the total with slope 1.15 (not the 1 / 0.87 that fits the per-head values on the fill screen):
+ *  with 1.15 all 73 fluid totals of the archived completed runs match — 5 × 18 µL → 105.0 (probe-9, high-volume
+ *  cassettes off), probe-22l z1 153.2, probe-24 d3 36.3 and d4 45.2; with 1 / 0.87 those four are 0.1 µL low. */
+const T8_TOTAL_SLOPE = 1.15;
 function headLoadExact(cassette, d, isDmso = true) {
   if (cassette.type === 'D4+') return cassette.slope * d + cassette.dead;
-  return Math.max(isDmso ? 2.0 : 4.0, cassette.slope * d + (isDmso ? 0.3 : 2.5));
+  return Math.max(isDmso ? 2.0 : 4.0, T8_TOTAL_SLOPE * d + (isDmso ? 0.3 : 2.5));
 }
 /** Load volume (µL) for one head that dispenses `d` µL. */
 export function headLoad(cassette, d, isDmso = true) {
@@ -61,8 +65,8 @@ export function headLoad(cassette, d, isDmso = true) {
   // 0.004–0.04 µL below a .5 tie (single-plate fluids, a ToVolume normalization head, two-plate heads, equal shares
   // of 2 and 3) all show the lower value: 149.96 → 202.45 → 202, 119.58 → 164, 86.78 → 123, 190.76 → 253,
   // 158.796 → 213. "Dispensed to 0.1 µL first" (which would give 203, 165, 124, 254) is refuted.
-  // probe-25 head 4 (258 for 193.996 µL dispensed) is not a rounding matter: that head is planned from other
-  // top-up volumes than the dispensed ones — see perPlateAmounts ("% of assay volume").
+  // probe-25 head 4 (258 for 193.996 µL dispensed) is explained by the head volume, not the rounding: top-ups are
+  // planned unrounded (perPlateAmounts).
   // (was 2026-11-16 morning: whole-plate heads from d rounded to 0.1 µL, equal shares exact — fitted on that head.)
   if (cassette.type === 'D4+') return roundTo(cassette.slope * d + cassette.dead, 0); // UNVERIFIED for aqueous
   const dead = isDmso ? 0.3 : 2.5, min = isDmso ? 2.0 : 4.0;
@@ -82,15 +86,19 @@ export function perPlateAmounts(protocol, computed) {
   for (const b of protocol.backfills) for (const w of b.wells) normClass.set(`${w.p}|${w.r},${w.c}`, b.classId);
   computed.forEach(({ wells }, p) => {
     for (const [k, r] of wells) {
+      // fluids: the dispensed (rounded) volumes — probe-9 b3: 45 wells sum to 90.0 µL dispensed (→ 127.5 → 128, as
+      // loaded) but 89.995 µL unrounded (→ 127)
       for (const x of r.fluids) if (x.volume > 0) { const it = get(`f${x.fluidId}`, {}); it.perPlate[p] += x.volume / 1000; it.wells.push(well(p, k, x.volume)); }
       if (r.normalization > 0) {
         const cls = normClass.get(`${p}|${k}`) ?? 0;
         const it = get(`n${cls}`, { key: `n${cls}`, fluidId: null, classId: cls, name: `${fluidClass(cls).short} normalization`, order: 1 });
-        // "% of assay volume": D300e sizes the head from the top-up of the NEXT iteration step (Nⱼ), while it
-        // dispenses Nⱼ₋₁ (dispense.js pctTopUp). probe-25 plate 2: Σ dispensed 193.996 µL, Σ Nⱼ 194.042 µL → the head
-        // was loaded 258 (= 1.25 × 194.04 + 15), not 257. FITTED on that head; D3, T05 and probe-25's other head fit
-        // both readings. Blind check: probe-31.
-        const vn = r.normalizationPlanned ?? r.normalization;
+        // top-ups: the UNROUNDED volumes (before the 0.4 nL grid). probe-25 plate 2: 349 top-ups, 193.996 µL
+        // dispensed but 194.0006 µL unrounded → 257.501 → loaded 258; plate 1 192.971 → 256. probe-31 (three "% of
+        // assay volume" heads placed between candidate sums): 193.949 / 197.152 / 190.756 → 257 / 261 / 253, as
+        // loaded. probe-27a's ToVolume head (on-grid top-ups) 149.96 → 202. Needs the stop rule of pctTopUp as
+        // revised by probe-31 (with the earlier rule the unrounded sum was 193.999 and this reading looked refuted).
+        // (was: dispensed top-ups; and for a few hours the next-step top-ups Nⱼ, refuted by probe-31)
+        const vn = r.normalizationExact > 0 ? r.normalizationExact : r.normalization;
         it.perPlate[p] += vn / 1000; it.wells.push(well(p, k, vn));
       }
     }
@@ -292,13 +300,15 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
     const hs = cassettes.flatMap((c) => c.heads.filter((h) => h.key === it.key).map((h) => ({ ...h, cassette: c.index, type: c.type })));
     // Per-fluid total as the run report's "Loaded Volume" shows it: the unrounded head loads added up and rounded
     // once — to 1 µL when a D4+ head is involved, else 0.1 µL (probe-27a e2: 2 × 202.45 = 404.9 → 405, not
-    // 202 + 202; probe-23 normalization 391, not 166 + 226). 61 of 64 fluid rows of the archived completed runs;
-    // the 3 misses are T8+-only fluids 0.1 µL low (probe-22l z1, probe-24 d3 and d4). The pre-run summary shows the
-    // same total to 0.1 µL for fluids (202.4, 404.9, 640.5) and to 1 µL for normalization.
-    // (was: sum of the head loads as shown, 43 of 64)
+    // 202 + 202; probe-23 normalization 391, not 166 + 226). All 73 fluid rows of the archived completed runs (T8+
+    // heads with slope 1.15, see headLoadExact). The pre-run summary shows the same total to 0.1 µL for fluids
+    // (202.4, 404.9, 640.5) and to 1 µL for normalization.
+    // (was: sum of the head loads as shown, 43 of 64; then exact sum with the per-head T8+ slope, 61 of 64)
+    // The 1e-9 keeps exact .x5 products of the 1.15 slope on the lower side, as D300e shows them (probe-2 m4:
+    // 1.15 × 19 + 0.3 = 22.15 → 22.1).
     const isDmso = fluidClass(it.classId).isDmso;
     const exact = hs.reduce((s, h) => s + headLoadExact(h.type === 'D4+' ? D4 : T8, h.dispensed, isDmso), 0);
-    const load = hs.some((h) => h.type === 'D4+') ? roundTo(exact, 0) : roundTo(exact, 1);
+    const load = hs.some((h) => h.type === 'D4+') ? roundTo(exact, 0) : roundTo(exact - 1e-9, 1);
     return { name: it.name, fluidId: it.fluidId, classId: it.classId, dispensed: it.perPlate.reduce((s, v) => s + v, 0), load, heads: hs };
   });
   return { cassettes, fluids };
