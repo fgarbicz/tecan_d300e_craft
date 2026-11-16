@@ -119,8 +119,14 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   rows): a LAGGED iteration from V = 0, N = 0 — Tᵢ = A + Nᵢ₋₁ + Vᵢ₋₁, Vᵢ = Σ C·Tᵢ/S, Nᵢ = gap − Vᵢ₋₁ — that stops
   at the first i with |Vᵢ − Vᵢ₋₁| / Nᵢ < 0.1 % (at most i = 3) and returns Nᵢ; the fluids are dispensed as sized
   at step min(max(i, 1), 2). The stop thresholds sit exactly at the switches seen (k = 0.000881 → 0.0999 % stops,
-  0.000919 → 0.1048 % goes on; 0.003256 → 0.0975 %, 0.003299 → 0.1005 %). 663/664 rows; open: E21 (fluid V₁ vs V₂).
-- OPEN — "to highest total" (probe-23 plate 2): the fluids follow the same lagged model (326/329), but the target
+  0.000919 → 0.1048 % goes on; 0.003256 → 0.0975 %, 0.003299 → 0.1005 %). The fluid sizing step is the first
+  j ≥ 1 with |Vⱼ − Vⱼ₋₁| / Nⱼ₋₁ < 0.1 % (capped at that step): E21 (0.0979 % of N₀) is sized at T₁, F13 (0.163 %)
+  at T₂ — FITTED on E21 alone (2026-11-16). 664/664 rows.
+- OPEN — "to highest total" (probe-23 plate 2). 2026-11-16: for each well, the gap g that reproduces its top-up and
+  fluid under the lagged model drifts with k inside one stop group (stop-1 wells: ≈556.25 for k < 4.9e-4, ≈555.7 up
+  to 6.3e-4, ≈555.4 above; stop-2: ≈555.95 → 556.3 → 556.5; stop-3: 556.245–556.28), so no single target sequence
+  fits; the target likely depends on each well (or N is rounded differently). Not fixable from this run; needs a
+  probe that varies only the largest well. Earlier notes: the fluids follow the same lagged model (326/329), but the target
   is itself an iterated sequence that depends on more than the largest well: the stop-step-3 wells (176) all imply
   g₃ = 556.2445, the smallest wells g₀ ≈ 555.6, and empty wells and the largest well get 556.4 (its dispensed
   volume). No candidate sequence (largest well iterated alone, lagged, overshooting) reproduces this; the engine
@@ -130,7 +136,10 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   probe-25: 1076/1076).
 - Cassettes / heads: see the src/cassette.js header (probe-22a–o, 24, 25, 26; docs/handoff_probe22_predictions.md).
   T8+ heads in probe-25 and D4+ heads in probe-26 were predicted before the run; every cassette phase plans its
-  fluids from the plate it starts at. OPEN: D4+ load shown at an exact .5 (probe-25 258 vs probe-26 213).
+  fluids from the plate it starts at. D4+ load at an exact .5 (2026-11-16): a head of whole plates / plate parts
+  takes its dispensed volume to 0.1 µL first (probe-25 193.996 → 194.0 → 257.5 → 258); a head that is one of k
+  equal shares uses the exact share (probe-26 158.7992 → 213.499 → 213). All other 31 D4+ loads fit either
+  reading; FITTED on these two — check in the next blind run.
 - Fluid sizing of unnormalized wells: convergence check from the first step (k < 0.001 → sized at A); fluid
   rounding = .NET Math.Round(v / inc) in doubles, no tie tolerance (probe-22l, 26).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
