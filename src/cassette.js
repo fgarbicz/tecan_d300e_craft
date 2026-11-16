@@ -27,10 +27,10 @@
 //      and the D4+ heads share the rest (probe-10 201 µL → 20 T8+ + 181 D4+; probe-11 210 → 20 + 190);
 //      r > 20 → n + 1 D4+ heads (probe-13 230 → 115 + 115; 250 → 125 + 125; 300 → 150 + 150).
 //      Aqueous fluids on D4+ use the same load formula (probe-13: 100 µL → 140).
-//  - Splitting over plates: whole plates per head, packed next-fit in plate order; for D4+ heads, if that
-//    needs too many heads, largest-first (first-fit decreasing) packing (probe-13 [50,160,40,90] → 160+40 |
-//    90+50; the real D3 run: 265 µL normalization head = 144.5 + 2×22.4 + 3×3.5); otherwise an equal split.
-//    T8+ goes straight from next-fit to the equal split (probe-13 [5,16,4,9] → 17 | 17).
+//  - Splitting over plates: see fillPlan / packOrSplit below — T8+: plate-by-plate fill plan with plate-boundary
+//    starts, else equal shares; D4+: whole plates next-fit in run order, then largest-first, then the fill plan,
+//    then equal shares (probe-13, 19, 24, 25, 26, D3). Each cassette phase plans its fluids from the plate it
+//    starts at (the plate where the previous cassette finished).
 //  - Normalization is planned like a fluid, one per fluid class, after all fluids (D3: "DMSO normalization").
 //  - Run order: all cassettes of the type that fluid 1 needs first (probe-15: D4+ first), then the other type.
 //    A cassette is filled with the heads needed first, scanning plates from the plate where the previous
