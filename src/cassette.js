@@ -11,13 +11,18 @@
 //    D3 IDOTDO 8.7+8.7 | 8.7). Otherwise it is split equally across k heads, wells shared ("multiple").
 //  - High-volume cassettes (D4+, 4 heads, on by default): used when a fluid would need more than 2 T8+ heads.
 //      A D4+ head takes at most 200 µL; load = 1.25 × dispensed + 15 µL, shown to 1 µL (half up).
-//      n = ⌊d / 200⌋ full D4+ heads, remainder r: r = 0 → n heads; r ≤ 40 µL → r goes to ⌈r/20⌉ T8+ heads
-//      filled to 20 µL each and the D4+ heads share the rest equally (probe-10 201 µL → 20 T8+ + 181 D4+;
-//      probe-11 210 → 20 + 190); r > 40 → n + 1 D4+ heads sharing equally (250 → 125 + 125; 300 → 150+150).
-//      UNVERIFIED: aqueous fluids on D4+, remainders 20 < r ≤ 40, whole-plate packing on D4+.
+//      n = ⌊d / 200⌋ full D4+ heads, remainder r: r = 0 → n heads; r ≤ 20 µL → one T8+ head filled to 20 µL
+//      and the D4+ heads share the rest (probe-10 201 µL → 20 T8+ + 181 D4+; probe-11 210 → 20 + 190);
+//      r > 20 → n + 1 D4+ heads (probe-13 230 → 115 + 115; 250 → 125 + 125; 300 → 150 + 150).
+//      Aqueous fluids on D4+ use the same load formula (probe-13: 100 µL → 140).
+//  - Splitting over plates: whole plates per head, packed next-fit in plate order; for D4+ heads, if that
+//    needs too many heads, largest-first (first-fit decreasing) packing (probe-13 [50,160,40,90] → 160+40 |
+//    90+50; the real D3 run: 265 µL normalization head = 144.5 + 2×22.4 + 3×3.5); otherwise an equal split.
+//    T8+ goes straight from next-fit to the equal split (probe-13 [5,16,4,9] → 17 | 17).
 //  - Normalization is planned like a fluid, one per fluid class, after all fluids (D3: "DMSO normalization").
-//  - Head order: T8+ heads first (cassette 1, 2, …), then D4+ heads; within a type by the plate where the
-//    head first dispenses, then fluid order, then the head's index within the fluid (probe-3, probe-11).
+//  - Run order: all cassettes of the type that fluid 1 needs first (probe-15: D4+ first), then the other type.
+//    A cassette is filled with the heads needed first, scanning plates from the plate where the previous
+//    cassette finished, then plate 1, 2, …; within a plate in fluid order (probe-3, 11, 13, 15).
 
 import { fluidClass } from './dispense.js';
 
@@ -60,43 +65,47 @@ export function perPlateAmounts(protocol, computed) {
     .sort((a, b) => (a.order || 0) - (b.order || 0) || (a.fluidId ?? a.classId) - (b.fluidId ?? b.classId));
 }
 
-/** First plate on which a head that starts at cumulative amount `from` (µL) dispenses. */
-function firstPlateAt(perPlate, from) {
-  let cum = 0;
-  for (let p = 0; p < perPlate.length; p++) { cum += perPlate[p]; if (perPlate[p] > 0 && cum > from + EPS) return p; }
-  return perPlate.length - 1;
-}
-
-/** Split one fluid's amounts into heads: [{cassette:T8|D4, amount, firstPlate}]. */
+/** Split one fluid's amounts into heads: [{cassette:T8|D4, amount, plates:Set}]. */
 export function splitFluid(perPlate, { highVolume = true } = {}) {
   const d = perPlate.reduce((s, v) => s + v, 0);
   if (d <= EPS) return [];
   const kT = Math.ceil(d / T8.cap - EPS);
-  if (kT <= 2 || !highVolume) return splitT8(perPlate, d, kT);
-  // high-volume path
+  if (kT <= 2 || !highVolume) return packOrSplit(perPlate, 0, d, kT, T8, false);
   const n = Math.floor(d / D4.cap + EPS), r = d - n * D4.cap;
-  const heads = [];
-  const equalD4 = (count, total, startAt) => { for (let j = 0; j < count; j++) heads.push({ cassette: D4, amount: total / count, firstPlate: firstPlateAt(perPlate, startAt + (j * total) / count) }); };
-  if (r <= EPS) equalD4(n, d, 0);
-  else if (r <= 2 * T8.cap + EPS && n > 0) {
-    const t = Math.ceil(r / T8.cap - EPS);
-    for (let j = 0; j < t; j++) heads.push({ cassette: T8, amount: T8.cap, firstPlate: firstPlateAt(perPlate, j * T8.cap) });
-    equalD4(n, d - t * T8.cap, t * T8.cap);
-  } else equalD4(n + 1, d, 0);
-  return heads;
+  if (r <= EPS) return packOrSplit(perPlate, 0, d, n, D4, true);
+  if (r <= T8.cap + EPS && n > 0) {
+    // the first 20 µL (in run order) on one T8+ head, the rest on n D4+ heads
+    return [{ cassette: T8, amount: T8.cap, plates: platesIn(perPlate, 0, T8.cap) }, ...packOrSplit(perPlate, T8.cap, d - T8.cap, n, D4, true)];
+  }
+  return packOrSplit(perPlate, 0, d, n + 1, D4, true);
 }
 
-function splitT8(perPlate, d, k) {
-  // next-fit whole-plate packing in run (plate) order
-  const bins = [];
-  for (let p = 0; p < perPlate.length; p++) {
-    const v = perPlate[p]; if (v <= EPS) continue;
-    const last = bins[bins.length - 1];
-    if (last && last.amount + v <= T8.cap + EPS) last.amount += v;
-    else bins.push({ amount: v, firstPlate: p });
+/** Plates whose dispenses fall in the cumulative range [from, to). */
+function platesIn(perPlate, from, to) {
+  const out = new Set(); let cum = 0;
+  perPlate.forEach((v, p) => { if (v > EPS && cum < to - EPS && cum + v > from + EPS) out.add(p); cum += v; });
+  return out;
+}
+
+/** k heads for the amounts starting at cumulative `offset`: whole plates if they pack, else equal shares. */
+function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst) {
+  // the part of each plate that belongs to this group (after `offset`)
+  let cum = 0; const part = perPlate.map((v) => { const a = Math.max(0, Math.min(v, cum + v - offset)); cum += v; return a; });
+  const items = part.map((v, p) => ({ v, p })).filter((x) => x.v > EPS);
+  const nextFit = [];
+  for (const it of items) { const b = nextFit.at(-1); if (b && b.amount + it.v <= cas.cap + EPS) { b.amount += it.v; b.plates.add(it.p); } else nextFit.push({ amount: it.v, plates: new Set([it.p]) }); }
+  const fits = (bins) => bins.length <= k && bins.every((b) => b.amount <= cas.cap + EPS);
+  if (fits(nextFit)) return nextFit.map((b) => ({ cassette: cas, ...b }));
+  if (tryLargestFirst) {
+    const bins = [];
+    // ties: the later plate first (D3: the 265 µL head, the one that also dispensed plate 9)
+    for (const it of [...items].sort((a, b) => b.v - a.v || b.p - a.p)) {
+      const b = bins.find((x) => x.amount + it.v <= cas.cap + EPS);
+      if (b) { b.amount += it.v; b.plates.add(it.p); } else bins.push({ amount: it.v, plates: new Set([it.p]) });
+    }
+    if (fits(bins)) return bins.map((b) => ({ cassette: cas, ...b }));
   }
-  if (bins.length <= k && bins.every((b) => b.amount <= T8.cap + EPS)) return bins.map((b) => ({ cassette: T8, ...b }));
-  return Array.from({ length: k }, (_, j) => ({ cassette: T8, amount: d / k, firstPlate: firstPlateAt(perPlate, (j * d) / k) }));
+  return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: platesIn(perPlate, offset + (j * total) / k, offset + ((j + 1) * total) / k) }));
 }
 
 /**
@@ -105,19 +114,37 @@ function splitT8(perPlate, d, k) {
  */
 export function planRun(protocol, computed, { highVolume = true } = {}) {
   const items = perPlateAmounts(protocol, computed);
+  const nPlates = computed.length;
   const heads = [];
   items.forEach((it, order) => {
     splitFluid(it.perPlate, { highVolume }).forEach((h, seg) => heads.push({ ...h, it, order, seg }));
   });
-  const byType = (c) => heads.filter((h) => h.cassette === c).sort((a, b) => a.firstPlate - b.firstPlate || a.order - b.order || a.seg - b.seg);
+  // Run simulation: phases by cassette type (the type fluid 1 needs first), cassettes filled with the heads the
+  // run needs first, starting at the plate where the previous cassette finished.
+  const firstType = heads.length ? heads.reduce((a, b) => (b.order < a.order || (b.order === a.order && b.seg < a.seg) ? b : a)).cassette : T8;
+  const types = firstType === D4 ? [D4, T8] : [T8, D4];
   const cassettes = [];
-  for (const c of [T8, D4]) {
-    byType(c).forEach((h, i) => {
-      if (i % c.heads === 0) cassettes.push({ type: c.type, index: cassettes.length + 1, heads: [] });
-      const isDmso = fluidClass(h.it.classId).isDmso;
-      cassettes[cassettes.length - 1].heads.push({ head: (i % c.heads) + 1, name: h.it.name, key: h.it.key, fluidId: h.it.fluidId, classId: h.it.classId,
-        dispensed: h.amount, load: headLoad(c, h.amount, isDmso), firstPlate: h.firstPlate });
-    });
+  let current = 0;
+  for (const c of types) {
+    const remaining = heads.filter((h) => h.cassette === c).sort((a, b) => a.order - b.order || a.seg - b.seg);
+    while (remaining.length) {
+      const order = [current, ...Array.from({ length: nPlates }, (_, p) => p).filter((p) => p !== current)];
+      const chosen = [];
+      for (const p of order) {
+        for (const h of remaining) if (chosen.length < c.heads && !chosen.includes(h) && h.plates.has(p)) chosen.push(h);
+        if (chosen.length >= c.heads) break;
+      }
+      for (const h of chosen) remaining.splice(remaining.indexOf(h), 1);
+      const visited = order.filter((p) => chosen.some((h) => h.plates.has(p)));
+      if (visited.length) current = visited.at(-1);
+      const cas = { type: c.type, index: cassettes.length + 1, heads: [] };
+      chosen.forEach((h, i) => {
+        const isDmso = fluidClass(h.it.classId).isDmso;
+        cas.heads.push({ head: i + 1, name: h.it.name, key: h.it.key, fluidId: h.it.fluidId, classId: h.it.classId,
+          dispensed: h.amount, load: headLoad(c, h.amount, isDmso), plates: [...h.plates].sort((a, b) => a - b) });
+      });
+      cassettes.push(cas);
+    }
   }
   const fluids = items.map((it) => {
     const hs = cassettes.flatMap((c) => c.heads.filter((h) => h.key === it.key).map((h) => ({ ...h, cassette: c.index, type: c.type })));

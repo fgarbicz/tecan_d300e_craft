@@ -844,14 +844,13 @@ function renderRun(el) {
   if (!plan || !plan.cassettes.length) { el.innerHTML = '<div class="callout">Nothing to dispense yet.</div>'; return; }
   const t8 = plan.cassettes.filter((c) => c.type === 'T8+').length, d4 = plan.cassettes.filter((c) => c.type === 'D4+').length;
   el.innerHTML = `<div class="callout"><b>You need ${t8 ? `${t8} × T8+` : ''}${t8 && d4 ? ' and ' : ''}${d4 ? `${d4} × D4+ (high-volume)` : ''} cassette${t8 + d4 > 1 ? 's' : ''}</b> for ${S.protocol.plates.length} plate${S.protocol.plates.length > 1 ? 's' : ''}.
-      Load each head with the volume in bold. Estimated the way D300e Control 4.0.1 computes it (matched on simulated runs, Nov 2026), with "Use high-volume cassettes" ticked.</div>
+      Load each head with the volume in bold. Computed the way D300e Control 4.0.1 does (matched on simulated runs, Nov 2026), with "Use high-volume cassettes" ticked (its default).</div>
     ${plan.cassettes.map((c) => `<div class="cassette-h">${icon('cassette', 16)} Cassette ${c.index} · ${c.type}</div>
       <table class="plan"><tr><th>Head</th><th>Fluid</th><th class="num">Dispensed</th><th class="num">Load</th></tr>
       ${c.heads.map((h) => `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
     <h3>Per fluid</h3><table class="plan"><tr><th>Fluid</th><th class="num">Heads</th><th class="num">Dispensed</th><th class="num">Total load</th></tr>
     ${plan.fluids.map((f) => `<tr><td>${esc(f.name)}</td><td class="num">${f.heads.length}</td><td class="num">${fmt(f.dispensed, 4)} µL</td><td class="load">${f.heads.some((h) => h.type === 'D4+') ? Math.round(f.load) : f.load.toFixed(1)} µL</td></tr>`).join('')}</table>
-    ${plan.fluids.some((f) => f.heads.filter((h) => h.type === 'D4+').length > 1 && S.protocol.plates.length > 1) ? `<div class="callout warn">${icon('warn', 15)} <b>Check the D4+ loads on the instrument's pre-run screen.</b> When a fluid needs several D4+ heads across several plates, D300e may pack whole plates into a head instead of splitting evenly: in your real D3 run it loaded <b>265 µL</b> into the first normalization head (199.8 µL dispensed: the largest plates first), where this estimate shows the even split. Load what D300e asks for.</div>` : ''}
-    <p class="hint">Heads are filled in this order on the instrument. Not yet confirmed on the instrument: aqueous fluids on D4+ heads, D4+ remainders between 20 and 40 µL, and D4+ splits over several plates.</p>
+    <p class="hint">Heads are filled in this order on the instrument. Rules matched on simulated D300e runs (13 probes + your D3 run). If the instrument's pre-run screen ever shows different loads, load what it asks for and tell us.</p>
     <div class="actions"><button id="runCsv">${icon('save', 15)} Save loading sheet (CSV)</button></div>`;
   $('runCsv').onclick = () => {
     const rows = [['Cassette', 'Type', 'Head', 'Fluid', 'Dispensed (µL)', 'Load (µL)']];

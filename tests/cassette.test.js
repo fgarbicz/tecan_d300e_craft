@@ -77,11 +77,24 @@ test('headLoad rounding', () => {
   assert.equal(headLoad(T8, 1, false), 4.0);
 });
 
-test('KNOWN MISMATCH: D3 normalization on D4+ (3 heads over 9 plates)', () => {
-  // The real D3 run loaded 265 µL into D4+ head 1 = 1.25 × 199.785 + 15, i.e. whole plates packed largest first
-  // (144.5 + 2 × 22.4 + 3 × 3.5 µL). The planner splits evenly (170.4 µL → 228 µL) and the Run tab warns.
-  // One datapoint, and T8+ packing is not largest-first (probe-11), so the rule is not changed yet.
+test('D3 run: normalization on D4+ packs whole plates largest first (head 1 = 265 µL)', () => {
+  // The real D3 run loaded 265 µL into D4+ head 1 = 1.25 × 199.785 + 15: plates 9, 6, 5 (144.5 + 2 × 22.4 µL)
+  // and 3, 2, 1 (3 × 3.5 µL); it dispensed plates 1, 2 and 9 (151.5 µL) before the run was aborted.
+  // Heads 2 and 3 were filled but have no loaded volume in the report (aborted), so only head 1 is checked.
   const r = plan('fixtures/reference/2026.08.28 synergy D3.tdd');
   const d4 = r.cassettes.find((c) => c.type === 'D4+');
-  assert.deepEqual(d4.heads.map((h) => h.load), [228, 228, 228]); // observed on the instrument: 265 for head 1
+  assert.equal(d4.heads[0].load, 265);
+  assert.deepEqual(d4.heads[0].plates, [0, 1, 2, 4, 5, 8]);
+  assert.deepEqual(d4.heads.map((h) => h.load), [265, 224, 196]);
+});
+
+test('probe-13: D4+ largest-first packing, remainder > 20 µL on D4+, aqueous on D4+, cassette order by run', () => {
+  assert.deepEqual(heads(plan('fixtures/reference/probes/probe-13-packing2.tdd')), [
+    ['T8+', ['q1 19.8', 'q1 19.8']],
+    ['D4+', ['q2 190', 'q4 159', 'q4 159', 'q5 140']],
+    ['D4+', ['q3 240', 'q2 265', 'q3 140']]]);
+});
+
+test('probe-15: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first', () => {
+  assert.deepEqual(heads(plan('fixtures/reference/probes/probe-15-dmsorule.tdd')), [['D4+', ['d1 78']], ['T8+', ['d2 2']]]);
 });
