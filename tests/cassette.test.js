@@ -102,3 +102,17 @@ test('probe-15: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first'
 test('probe-19: a D4+ fluid over 3 plates that no whole-plate packing fits is split evenly (259 + 259 µL)', () => {
   assert.deepEqual(heads(plan('fixtures/reference/probes/probe-19-d4equal.tdd')), [['D4+', ['e1 259', 'e1 259']]]);
 });
+
+// KNOWN DIFFERENCES (open). Both runs have large per-well DMSO volumes (up to 556 nL/well, DMSO limit 2–3 %).
+// D300e filled T8+ heads in well order to ≈ 10 µL each (not 20) — z1: 7 heads on plate 1 + 1 head on the first
+// 179 wells of plate 2, the rest of plate 2 on a D4+ head (55.2 µL); h1 (16.2 µL, no D4+ involved) also got one
+// head per plate. Neither the 10 µL cap nor its trigger is explained by the settings, MaxVolume, well counts or
+// the presence of a D4+ (probe-10 has 20 µL T8+ heads next to a D4+). Needs a dedicated probe.
+test('probe-21: z1 over 8 T8+ heads at ≈ 10 µL + one D4+ head (D300e) — planner differs', { todo: 'per-head 10 µL cap not modelled' }, () => {
+  const r = plan('fixtures/reference/probes/probe-21-normsweep.tdd');
+  assert.deepEqual(heads(r).map(([t, h]) => [t, h.length]), [['T8+', 8], ['D4+', 3]]);
+});
+test('probe-20: h1 16.2 µL on two T8+ heads, one per plate (9.0 + 7.2 µL dispensed) — planner differs', { todo: 'per-head 10 µL cap not modelled' }, () => {
+  const r = plan('fixtures/reference/probes/probe-20-normholdout.tdd');
+  assert.equal(r.cassettes[0].heads.filter((h) => h.name === 'h1').length, 2);
+});

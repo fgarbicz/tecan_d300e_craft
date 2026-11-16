@@ -13,7 +13,7 @@ import { planRun } from '../src/cassette.js';
 import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
 import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
-import { DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapBySignature } from '../src/dosemap.js';
+import { DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapTest } from '../src/dosemap.js';
 
 export const APP_NAME = 'Tecan D300 Craft';
 const APP_VERSION = '0.2.0';
@@ -358,10 +358,7 @@ function renderGrid() {
 function mark(d, t) { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = t; d.appendChild(s); }
 
 // Dose scales over the whole protocol (same colour = same concentration on every plate), scrap wells left out.
-function doseScrap() {
-  const sig = scrapBySignature(S.protocol);
-  return (pi, key) => { const [r, c] = key.split(',').map(Number); return wellRole(S.meta, S.protocol.plates[pi], pi, r, c) === 'scrap' || sig(pi, key); };
-}
+function doseScrap() { return scrapTest(S.protocol, S.meta, wellRole); }
 function doseScales() { return drugScales(S.protocol, { skip: doseScrap() }); }
 function exportDoseMap(format) {
   const roleOf = (pi, r, c) => wellRole(S.meta, S.protocol.plates[pi], pi, r, c);

@@ -131,9 +131,8 @@ function wellSvg(cx, cy, r, colors) {
  *   'vehicle' wells dotted) }
  */
 export function doseMapSvg(protocol, { title = 'Dose map', plates = null, roleOf = null } = {}) {
-  const sig = scrapBySignature(protocol);
-  // marked scrap in the experiment file, or (files from elsewhere) recognised by the priming-value signature
-  const isScrap = (pi, key) => { const [r, c] = key.split(',').map(Number); return (roleOf && roleOf(pi, r, c) === 'scrap') || sig(pi, key); };
+  // marked scrap in the experiment file, or (plates with none marked) recognised by the priming-value signature
+  const isScrap = scrapTestFromRoles(protocol, roleOf);
   const scales = drugScales(protocol, { skip: isScrap });
   const idx = (plates || protocol.plates.map((_, i) => i)).filter((i) => protocol.plates[i]);
   const maxCols = Math.max(...idx.map((i) => protocol.plates[i].cols), 1), maxRows = Math.max(...idx.map((i) => protocol.plates[i].rows), 1);
@@ -210,8 +209,25 @@ export function doseSummary(protocol, opts = {}) {
   return doseLevels(protocol, opts).map((d) => `${d.drug}: ${d.levels.length} level(s), ${short(d.min)}–${short(d.max)} ${d.unit} (${d.foldRange}-fold) on plate(s) ${d.plates.join(', ')}` +
     (d.levels.length > 1 ? ` (${d.levels.map(short).join(', ')})` : ''));
 }
-/** Scrap test from an experiment file's roles plus the priming-value signature. */
+/**
+ * Scrap test: wells marked scrap in the experiment file; on plates where none are marked (files from elsewhere),
+ * the priming-value signature — so a real dose that happens to sit near the priming value is never dropped from
+ * the scale when the experiment file says where the scrap wells are.
+ * roleOf(pi, r, c) → role, or null without an experiment file.
+ */
+export function scrapTestFromRoles(protocol, roleOf) {
+  const sig = scrapBySignature(protocol), marked = new Map();
+  const hasMarked = (pi) => {
+    if (!roleOf) return false;
+    if (!marked.has(pi)) { const p = protocol.plates[pi]; let any = false; for (const key of p.wells.keys()) { const [r, c] = key.split(',').map(Number); if (roleOf(pi, r, c) === 'scrap') { any = true; break; } } marked.set(pi, any); }
+    return marked.get(pi);
+  };
+  return (pi, key) => {
+    if (hasMarked(pi)) { const [r, c] = key.split(',').map(Number); return roleOf(pi, r, c) === 'scrap'; }
+    return sig(pi, key);
+  };
+}
+/** Same, from an experiment file (meta) and experiment.js wellRole. */
 export function scrapTest(protocol, meta, wellRoleFn) {
-  const sig = scrapBySignature(protocol);
-  return (pi, key) => { if (sig(pi, key)) return true; if (!meta || !wellRoleFn) return false; const [r, c] = key.split(',').map(Number); return wellRoleFn(meta, protocol.plates[pi], pi, r, c) === 'scrap'; };
+  return scrapTestFromRoles(protocol, meta && wellRoleFn ? (pi, r, c) => wellRoleFn(meta, protocol.plates[pi], pi, r, c) : null);
 }

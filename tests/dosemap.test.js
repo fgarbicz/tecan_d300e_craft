@@ -77,3 +77,13 @@ test('design plan carries the dose levels; the CLI writes the dose map', async (
     assert.match(out, /## Dose gradients/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('scrap signature is not used on a plate whose experiment file marks scrap wells', async () => {
+  const { scrapTestFromRoles } = await import('../src/dosemap.js');
+  // D3 plate 1: A24 matches the priming signature; if the experiment file marks a different well as scrap,
+  // A24 must stay on the scale.
+  const marked = scrapTestFromRoles(d3, (pi, r, c) => (pi === 0 && r === 1 && c === 1 ? 'scrap' : 'treated'));
+  assert.equal(marked(0, '0,23'), false, 'A24 kept: this plate has explicitly marked scrap wells');
+  const none = scrapTestFromRoles(d3, () => 'treated');
+  assert.equal(none(0, '0,23'), true, 'no scrap marked anywhere: signature applies');
+});
