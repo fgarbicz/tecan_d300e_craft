@@ -207,3 +207,9 @@ D4+ pr1:177.7424→237  DMSO normalization:193.9960→257  DMSO normalization:19
 D4+ DMSO normalization:197.2018→262
    (planned from the dispensed volumes instead: 258, 253, 261)
 ```
+
+### probe-32 result (2026-11-16)
+- Heads pr1 237, normalization 257, 254, pr1 121 | normalization 262 — exactly the "unrounded top-ups" prediction on
+  all three heads, in both directions (dispensed sums would give 258, 253, 261). Summary: 5 D4+ heads, pr1 357.9,
+  normalization 772. Dispense rows 2081/2081 as predicted (also a blind pass for the revised "% of assay volume"
+  stop check). probe-25 head 4 (258) is thereby explained: 194.0006 µL of unrounded top-ups.

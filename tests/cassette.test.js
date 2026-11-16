@@ -219,3 +219,9 @@ test('per-fluid totals of T8+ fluids use slope 1.15 (probe-22l z1, probe-24 d3 /
   const p24 = tot('probe-24-validate.tdd'); assert.equal(p24.d3, 36.3); assert.equal(p24.d4, 45.2); assert.equal(p24.d2, 27.9);
   const p2 = tot('probe-2-split.tdd'); assert.equal(p2.m4, 22.1); assert.equal(p2.m6, 24.7); assert.equal(p2.m8, 30.5);
 });
+
+test('probe-32 (blind): top-ups planned from their unrounded volumes — 257 / 254 / 262 (dispensed sums would give 258 / 253 / 261)', () => {
+  assert.deepEqual(heads(plan(R + 'probe-32-rawplan.tdd')), [
+    ['D4+', ['pr1 237', 'DMSO normalization 257', 'DMSO normalization 254', 'pr1 121']],
+    ['D4+', ['DMSO normalization 262']]]);
+});

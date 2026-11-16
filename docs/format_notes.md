@@ -84,7 +84,7 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
 - The summary's total per fluid can differ by 0.1 µL from the sum of the per-head loads (e.g. 24.1 vs 12.0+12.0).
 - Volume solve: see the next section (iteration with a 0.1 % stop; the earlier "3 fixed steps" was a
   partial fit, and the probe-7 A1 0.4 nL difference is resolved by it).
-- UNVERIFIED: "Use high-volume cassettes" unticked (the summary did not update when unticked); the aqueous
+- UNVERIFIED (high-volume cassettes unticked: now verified, see below): the aqueous
   minimum load (one point); the largest-first tie-break (from the aborted D3 run); D300e's pre-run warning
   "plate fluid is split between multiple dispense heads, and there are no wells greater than 30 nL in some
   cases" is not produced by this app.
@@ -133,8 +133,18 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   (earlier notes, kept for the record: the implied gap looked k-dependent — 556.25 → 555.7 → 555.4 → 556.25 —
   because the middle band subtracts X₁, not V₀ or V₁; no single-volume model could fit.)
 - "% of assay volume", stop check revised 2026-11-16 (probe-31): the first step compares the change of the top-up
-  (N₁ − N₀ = p³·A) with 0.1 % of the top-up, later steps the change of the fluid volume. Heads for this type are
-  planned from the dispensed top-ups (probe-31; the "next-step" idea for probe-25 head 4 is refuted).
+  (N₁ − N₀ = p³·A) with 0.1 % of the top-up, later steps the change of the fluid volume. Blind pass: probe-32,
+  2081/2081 rows.
+- Head volumes (cassette planning): fluids from their dispensed (grid) volumes, top-ups from their UNROUNDED
+  volumes. probe-25 head 4: 193.996 µL dispensed, 194.0006 µL unrounded → 258. Blind: probe-32, three heads placed
+  between the two sums in both directions — 257 / 254 / 262 as predicted. (Refuted on the way: head volume to
+  0.1 µL first — probe-27a; next-iteration top-ups — probe-31.)
+- Per-fluid total ("Loaded Volume", pre-run "Total load volumes"): Σ over heads of 1.25·d + 15 (D4+) and
+  1.15·d + 0.3 / 2.5 (T8+; the per-head value on the fill screen follows d / 0.87 + dead), rounded once — to 1 µL
+  with a D4+ head, else 0.1 µL. All 73 fluid rows of the archived completed runs.
+- "Use high-volume cassettes" unticked (probe-9, 2026-11-16): the pre-run summary switches to T8+ heads only
+  (10 heads / 2 cassettes for 40 + 60 + 90 µL), 20 µL per head, equal shares: 23.3 ×2, 23.3 ×3, 21.0 ×5. The tick
+  is back on at the next run.
 - "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at
   A(1+p); wells already over the target get no top-up and normal sizing (src/dispense.js pctTopUp; D3 plate 9 +
   probe-25: 1076/1076).
