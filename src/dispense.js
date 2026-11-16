@@ -65,10 +65,10 @@ export function roundVolume(v, cls) {
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
     if (v <= upper || upper === Infinity) {
-      // Nearest multiple of the band's increment (UNVERIFIED: tie and band-edge handling).
-      // Nearest multiple, ties to even (.NET Math.Round default). Confirmed on the D3 run report:
-      // 1.01 nL → 1.00 nL (50.5 × 20 pL → 50). (was: Math.round, ties up)
-      let r = roundHalfEven(v / inc) * inc;
+      // Nearest multiple of the band's increment like .NET Math.Round on v / inc in doubles: exact binary ties to
+      // even, no tolerance (probe-26 A1: 60·50900/10000 = 305.39999999999998 → 305.2; probe-25 L13:
+      // 136·50750/10000 = 690.2000000000000455 → 690.4; D3 1.01 nL → 1.00). (was: ties within 1e-9 to even)
+      let r = roundHalfEvenStrict(v / inc) * inc;
       if (r < lower) r = lower;
       return { volume: cleanFloat(r), belowMin: false };
     }
@@ -205,9 +205,10 @@ export function iteratedTotal(fixed, k) {
   let prev = fixed; // T_0: no fluid volume yet
   for (let n = 1; n <= 100; n++) {
     const next = fixed + k * prev; // T_n = fixed + V_n, V_n = k·T_(n−1)
-    // The check starts at the second step: at least two steps are always taken (D3 report: MEN-only wells,
-    // k = 0.0003, need V_2 = k·A·(1 + k) for their DMSO top-up to floor to 1.0 nL rather than 1.2 nL).
-    if (n >= 2 && Math.abs(next - prev) / next < SIZING_TOLERANCE) return prev; // V_n was sized with T_(n−1)
+    // The check starts at the first step: a well with k < 0.001 is sized at the bare fixed volume (probe-22l E14,
+    // k = 0.000684: 34.185 → 34.0; probe-26 g3 0.01 µM: 0.25 → 0.24). (was: from the second step, for D3's
+    // MEN-only wells — their top-up is now computed by iteratedTopUp, which never used this.)
+    if (Math.abs(next - prev) / next < SIZING_TOLERANCE) return prev; // V_n was sized with T_(n−1)
     prev = next;
   }
   return prev;
@@ -397,7 +398,7 @@ function pctTopUp(req, fluids, b, A, p, cls) {
   for (const [id, c] of req) { const f = fluids.get(id); if (!f || f.byVol || !c) continue; cAll.push([c, stockInBase(f)]); if (f.classId === b.classId) cC.push([c, stockInBase(f)]); }
   const vol = (cs, T) => { let v = 0; for (const [c, S] of cs) v += (c * T) / S; return v; };
   const Ts = [], Vs = [], Ns = [];
-  let T = A * (1 + p);
+  let T = A + A * p; // = A·(1 + p) in the float order D300e uses (probe-25 L13: 136·50750/10000 sits on a tie)
   for (let i = 0; i < 6; i++) {
     const V = vol(cC, T), N = p * T - (i ? Vs[i - 1] : V);
     Ts.push(T); Vs.push(V); Ns.push(N);

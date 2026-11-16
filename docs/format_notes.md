@@ -128,7 +128,10 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
 - "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at
   A(1+p); wells already over the target get no top-up and normal sizing (src/dispense.js pctTopUp; D3 plate 9 +
   probe-25: 1076/1076).
-- Cassettes / heads: see the src/cassette.js header (probe-22a–o, 24, 25; docs/handoff_probe22_predictions.md).
-  T8+ heads in probe-25 were predicted exactly before the run.
+- Cassettes / heads: see the src/cassette.js header (probe-22a–o, 24, 25, 26; docs/handoff_probe22_predictions.md).
+  T8+ heads in probe-25 and D4+ heads in probe-26 were predicted before the run; every cassette phase plans its
+  fluids from the plate it starts at. OPEN: D4+ load shown at an exact .5 (probe-25 258 vs probe-26 213).
+- Fluid sizing of unnormalized wells: convergence check from the first step (k < 0.001 → sized at A); fluid
+  rounding = .NET Math.Round(v / inc) in doubles, no tie tolerance (probe-22l, 26).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.

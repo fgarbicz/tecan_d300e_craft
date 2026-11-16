@@ -53,7 +53,8 @@ const roundTo = (x, d) => { const m = 10 ** d; return Math.round(x * m) / m; };
 /** Load volume (µL) for one head that dispenses `d` µL. */
 export function headLoad(cassette, d, isDmso = true) {
   // the dispensed volume is taken to 0.1 µL first (as the report shows it): probe-25 193.99 → 194.0 → 257.5 → 258
-  if (cassette.type === 'D4+') return roundTo(cassette.slope * roundTo(d, 1) + cassette.dead, 0); // UNVERIFIED for aqueous
+  // OPEN: at exact .5 the shown load is 1 µL off either way (probe-25 257.495 → 258, probe-26 213.499 → 213)
+  if (cassette.type === 'D4+') return roundTo(cassette.slope * d + cassette.dead, 0); // UNVERIFIED for aqueous
   const dead = isDmso ? 0.3 : 2.5, min = isDmso ? 2.0 : 4.0;
   return Math.max(min, roundTo(cassette.slope * d + dead, 1));
 }
@@ -215,10 +216,11 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
   let current = 0;
   for (let pass = 0; pass < 8 && heads.some((h) => !h.done); pass++) {
     for (const c of types) {
-      if (c === D4) { // D4+-only fluids are planned from the plate the D4+ phase starts at
+      if (current) { // fluids on this cassette type only are planned from the plate the phase starts at
+        // (probe-24/25: D4+ after T8+; probe-26: T8+ after D4+, g3 from plate 3 → 10 | 10 | 9.4 | 5.8)
         for (const it of items) {
           const own = heads.filter((h) => h.it === it);
-          if (!own.length || own.some((h) => h.done || h.cassette !== D4)) continue;
+          if (!own.length || own.some((h) => h.done || h.cassette !== c)) continue;
           const seg0 = Math.max(...own.map((h) => h.seg)) + 1, order = own[0].order;
           for (const h of own) heads.splice(heads.indexOf(h), 1);
           add(it, order, splitFluid(it.perPlate, { highVolume, wells: it.wells, start: current }), seg0);

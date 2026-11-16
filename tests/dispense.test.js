@@ -140,7 +140,10 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
     // probe-24: 4 plates of ToMaxVolume, computed before the run (blind check of the top-up model)
     ['fixtures/reference/probes/probe-24-validate.tdd', 'fixtures/reference/reports/probes/probe-24-validate.xml'],
     // probe-25: "% of assay volume" with up to 860 nL of drug (model revised from this run: pctTopUp)
-    ['fixtures/reference/probes/probe-25-blind.tdd', 'fixtures/reference/reports/probes/probe-25-blind.xml']]) {
+    ['fixtures/reference/probes/probe-25-blind.tdd', 'fixtures/reference/reports/probes/probe-25-blind.xml'],
+    // probe-26: "to volume" 900 nL + unnormalized plate (fluid ties: strict rounding, first-step sizing check)
+    ['fixtures/reference/probes/probe-26-blind.tdd', 'fixtures/reference/reports/probes/probe-26-blind.xml'],
+    ['fixtures/reference/probes/probe-22l-sweepnonorm.tdd', 'fixtures/reference/reports/probes/probe-22l-sweepnonorm.xml']]) {
     const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' });
     assert.match(out, /ALL ROWS MATCH/, tdd + ': ' + out.split('\n')[0]);
   }

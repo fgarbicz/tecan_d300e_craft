@@ -221,7 +221,8 @@ pub fn round_volume(v: f64, cls: &FluidClass) -> Rounded {
             // Nearest multiple of the band's increment (UNVERIFIED: tie and band-edge handling).
             // Nearest multiple, ties to even (.NET Math.Round default). Confirmed on the D3 run report:
             // 1.01 nL → 1.00 nL (50.5 × 20 pL → 50). (was: Math.round, ties up)
-            let mut r = round_half_even(v / inc) * inc;
+            // .NET Math.Round on v / inc in doubles (no tie tolerance): probe-26 A1, probe-25 L13
+            let mut r = round_half_even_strict(v / inc) * inc;
             if r < lower {
                 r = lower;
             }
@@ -304,7 +305,9 @@ pub fn iterated_total(fixed: f64, k: f64) -> f64 {
     let mut prev = fixed;
     for n in 1..=100 {
         let next = fixed + k * prev;
-        if n >= 2 && (next - prev).abs() / next < SIZING_TOLERANCE {
+        // check from the first step (probe-22l E14, probe-26 g3); see iteratedTotal in src/dispense.js
+        let _ = n;
+        if (next - prev).abs() / next < SIZING_TOLERANCE {
             return prev;
         }
         prev = next;
@@ -930,7 +933,7 @@ fn pct_top_up(req: &WellFluids, fluids: &FluidLookup, b: &crate::tdd::Backfill, 
     }
     let vol = |cs: &[(f64, f64)], t: f64| cs.iter().fold(0.0, |v, &(c, s)| v + (c * t) / s);
     let (mut ts, mut vs, mut ns): (Vec<f64>, Vec<f64>, Vec<f64>) = (vec![], vec![], vec![]);
-    let mut t = a * (1.0 + p);
+    let mut t = a + a * p; // the float order D300e uses (probe-25 L13)
     for i in 0..6 {
         let v = vol(&c_c, t);
         let n = p * t - if i > 0 { vs[i - 1] } else { v };

@@ -92,3 +92,12 @@ D4+ g1:220 g2:167 DMSO normalization:214 DMSO normalization:214
 D4+ DMSO normalization:214
 T8+ g3:11.8 g3:9 g3:11.8 g3:9.1
 ```
+
+### probe-26 result
+- D4+ heads (g1 220, g2 167, normalization 3 × 213) as predicted except the normalization loads (214 predicted).
+- T8+ g3 11.8, 11.8, 11.1, 7.0 vs predicted 11.8, 9.0, 11.8, 9.1 → every cassette phase plans its fluids from the
+  plate the phase starts at (here plate 3, where the D4+ phase ended).
+- Dispenses: 12 fluid rows off → (a) unnormalized wells are sized with the convergence check from the FIRST step
+  (k < 0.001 → T = A; also fixes probe-22l E14), (b) fluid volumes round like .NET Math.Round on v/inc in doubles
+  with no tie tolerance, and A·(1+p) is computed as A + A·p. All 1920 rows now match; probe-25 and D3 still exact.
+- OPEN: D4+ load at exact .5 — probe-25 257.495 → 258, probe-26 213.499 → 213 (tests: todo).
