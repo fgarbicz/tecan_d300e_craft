@@ -116,6 +116,13 @@ fn write_sidecar(tdd_path: &Path, text: &str) -> Result<PathBuf, String> {
         return Err("Experiment file must be a JSON object".into());
     }
     let p = sidecar_path(tdd_path);
+    // Keep the previous version as "<stem>.craft.backup.json": the experiment file holds pasted readouts that
+    // exist nowhere else, and a file this version could not read must not be lost by the next save.
+    if p.exists() {
+        let stem = tdd_path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let backup = tdd_path.with_file_name(format!("{stem}.craft.backup.json"));
+        std::fs::copy(&p, &backup).map_err(|e| format!("Could not back up {}: {e}", p.display()))?;
+    }
     write_atomic(&p, text.as_bytes())?;
     Ok(p)
 }
@@ -177,6 +184,13 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     #[test]
+    fn a_protocol_saved_by_the_interface_passes_the_cross_check() {
+        // D3 rebuilt by the experiment wizard and serialized by the UI in Chrome (canvas thumbnail, new revision).
+        let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/roundtrip/craft-ui-d3.tdd");
+        cross_check(&std::fs::read_to_string(p).unwrap()).unwrap();
+    }
+
+    #[test]
     fn sidecar_sits_next_to_the_protocol_and_must_be_a_json_object() {
         assert_eq!(sidecar_path(Path::new("/a/b/run 1.tdd")), PathBuf::from("/a/b/run 1.craft.json"));
         let dir = std::env::temp_dir().join(format!("d300craft-sidecar-{}", std::process::id()));
@@ -184,6 +198,8 @@ mod tests {
         let tdd = dir.join("exp.tdd");
         let p = write_sidecar(&tdd, "{\"version\":1}").unwrap();
         assert_eq!(std::fs::read_to_string(&p).unwrap(), "{\"version\":1}");
+        write_sidecar(&tdd, "{\"version\":2}").unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("exp.craft.backup.json")).unwrap(), "{\"version\":1}");
         assert!(write_sidecar(&tdd, "[1]").is_err());
         assert!(write_sidecar(&tdd, "not json").is_err());
         std::fs::remove_dir_all(&dir).unwrap();

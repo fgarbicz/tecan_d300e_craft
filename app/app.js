@@ -108,7 +108,7 @@ export function loadText(text, name, handle = null, sidecarText = null) {
     let meta = null, stale = false, note = '';
     if (sidecarText) {
       try { ({ meta, stale } = parseMeta(sidecarText, p)); note = stale ? ' — the protocol changed since the experiment file was saved; check cell lines and roles' : ', experiment file loaded'; }
-      catch (e) { note = ` (experiment file ignored: ${e.message})`; }
+      catch (e) { note = ` (experiment file could not be read: ${e.message}; it will be kept as a backup when you save)`; }
     }
     S.protocol = p; S.meta = meta || reconcileMeta(null, p); S.metaStale = stale;
     S.fileName = name; S.fileHandle = handle; S.dirty = false; S.undo = []; S.redo = [];
@@ -850,7 +850,8 @@ function renderRun(el) {
       ${c.heads.map((h) => `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
     <h3>Per fluid</h3><table class="plan"><tr><th>Fluid</th><th class="num">Heads</th><th class="num">Dispensed</th><th class="num">Total load</th></tr>
     ${plan.fluids.map((f) => `<tr><td>${esc(f.name)}</td><td class="num">${f.heads.length}</td><td class="num">${fmt(f.dispensed, 4)} µL</td><td class="load">${f.heads.some((h) => h.type === 'D4+') ? Math.round(f.load) : f.load.toFixed(1)} µL</td></tr>`).join('')}</table>
-    <p class="hint">Heads are filled in this order on the instrument. Not yet confirmed on the instrument: aqueous fluids on D4+ heads and D4+ remainders between 20 and 40 µL.</p>
+    ${plan.fluids.some((f) => f.heads.filter((h) => h.type === 'D4+').length > 1 && S.protocol.plates.length > 1) ? `<div class="callout warn">${icon('warn', 15)} <b>Check the D4+ loads on the instrument's pre-run screen.</b> When a fluid needs several D4+ heads across several plates, D300e may pack whole plates into a head instead of splitting evenly: in your real D3 run it loaded <b>265 µL</b> into the first normalization head (199.8 µL dispensed: the largest plates first), where this estimate shows the even split. Load what D300e asks for.</div>` : ''}
+    <p class="hint">Heads are filled in this order on the instrument. Not yet confirmed on the instrument: aqueous fluids on D4+ heads, D4+ remainders between 20 and 40 µL, and D4+ splits over several plates.</p>
     <div class="actions"><button id="runCsv">${icon('save', 15)} Save loading sheet (CSV)</button></div>`;
   $('runCsv').onclick = () => {
     const rows = [['Cassette', 'Type', 'Head', 'Fluid', 'Dispensed (µL)', 'Load (µL)']];
@@ -946,7 +947,7 @@ function pasteSel() {
 function showStart() {
   const st = $('start');
   st.innerHTML = `<div class="inner"><h1><span class="logo" style="width:34px;height:34px"></span>${APP_NAME}</h1>
-    <p class="lead">Design D300e drug-printer protocols on the Mac, keep track of cell lines and controls, and turn plate-reader data into an annotated Excel file. Files open in D300e Control as they are.</p>
+    <p class="lead">Design D300e drug-printer protocols on the Mac, keep track of cell lines and controls, and turn plate-reader data into an annotated Excel file. Protocols are saved in D300e Control's own .tdd format.</p>
     <div class="cards">
       <button class="card" id="stWizard">${icon('wizard', 28)}<b>New experiment</b><span>Step-by-step: plates and PBS border, drugs and dilution series, combinations, replicates, cell lines.</span></button>
       <button class="card" id="stOpen">${icon('open', 28)}<b>Open protocol</b><span>A .tdd from D300e Control or this app. Its experiment file (cell lines, data) loads with it.</span></button>

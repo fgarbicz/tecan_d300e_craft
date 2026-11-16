@@ -407,7 +407,7 @@ export function sheetName(name, taken = new Set()) {
 }
 
 const NORMALIZATION_TEXT = 'Viability % = (signal − background) / (vehicle mean − background) × 100. Background = mean signal of the blank wells (medium, no cells) on the same plate; 0 when a plate has no blank wells. Vehicle mean = mean signal of the vehicle wells (cells, no drug) with the same cell line on the same plate. Wells without a signal are left out of every mean. PBS, scrap, excluded and empty wells are listed but not normalized.';
-const CONDITIONS_TEXT = 'Treated and vehicle wells pooled over all analyzed plates by cell line and requested concentrations (rounded to 10 significant digits). SD is the sample SD (n − 1); SEM = SD / √n; CV % = SD / mean × 100.';
+const CONDITIONS_TEXT = 'Treated and vehicle wells pooled over all analyzed plates by cell line and requested concentrations (rounded to 10 significant digits). Wells with the same concentrations are pooled even when they come from different plate sets, e.g. a drug alone appears in every combination block; DMSO normalization can differ between those sets (see DMSO % in Wells). SD is the sample SD (n − 1); SEM = SD / √n; CV % = SD / mean × 100.';
 const SYNERGY_TEXT = 'From condition means, for combinations of exactly two drugs whose single-agent conditions (same concentrations, all other drugs 0) were measured for the same cell line. Inhibition I = 1 − viability/100 (not clamped). Bliss expected = I_A + I_B − I_A·I_B; Bliss excess = I_A+B − expected; HSA excess = I_A+B − max(I_A, I_B). Positive = more inhibition than expected (synergy), negative = antagonism.';
 
 function stockText(f) {

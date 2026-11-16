@@ -76,3 +76,12 @@ test('headLoad rounding', () => {
   assert.equal(headLoad(D4, 135), 184);
   assert.equal(headLoad(T8, 1, false), 4.0);
 });
+
+test('KNOWN MISMATCH: D3 normalization on D4+ (3 heads over 9 plates)', () => {
+  // The real D3 run loaded 265 µL into D4+ head 1 = 1.25 × 199.785 + 15, i.e. whole plates packed largest first
+  // (144.5 + 2 × 22.4 + 3 × 3.5 µL). The planner splits evenly (170.4 µL → 228 µL) and the Run tab warns.
+  // One datapoint, and T8+ packing is not largest-first (probe-11), so the rule is not changed yet.
+  const r = plan('fixtures/reference/2026.08.28 synergy D3.tdd');
+  const d4 = r.cassettes.find((c) => c.type === 'D4+');
+  assert.deepEqual(d4.heads.map((h) => h.load), [228, 228, 228]); // observed on the instrument: 265 for head 1
+});

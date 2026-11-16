@@ -151,7 +151,8 @@ export function computeWell(requests, fluids, plate, normalization = 0, sizingTo
   // V_fluids = 0 (V_i = C_i·T/S_i, T = fixed + ΣV_i), i.e. the fluids are sized with T = fixed·(1 + k + k²).
   // Fitted on simulated run reports (fixtures/reference/reports/probe-2, probe-10: 278/278 DMSO rows with
   // 1–4 µL per well, where the exact solution is 0.4–1.2 nL too high); identical to the exact solution at
-  // the small volumes of the D3 report. (was: const vTotalExact = fixed / (1 - k);)
+  // the small volumes of the D3 report. The large-volume fit is on single-fluid wells only; multi-fluid wells are
+  // confirmed only at D3's volumes (≤ 0.5 µL per well). (was: const vTotalExact = fixed / (1 - k);)
   const vTotalExact = fixed * (1 + k + k * k);
   const out = [];
   for (const it of items) {
