@@ -463,12 +463,12 @@
    "id": "36",
    "chapter": "Results",
    "title": "Heat map and synergy",
-   "text": "The map now shows the signal. Below: viability and Bliss synergy per cell line (red = the pair kills more than expected). The SynergyFinder package adds ZIP, HSA and Loewe in R.",
+   "text": "The map now shows the signal. Below: viability, Bliss synergy and Chou–Talalay combination index and isobolograms per cell line (red = synergy). The SynergyFinder package adds ZIP, HSA and Loewe in R.",
    "box": {
     "x": 1073,
-    "y": 103.578125,
+    "y": 103.375,
     "width": 355,
-    "height": 796.421875
+    "height": 796.625
    },
    "click": false
   },
@@ -479,7 +479,7 @@
    "text": "Export Excel: one row per well with cell line, every drug's concentration, DMSO, raw signal and % of vehicle, plus replicate statistics. That is the whole cycle.",
    "box": {
     "x": 1073,
-    "y": 475.390625,
+    "y": 476.1875,
     "width": 127.34375,
     "height": 28.1875
    },

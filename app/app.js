@@ -23,7 +23,7 @@ const keys = (s) => IS_MAC ? s : String(s).replace(/⇧⌘/g, 'Ctrl+Shift+').rep
 
 
 export const APP_NAME = 'Tecan D300 Craft';
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 const REVISION_USER = `${IS_MAC ? "Mac" : /Win/.test(navigator.platform || navigator.userAgent) ? "Windows" : "Linux"}\\D300 Craft`; // DOMAIN\\user, as D300e Control writes it (was always Mac)
 
 // ---------------- state ----------------
