@@ -8,8 +8,8 @@
 // adds, removes or reorders plates must call the matching meta helper below (tested).
 
 import { wellKey, splitKey, wellName } from './tdd.js';
-import { newPlate, titrationLevels, addNormalization, setWell } from './ops.js';
-import { computeProtocol, PRIMING_VOLUME, stockInBase } from './dispense.js';
+import { newPlate, titrationLevels, addNormalization, setWell, suggestShift, dilutedFluid } from './ops.js';
+import { computeProtocol, PRIMING_VOLUME, stockInBase, validRange } from './dispense.js';
 
 export const META_VERSION = 1;
 export const ROLE = { PBS: 'pbs', SCRAP: 'scrap', BLANK: 'blank', EXCLUDE: 'exclude' };
@@ -160,6 +160,90 @@ export function removeCellLine(meta, id) {
 
 // ---------- experiment wizard ----------
 /**
+ * Concentration levels of one axis, high → low, then 0 when includeZero.
+ *  - { high, factor, levels }: high, high/factor, high/factor², …
+ *  - { high, low, levels }: `levels` values evenly spaced on a log scale from high down to low (both included);
+ *    the step is (high/low)^(1/(levels−1)). Values are kept to 10 significant digits.
+ */
+export function axisLevels(a) {
+  let lv = [];
+  if (a.levels > 0 && a.low > 0 && a.high > 0) {
+    const n = Math.floor(a.levels);
+    if (n === 1) lv = [a.high];
+    else lv = Array.from({ length: n }, (_, i) => (i === n - 1 ? a.low : Number((a.high * (a.low / a.high) ** (i / (n - 1))).toPrecision(10))));
+  } else if (a.levels > 0) lv = titrationLevels({ mode: 'high', distribution: 'dilution', high: a.high, factor: a.factor, levels: a.levels });
+  return a.includeZero ? [...lv, 0] : lv;
+}
+/** Dilution step (fold per level) of a high/low/levels axis. */
+export const rangeStep = (high, low, levels) => (levels > 1 && high > 0 && low > 0 ? (high / low) ** (1 / (levels - 1)) : null);
+
+/**
+ * Extra diluted stocks for series that go below one drop of the stock (D300e "fluid shift / extend", guide
+ * p.29–31; dilution choice and level split INFERRED from the guide's two worked examples — ops.js suggestShift):
+ *  - shift: one diluted stock covers the whole series → the axis uses "Drug - 1:N" only;
+ *  - extend: the series needs both → levels the stock can reach stay on the stock, lower levels go to "Drug - 1:N".
+ * Mutates `protocol` (adds the diluted fluids, reusing one with the same name) and the axes of `spec`
+ * (fluidId / lowFluidId / splitBelow). Returns notes: [{ drug, kind: 'shift'|'extend'|'impossible', factor,
+ * fluid (name), stock (in base units), levels (on the diluted fluid) }].
+ */
+export function resolveStocks(protocol, spec) {
+  const notes = [], done = new Set();
+  const plate = { assayVolume: spec.plate.assayVolume, dmsoLimit: spec.plate.dmsoLimit };
+  for (const a of [spec.primary, ...spec.partners]) {
+    if (!a || a.fluidId == null || done.has(a)) continue;
+    done.add(a);
+    const f = protocol.fluids.find((x) => x.id === a.fluidId);
+    if (!f || f.byVol) continue;
+    const lv = axisLevels(a).filter((v) => v > 0);
+    if (!lv.length) continue;
+    const high = Math.max(...lv), low = Math.min(...lv);
+    const s = suggestShift(f, plate, high, low);
+    if (!s) continue;
+    if (s.kind === 'impossible') { notes.push({ drug: f.name, kind: 'impossible', levels: lv.filter((v) => v < validRange(f, plate).min) }); continue; }
+    const name = `${f.name} - 1:${s.factor}`;
+    const d = protocol.fluids.find((x) => x.name === name) || dilutedFluid(protocol, f, s.factor);
+    if (s.kind === 'shift') { a.rootFluidId = f.id; a.fluidId = d.id; notes.push({ drug: f.name, kind: 'shift', factor: s.factor, fluid: d.name, stock: d.concentration, levels: lv }); continue; }
+    a.lowFluidId = d.id; a.splitBelow = validRange(f, plate).min;
+    notes.push({ drug: f.name, kind: 'extend', factor: s.factor, fluid: d.name, stock: d.concentration, levels: lv.filter((v) => v < a.splitBelow) });
+  }
+  return notes;
+}
+
+/** Small seeded PRNG (mulberry32) so a randomization can be reproduced from its seed. */
+export function seededRng(seed) {
+  let t = seed >>> 0;
+  return () => { t = (t + 0x6d2b79f5) >>> 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+}
+/**
+ * Randomize where each design well is dispensed, keeping every well inside its own cell line: the wells seeded
+ * with one cell line (meta) are shuffled among themselves, so drugs move but cells stay put (two cell lines on a
+ * plate stay in their halves). Wells with a set role (PBS, scrap/priming, blank, excluded) are not moved.
+ * Writes plate.randomization (the D300e <Randomize> map, design well → dispensed well). D300e Control shows the
+ * plate as one randomized group; re-randomizing there would mix the cell lines again.
+ */
+export function randomizeByCellLine(protocol, meta, plateIndices, rng = Math.random) {
+  for (const pi of plateIndices) {
+    const p = protocol.plates[pi], pm = meta.plates[pi];
+    if (!p || !pm) continue;
+    const groups = new Map();
+    for (const [k, id] of Object.entries(pm.cellLines || {})) {
+      if (pm.roles?.[k]) continue;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(splitKey(k));
+    }
+    const list = [];
+    for (const cells of groups.values()) {
+      cells.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const to = cells.map((x) => x.slice());
+      for (let i = to.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [to[i], to[j]] = [to[j], to[i]]; } // Fisher-Yates
+      cells.forEach(([r, c], i) => list.push({ r, c, toR: to[i][0], toC: to[i][1] }));
+    }
+    p.randomization = list;
+  }
+}
+
+
+/**
  * Build a drug-combination experiment: the primary drug titrated along one axis, crossed with each
  * partner drug along the other, every block repeated on `plateReplicates` plates. Mirrors how
  * "2026.08.28 synergy D3" was built by hand in D300e Control (tests/experiment.test.js rebuilds it exactly).
@@ -180,10 +264,9 @@ export function buildExperiment(spec, fluids) {
   const fl = new Map(fluids.map((f) => [f.id, f]));
   const pt = newPlate(spec.plate);
   const depth = spec.border ?? 1;
-  const axisLevels = (a) => {
-    const lv = a.levels > 0 ? titrationLevels({ mode: 'high', distribution: 'dilution', high: a.high, factor: a.factor, levels: a.levels }) : [];
-    return a.includeZero ? [...lv, 0] : lv;
-  };
+  const nameOf = (id) => { const f = fl.get(id); return (f && f.rootFluidId != null && fl.get(f.rootFluidId)?.name) || f?.name; };
+  // after resolveStocks(): an "extended" axis puts its levels below the stock's reach on the diluted fluid
+  const fidFor = (a, v) => (a.lowFluidId != null && v < a.splitBelow ? a.lowFluidId : a.fluidId);
   const prim = spec.primary;
   const pLv = axisLevels(prim);
   const pRep = Math.max(1, prim.replicates || 1);
@@ -194,14 +277,14 @@ export function buildExperiment(spec, fluids) {
   const [r0, c0] = spec.origin || [depth, depth];
   const nCols = pLv.length * pRep;
   const availC = split === 'cols' ? Math.floor(innerC / 2) : pt.cols - depth - c0;
-  if (nCols > availC) throw new Error(`The ${fl.get(prim.fluidId)?.name ?? 'primary'} axis needs ${nCols} columns; only ${availC} fit ${split === 'cols' ? 'in half the plate' : 'inside the border'}`);
+  if (nCols > availC) throw new Error(fitAdvice(nameOf(prim.fluidId) ?? 'primary', prim, pLv, pRep, availC, 'columns', split === 'cols' ? 'in half the plate' : 'inside the border', depth));
   const plates = [], backfills = [], plateMeta = [], blocks = [];
   const nRep = Math.max(1, spec.plateReplicates || 1);
   spec.partners.forEach((part, bi) => {
     const qLv = axisLevels(part), qRep = Math.max(1, part.replicates || 1);
     const nRows = qLv.length * qRep;
     const availR = split === 'rows' ? Math.floor(innerR / 2) : pt.rows - depth - r0;
-    if (nRows > availR) throw new Error(`The ${fl.get(part.fluidId)?.name ?? 'partner'} axis needs ${nRows} rows; only ${availR} fit ${split === 'rows' ? 'in half the plate' : 'inside the border'}`);
+    if (nRows > availR) throw new Error(fitAdvice(part.fluidId == null ? 'single-drug replicate' : nameOf(part.fluidId) ?? 'partner', part, qLv, qRep, availR, 'rows', split === 'rows' ? 'in half the plate' : 'inside the border', depth));
     const origins = !split ? [[r0, c0]] : split === 'rows' ? [[depth, c0], [depth + Math.floor(innerR / 2), c0]] : [[r0, depth], [r0, depth + Math.floor(innerC / 2)]];
     const blockPlates = [];
     for (let rep = 0; rep < nRep; rep++) {
@@ -209,11 +292,11 @@ export function buildExperiment(spec, fluids) {
       // primary first in every well (fluid order inside a well is application order, as D300e writes it)
       for (const [or, oc] of origins) for (let i = 0; i < nRows; i++) for (let j = 0; j < nCols; j++) {
         const a = pLv[Math.floor(j / pRep)], b = qLv[Math.floor(i / qRep)];
-        if (a) setWell(p, or + i, oc + j, prim.fluidId, a);
-        if (b) setWell(p, or + i, oc + j, part.fluidId, b);
+        if (a) setWell(p, or + i, oc + j, fidFor(prim, a), a);
+        if (b) setWell(p, or + i, oc + j, fidFor(part, b), b);
       }
       const pm = newPlateMeta();
-      if (spec.scrap !== false) placeScrap(p, pm, [prim, part].map((x) => fl.get(x.fluidId)), depth);
+      if (spec.scrap !== false) placeScrap(p, pm, [prim, part].flatMap((x) => [x.fluidId, x.lowFluidId]).filter((id) => id != null).map((id) => fl.get(id)), depth);
       plateMeta.push(pm);
       blockPlates.push(plates.length);
       plates.push(p);
@@ -227,11 +310,23 @@ export function buildExperiment(spec, fluids) {
       for (const g of groups) backfills.push({ classId: nz.classId ?? 0, type: nz.type, param: nz.param, wells: g.flatMap((p) => grid.map(([r, c]) => ({ p, r, c }))) });
     }
     // A partner with fluidId null and only the 0 level makes a single-drug block (dose response, `replicates` rows).
-    blocks.push({ name: part.fluidId == null ? `${fl.get(prim.fluidId)?.name}` : `${fl.get(prim.fluidId)?.name} × ${fl.get(part.fluidId)?.name}`, plates: blockPlates, primary: prim.fluidId, partner: part.fluidId,
+    blocks.push({ name: part.fluidId == null ? `${nameOf(prim.fluidId)}` : `${nameOf(prim.fluidId)} × ${nameOf(part.fluidId)}`, plates: blockPlates, primary: prim.fluidId, partner: part.fluidId,
       region: { r0: origins[0][0], c0: origins[0][1], rows: nRows, cols: nCols }, copies: origins.map(([r, c]) => ({ r0: r, c0: c, rows: nRows, cols: nCols })),
       primaryLevels: pLv, partnerLevels: qLv });
   });
   return { plates, backfills, plateMeta, blocks };
+}
+
+/** "Does not fit" message with the numbers and what would fit. */
+function fitAdvice(name, a, lv, rep, avail, dim, where, depth) {
+  const n = lv.length * rep, zero = a.includeZero ? 1 : 0, nz = lv.length - zero;
+  const opts = [];
+  const maxLv = Math.floor(avail / rep) - zero;
+  if (maxLv >= 1 && maxLv < nz) opts.push(`${maxLv} levels${zero ? ' + 0' : ''} × ${rep} replicates`);
+  const maxRep = Math.floor(avail / lv.length);
+  if (maxRep >= 1 && maxRep < rep) opts.push(`${nz} levels${zero ? ' + 0' : ''} × ${maxRep} replicate${maxRep > 1 ? 's' : ''} (more plate replicates instead)`);
+  if (depth > 0 && n <= avail + 2 * depth) opts.push('no PBS border');
+  return `The ${name} axis needs ${n} ${dim} (${nz} levels${zero ? ' + 0' : ''} × ${rep} replicate${rep > 1 ? 's' : ''}); only ${avail} fit ${where}.` + (opts.length ? ` Fits: ${opts.join(', or ')}.` : '');
 }
 
 /** One priming well per fluid whose largest dispense on the plate is < 30 nL, in the top border row from the

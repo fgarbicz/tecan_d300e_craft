@@ -6,9 +6,12 @@
 // Spec (all concentrations as strings with units, e.g. "10 mM", "0.02 µM", "50 nM"):
 // {
 //   "name": "MM synergy",
-//   "plate":  { "type": "384", "wellVolumeUL": 50, "dmsoLimitPct": 1, "border": 1, "replicates": 3, "scrap": true, "shake": false },
+//   "plate":  { "type": "384", "wellVolumeUL": 50, "dmsoLimitPct": 1, "border": 1, "replicates": 3, "scrap": true, "shake": false,
+//               "dilutedStocks": true,          // add "Drug - 1:N" stocks when a series goes below one drop (D300e shift/extend)
+//               "randomize": false | "cellLine", "randomSeed": 1 },  // shuffle well positions within each cell line
 //   "drugs":  [ { "name": "Bortezomib", "stock": "1 mM", "class": "DMSO", "mw": 384.24 }, … ],
 //   "design": { "primary":  { "drug": "Bortezomib", "top": "0.02 µM", "dilution": "1:1.4", "levels": 10, "replicates": 2, "zero": true },
+//               // or a range: { "drug": "X", "top": "10 µM", "bottom": "0.1 nM", "levels": 10 } → evenly spaced on a log scale
 //               "partners": [ { "drug": "MEN", "top": "3 µM", "dilution": "1:2", "levels": 6, "replicates": 2, "zero": true,
 //                               "normalize": "block" | "plate" | "none" }, … ] },          // partner "drug": null = single drug
 //   "cells":  { "lines": ["MM.1S"], "arrangement": "same" | "perLine" | "splitRows" | "splitCols" | "none",
@@ -19,7 +22,7 @@
 import { newProtocol, writeTdd, wellName, parseTdd } from './tdd.js';
 import { addFluid, parseDilution, PLATE_TYPES } from './ops.js';
 import { computeProtocol, primingIssues, MOLARITY_UNITS, MASS_UNITS, fromDisplay, FLUID_CLASSES, unitLabel } from './dispense.js';
-import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole } from './experiment.js';
+import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole, resolveStocks, randomizeByCellLine, seededRng, rangeStep } from './experiment.js';
 
 import { planRun } from './cassette.js';
 import { doseLevels, scrapTest } from './dosemap.js';
@@ -63,7 +66,16 @@ export function designExperiment(spec) {
   const axis = (a, single) => {
     if (single) return { fluidId: null, high: 1, factor: 2, levels: 0, includeZero: true, replicates: Math.max(1, a.replicates ?? 1) };
     const top = parseAmount(a.top, `top concentration of ${a.drug}`);
-    return { fluidId: fluidOf(a.drug), high: toBase(top), factor: parseDilution(a.dilution ?? '1:3').factor, levels: a.levels ?? 8, includeZero: a.zero ?? true, replicates: Math.max(1, a.replicates ?? 1) };
+    const bottom = a.bottom ?? a.lowest;
+    if (bottom != null && a.dilution != null) throw new Error(`${a.drug}: give either "dilution" or "bottom", not both`);
+    const levels = a.levels ?? 8;
+    if (bottom != null) {
+      const low = toBase(parseAmount(bottom, `bottom concentration of ${a.drug}`));
+      if (!(low < toBase(top))) throw new Error(`${a.drug}: bottom (${bottom}) must be below top (${a.top})`);
+      if (levels < 2) throw new Error(`${a.drug}: a top–bottom range needs at least 2 levels`);
+      return { fluidId: fluidOf(a.drug), high: toBase(top), low, factor: rangeStep(toBase(top), low, levels), levels, includeZero: a.zero ?? true, replicates: Math.max(1, a.replicates ?? 1) };
+    }
+    return { fluidId: fluidOf(a.drug), high: toBase(top), factor: parseDilution(a.dilution ?? '1:3').factor, levels, includeZero: a.zero ?? true, replicates: Math.max(1, a.replicates ?? 1) };
   };
   const D = spec.design || {};
   if (!D.primary) throw new Error('design.primary is required');
@@ -83,13 +95,22 @@ export function designExperiment(spec) {
     : split ? (lines.length ? Array.from({ length: Math.ceil(lines.length / 2) }, (_, i) => lines.slice(2 * i, 2 * i + 2)) : [[]])
     : arrangement === 'none' || !lines.length ? [[]] : [[lines[0]]];
   if (arrangement === 'same' && lines.length > 1) throw new Error(`arrangement "same" puts one cell line on every plate, but ${lines.length} were given: use "perLine", "splitRows" or "splitCols"`);
+  const stockNotes = pl.dilutedStocks === false ? [] : resolveStocks(protocol, bspec);
   for (const set of sets) {
     const built = buildExperiment(bspec, protocol.fluids);
     applyExperiment(protocol, meta, built);
     seedBlocks(meta, protocol, meta.blocks.slice(-built.blocks.length), set);
     for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = set.map((c) => c.name).join(' / ');
   }
-  return { protocol, meta, spec };
+  if (pl.randomize) {
+    if (pl.randomize !== 'cellLine' && pl.randomize !== true) throw new Error(`plate.randomize must be "cellLine" (or false), not "${pl.randomize}"`);
+    if (!lines.length) throw new Error('plate.randomize "cellLine" needs cells.lines (wells are shuffled within each cell line)');
+    const seed = pl.randomSeed ?? 1;
+    randomizeByCellLine(protocol, meta, protocol.plates.map((_, i) => i), seededRng(seed));
+    meta.experiment.randomSeed = seed;
+  }
+  meta.experiment.stockNotes = stockNotes;
+  return { protocol, meta, spec, stockNotes };
 }
 
 const round = (x, d = 1) => Math.round(x * 10 ** d) / 10 ** d;
@@ -111,10 +132,16 @@ export function makePlan(protocol, meta, spec = {}) {
     const fl = f.fluidId != null ? protocol.fluids.find((x) => x.id === f.fluidId) : null;
     const prep = Math.ceil((f.load * 1.1 + 2) * 2) / 2; // +10 % +2 µL, to 0.5 µL
     const stock = fl ? `${fmtConc(fl.concentration / (MOLARITY_UNITS[fl.concentrationUnit] || MASS_UNITS[fl.concentrationUnit] || 1))} ${unitLabel(fl.concentrationUnit)}` : 'pure DMSO';
-    const mw = fl ? mwOf.get(fl.name) : null;
+    const root = fl && fl.rootFluidId != null ? protocol.fluids.find((x) => x.id === fl.rootFluidId) : null;
+    const mw = fl ? mwOf.get(root ? root.name : fl.name) : null;
     const molar = fl && fl.concentrationUnit in MOLARITY_UNITS;
     const massMg = mw && molar ? (fl.concentration * 1e-6) * 1e-3 * mw * 1e3 : null; // powder for 1 mL of stock: µM→M × 1 mL × g/mol → mg
-    return { name: f.name, stock, dispensedUL: round(f.dispensed, 2), loadUL: round(f.load, 1), heads: f.heads.length, prepareUL: prep, massMg: massMg != null ? +massMg.toPrecision(3) : null };
+    // a diluted stock (shift/extend) is made from its root stock: 1 part stock + (N − 1) parts DMSO / solvent
+    // pipette at least 1 µL of stock (to 0.5 µL), however little of the dilution the heads need
+    const stockPart = fl && fl.dilutionFactor ? Math.max(1, Math.ceil((prep / fl.dilutionFactor) * 2) / 2) : 0;
+    const dilution = root && fl.dilutionFactor ? { from: root.name, factor: fl.dilutionFactor, stockUL: stockPart, solventUL: +(stockPart * (fl.dilutionFactor - 1)).toPrecision(4),
+      levels: (meta.experiment?.stockNotes || []).filter((n) => n.fluid === fl.name).flatMap((n) => n.levels) } : null;
+    return { name: f.name, stock, dispensedUL: round(f.dispensed, 2), loadUL: round(f.load, 1), heads: f.heads.length, prepareUL: prep, massMg: root ? null : massMg != null ? +massMg.toPrecision(3) : null, dilution };
   });
   // cells
   const c = spec.cells || {};
@@ -145,6 +172,8 @@ export function makePlan(protocol, meta, spec = {}) {
     maxDmsoPct: round(maxDmso * 100, 4), maxDmsoScrapPct: round(maxDmsoScrap * 100, 4), unusedInnerWells: unused,
     vehicleDmsoPct: vehicleDmsoByBlock(protocol, meta, computed),
     doses: doseLevels(protocol, { skip: scrapTest(protocol, meta, wellRole) }),
+    stockNotes: meta.experiment?.stockNotes || [],
+    randomized: protocol.plates.map((p, i) => (p.randomization?.length ? i + 1 : null)).filter(Boolean),
     warnings: Object.entries(byCode).map(([code, list]) => ({ code, count: list.length, examples: list.slice(0, 8).map((x) => `P${x.plate} ${x.well}${x.fluid ? ' ' + x.fluid : ''}`) })),
     priming,
   };
@@ -177,6 +206,8 @@ export function planMarkdown(plan, { files = [] } = {}) {
     for (const p of plan.priming) L.push(`- Plate ${p.plate}: no well with ≥ 30 nL of ${p.fluids.join(', ')} (add a scrap well)`);
     L.push('');
   } else L.push('✓ No dispense warnings: every well is within the DMSO limit and above the smallest drop.', '');
+  for (const n of plan.stockNotes || []) if (n.kind === 'impossible') L.push(`⚠ ${n.drug}: ${n.levels.length} level(s) stay below one drop even with a 1:9000 dilution (${n.levels.map(fmtLevel).join(', ')}); they are flagged. Use a lower stock.`, '');
+  if (plan.randomized && plan.randomized.length) L.push(`Plate${plan.randomized.length > 1 ? 's' : ''} ${plan.randomized.join(', ')} ${plan.randomized.length > 1 ? 'are' : 'is'} **randomized within each cell line**: the D300e dispenses each design well into another well of the same cell line (stored in the .tdd). Paste readouts as read from the plate; Tecan D300 Craft maps them back. Do not re-randomize in D300e Control (it would mix the cell lines).`, '');
   L.push('## Layout', '', '| Plates | Design | Cell line(s) | Grid |', '|---|---|---|---|');
   for (const b of plan.blocks) L.push(`| ${b.plates.join(', ')} | ${b.name} | ${b.cellLine || '–'} | ${b.region.join(' and ')} |`);
   for (const b of plan.blocks) {
@@ -194,7 +225,9 @@ export function planMarkdown(plan, { files = [] } = {}) {
     L.push('');
   }
   L.push('## 1. Prepare the drug stocks', '', '| Drug | Stock | Dispensed | Load into heads | Prepare | Powder per 1 mL stock |', '|---|---|---|---|---|---|');
-  for (const d of plan.prepare) L.push(`| ${d.name} | ${d.stock} | ${d.dispensedUL} µL | ${d.loadUL.toFixed(1)} µL (${d.heads} head${d.heads > 1 ? 's' : ''}) | **${d.prepareUL} µL** | ${d.massMg == null ? '–' : d.massMg < 0.1 ? +(d.massMg * 1000).toPrecision(3) + ' µg' : d.massMg + ' mg'} |`);
+  for (const d of plan.prepare) L.push(`| ${d.name} | ${d.stock} | ${d.dispensedUL} µL | ${d.loadUL.toFixed(1)} µL (${d.heads} head${d.heads > 1 ? 's' : ''}) | **${d.prepareUL} µL**${d.dilution ? ` (mix ${d.dilution.stockUL} µL ${d.dilution.from} stock + ${d.dilution.solventUL} µL solvent = 1:${d.dilution.factor})` : ''} | ${d.massMg == null ? '–' : d.massMg < 0.1 ? +(d.massMg * 1000).toPrecision(3) + ' µg' : d.massMg + ' mg'} |`);
+  const dil = plan.prepare.filter((d) => d.dilution);
+  if (dil.length) L.push('', `Diluted stocks (D300e "fluid shift / extend"): ${dil.map((d) => `**${d.name}** = ${d.dilution.from} 1:${d.dilution.factor}${d.dilution.levels.length ? ` (dispenses ${d.dilution.levels.map(fmtLevel).join(', ')} µM)` : ''}`).join('; ')}. These levels need less than one drop (13 pL for DMSO) of the original stock, so the D300e dispenses them from a second, diluted stock in its own dispense head. Make it in the same solvent as the stock (DMSO for DMSO stocks).`);
   L.push('', '"Dispensed" includes the priming (scrap) wells. "Prepare" = what the heads take + 10 % + 2 µL for pipetting; take it from your stock. "Powder per 1 mL" only if you make the stock fresh (needs a molecular weight).', '');
   L.push('## 2. Seed the cells', '');
   if (plan.seeding.length) {

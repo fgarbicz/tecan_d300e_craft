@@ -16,7 +16,7 @@
 
 import { wellKey, wellName } from './tdd.js';
 import { wellRole } from './experiment.js';
-import { computeProtocol, unitKind, toDisplay, unitLabel } from './dispense.js';
+import { computeProtocol, unitKind, toDisplay, unitLabel, compounds } from './dispense.js';
 
 // ---------- row labels ----------
 /** Row letters as used by wellName(): A..Z, then AA, AB … (1536 plates). */
@@ -288,7 +288,11 @@ function stats(xs) {
  */
 export function analyze({ protocol, computed, meta, options = {} }) {
   const comp = computed || computeProtocol(protocol);
-  const fluids = protocol.fluids.map((f) => ({ id: f.id, name: f.name, unit: fluidUnit(f) }));
+  // one column per compound: a diluted stock (fluid shift/extend) counts as its root drug
+  const cmp = compounds(protocol.fluids);
+  const fluids = cmp.roots.map((f) => ({ id: f.id, name: f.name, unit: fluidUnit(f) }));
+  const col = new Map(cmp.roots.map((f, i) => [f.id, i]));
+  const concOf = (req) => { const v = fluids.map(() => 0); if (req) for (const [id, x] of req) { const i = col.get(cmp.rootOf(id)); if (i != null && finite(x) != null) v[i] += x; } return v; };
   const clName = new Map((meta.cellLines || []).map((c) => [c.id, c.name]));
   const clOrder = new Map((meta.cellLines || []).map((c, i) => [c.id, i]));
   const warnings = [];
@@ -306,19 +310,22 @@ export function analyze({ protocol, computed, meta, options = {} }) {
       return;
     }
     const pw = [];
+    const rnd = new Map((plate.randomization || []).map((m) => [wellKey(m.r, m.c), [m.toR, m.toC]]));
+    const disp = (r, c) => rnd.get(wellKey(r, c)) || [r, c];
     for (let r = 0; r < plate.rows; r++) for (let c = 0; c < plate.cols; c++) {
       const k = wellKey(r, c);
       const req = plate.wells.get(k);
       const role = wellRole(meta, plate, pi, r, c);
-      const cellLineId = pm.cellLines?.[k] ?? null;
+      const cellLineId = pm.cellLines?.[wellKey(...disp(r, c))] ?? null; // cells are where they were seeded
       const cw = comp?.[pi]?.wells?.get(k);
       pw.push({
         plate: pi + 1, plateIndex: pi, plateName: plate.name || '', well: wellName(r, c), row: rowLabel(r), col: c + 1, r, c,
         role, cellLineId, cellLine: cellLineId ? (clName.get(cellLineId) ?? cellLineId) : '',
-        conc: protocol.fluids.map((f) => finite(req?.get(f.id)) ?? 0),
+        conc: concOf(req),
         // a well the dispenser never touches holds no DMSO; a well the engine could not compute: unknown
         dmsoPct: !cw ? 0 : finite(cw.dmsoFraction) == null ? null : cw.dmsoFraction * 100,
-        raw: finite(values[r][c]), background: null, vehicleMean: null, viability: null, note: '',
+        // randomized plates: the design well's drugs were dispensed into another well, where its signal is read
+        raw: finite(values[disp(r, c)[0]][disp(r, c)[1]]), background: null, vehicleMean: null, viability: null, note: '',
       });
     }
     const blanks = pw.filter((w) => w.role === 'blank' && w.raw != null).map((w) => w.raw);

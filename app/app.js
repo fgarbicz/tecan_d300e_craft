@@ -7,6 +7,7 @@ import { computeProtocol, validRange, fluidTotals, primingIssues, scrapWellValue
 import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid,
   buildSynergy, synergyLevels, TITRATION_PATTERNS, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate,
   copyWells, pasteWells, copyNormalization, pasteNormalization } from '../src/ops.js';
+import { randomizeByCellLine } from '../src/experiment.js';
 import { newMeta, reconcileMeta, serializeMeta, parseMeta, sidecarName, wellRole, assignCellLine, setRole, addCellLine, removeCellLine, ROLE_LABEL,
   metaAddPlate, metaRemovePlate, metaReplicatePlate, metaClearPlate, metaCopyWells, metaPasteWells, isBorder } from '../src/experiment.js';
 import { planRun } from '../src/cassette.js';
@@ -734,6 +735,9 @@ function renderAnnotate(el) {
     <p class="hint" id="aSel"></p>
     <div class="actions"><button id="aAssign" class="primary">${icon('cells', 15)} Assign to selection</button><button id="aAssignAll" title="Every well inside the border on this plate">Whole plate</button><button id="aClear">Clear</button></div>
     <div class="actions"><button id="aAllPlates" title="Copy this plate's cell-line map to every plate">${icon('dup', 15)} Same layout on all plates</button></div>
+    <h3>${icon('cells', 16)} Randomize</h3>
+    <p class="hint">Shuffle where each design well is dispensed, only among the wells of the same cell line (cells stay where you seed them). Stored in the .tdd as D300e's plate randomization; readouts pasted as read are mapped back. ${plate().randomization?.length ? `<b>This plate is randomized (${plate().randomization.length} wells).</b>` : ''}</p>
+    <div class="actions"><button id="aRand">Randomize this plate</button><button id="aRandAll">All plates</button><button id="aRandOff" ${plate().randomization?.length ? '' : 'disabled'}>Remove</button></div>
     <h3>${icon('tag', 16)} Well roles</h3>
     <p class="hint">Treated and vehicle (cells, no drug) are worked out automatically. Mark the rest:</p>
     <div class="actions" style="flex-wrap:wrap">
@@ -758,6 +762,15 @@ function renderAnnotate(el) {
     if (!(await ask(`Copy plate ${S.plateIdx + 1}'s cell-line map to all ${S.protocol.plates.length} plates (replacing theirs)?`, 'Copy'))) return;
     mutate('cell lines on all plates', () => { const src = S.meta.plates[S.plateIdx].cellLines; S.meta.plates.forEach((pm, i) => { if (i !== S.plateIdx) pm.cellLines = { ...src }; }); });
   };
+  const randomize = (idx, label) => {
+    const lacking = idx.filter((i) => !Object.keys(S.meta.plates[i]?.cellLines || {}).length);
+    if (lacking.length === idx.length) return toast('Assign cell lines first: wells are shuffled within each cell line');
+    mutate(label, () => randomizeByCellLine(S.protocol, S.meta, idx));
+    toast(`Randomized ${idx.length - lacking.length} plate(s) within each cell line${lacking.length ? `; ${lacking.length} without cell lines left as they are` : ''}`);
+  };
+  $('aRand').onclick = () => randomize([S.plateIdx], 'randomize plate');
+  $('aRandAll').onclick = () => randomize(S.protocol.plates.map((_, i) => i), 'randomize all plates');
+  $('aRandOff').onclick = () => mutate('remove randomization', () => { plate().randomization = []; });
   for (const b of el.querySelectorAll('[data-role]')) b.onclick = () => { if (!S.sel.size) return toast('Select wells first'); mutate('set role', () => setRole(S.meta, S.plateIdx, selectedCells(), b.dataset.role || null)); if (S.layer === 'drugs') { S.layer = 'roles'; render(); } };
   panelUpdate = () => { $('aSel').textContent = selCount(); $('aAssign').disabled = $('aClear').disabled = !S.sel.size || !S.meta.cellLines.length; $('aAssignAll').disabled = $('aAllPlates').disabled = !S.meta.cellLines.length; };
 }

@@ -48,7 +48,7 @@ test('experiment wizard rebuilds the hand-made D3 protocol byte for byte', () =>
 
 test('wizard refuses a grid that does not fit inside the border', () => {
   const p = parseTdd(D3);
-  assert.throws(() => buildExperiment({ ...D3_SPEC, primary: { ...D3_SPEC.primary, levels: 11 } }, p.fluids), /needs 24 columns; only 22 fit/);
+  assert.throws(() => buildExperiment({ ...D3_SPEC, primary: { ...D3_SPEC.primary, levels: 11 } }, p.fluids), /needs 24 columns \(11 levels \+ 0 × 2 replicates\); only 22 fit inside the border\. Fits: 10 levels \+ 0 × 2 replicates/);
 });
 
 test('sidecar round-trip and stale detection', () => {

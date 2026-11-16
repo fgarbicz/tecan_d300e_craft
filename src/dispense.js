@@ -513,3 +513,15 @@ export function scrapWellValues(fluids, plate, volume = PRIMING_VOLUME) {
     return [f.id, Math.ceil(exact / mag - 1e-9) * mag];
   });
 }
+
+/**
+ * Compounds: a diluted stock made by fluid shift/extend ("Drug - 1:30", RootFluidID = the original fluid) is the
+ * same compound as its root. Returns { roots: [fluid], rootOf(id) → root fluid id }. Requested well values are
+ * concentrations in the well, so the stock and its dilution add up on one compound axis.
+ */
+export function compounds(fluids) {
+  const byId = new Map(fluids.map((f) => [f.id, f]));
+  const rootId = (f) => { let x = f; for (let i = 0; i < 20 && x.rootFluidId != null && byId.has(x.rootFluidId) && x.rootFluidId !== x.id; i++) x = byId.get(x.rootFluidId); return x.id; };
+  const map = new Map(fluids.map((f) => [f.id, rootId(f)]));
+  return { roots: fluids.filter((f) => map.get(f.id) === f.id), rootOf: (id) => map.get(id) ?? id };
+}

@@ -8,7 +8,7 @@
 // therefore shows one gradient across the columns (left halves) and one down the rows (right halves).
 
 import { wellKey, wellName } from './tdd.js';
-import { unitKind, unitLabel, scrapWellValues } from './dispense.js';
+import { unitKind, unitLabel, scrapWellValues, compounds } from './dispense.js';
 
 export const DRUG_PALETTE = ['#2f6fde', '#d9480f', '#2b8a3e', '#ae3ec9', '#e8590c', '#1098ad', '#c2255c', '#5c940d', '#f08c00', '#3b5bdb', '#862e9c', '#0b7285'];
 export const fluidColor = (f) => DRUG_PALETTE[((f.id % DRUG_PALETTE.length) + DRUG_PALETTE.length) % DRUG_PALETTE.length];
@@ -66,24 +66,28 @@ function distinct(values) {
  * the darkest step.
  */
 export function drugScales(protocol, { plateIdx = null, skip = null } = {}) {
+  // one scale per compound: a diluted stock (fluid shift/extend, RootFluidID) shares its root drug's scale
+  const { roots, rootOf } = compounds(protocol.fluids);
   const vals = new Map(), plates = new Map();
   protocol.plates.forEach((p, pi) => {
     if (plateIdx != null && pi !== plateIdx) return;
-    for (const [key, m] of p.wells) for (const [id, v] of m) {
+    for (const [key, m] of p.wells) for (const [fid, v] of m) {
       if (skip && skip(pi, key)) continue;
       if (!(v > 0) || !Number.isFinite(v)) continue;
+      const id = rootOf(fid);
       if (!vals.has(id)) { vals.set(id, []); plates.set(id, new Set()); }
       vals.get(id).push(v); plates.get(id).add(pi);
     }
   });
   const out = new Map();
-  for (const f of protocol.fluids) {
+  for (const f of roots) {
     if (!vals.has(f.id)) continue;
     const levels = distinct(vals.get(f.id)), min = levels[0], max = levels[levels.length - 1];
     const lmin = Math.log(min), span = Math.log(max) - lmin;
     const t = (v) => (span > 0 ? Math.max(0, Math.min(1, (Math.log(v) - lmin) / span)) : 1);
     const color = fluidColor(f);
-    out.set(f.id, { fluid: f, color, unit: wellUnitOf(protocol, f), levels, min, max, t, colorOf: (v) => rampColor(color, t(v)), plates: plates.get(f.id) });
+    const ids = protocol.fluids.filter((x) => rootOf(x.id) === f.id).map((x) => x.id);
+    out.set(f.id, { fluid: f, ids, color, unit: wellUnitOf(protocol, f), levels, min, max, t, colorOf: (v) => rampColor(color, t(v)), plates: plates.get(f.id) });
   }
   return out;
 }
@@ -93,8 +97,8 @@ export function wellDoses(m, scales, onlyId = null) {
   if (!m || !m.size) return [];
   const out = [];
   for (const [id, sc] of scales) {
-    if (onlyId != null && id !== onlyId) continue;
-    const v = m.get(id);
+    if (onlyId != null && id !== onlyId && !(sc.ids || []).includes(onlyId)) continue;
+    let v = 0; for (const x of sc.ids || [id]) if (m.get(x) > 0) v += m.get(x);
     if (v > 0) out.push({ id, v, color: sc.colorOf(v) });
   }
   return out;

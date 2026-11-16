@@ -17,7 +17,17 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
    - design: the primary drug (along the columns) and partner drug(s) (along the rows, each its own plate set):
      top concentration, dilution step (any of "1:3", "1.5", "÷2", "×0.667", "-33%"; "1:0.33" = remove a third),
      number of non-zero levels, replicates (adjacent wells), include 0 (default yes: gives single agents and
-     vehicle). A single-drug dose response = a partner with `"drug": null` and `replicates` = rows;
+     vehicle). Instead of a dilution step, give `"bottom"` (lowest concentration, e.g. "0.1 nM"): the levels then
+     run evenly on a log scale from top to bottom (step = (top/bottom)^(1/(levels−1))). Never both.
+     A single-drug dose response = a partner with `"drug": null` and `replicates` = rows;
+   - wide ranges: `plate.dilutedStocks` (default true) adds a second stock "Drug - 1:N" when a series needs less
+     than one drop (13 pL DMSO) of the stock — D300e's fluid shift (whole series on the dilution) / extend
+     (stock for the high levels, dilution for the low ones). The plan lists it under "Prepare" with a recipe
+     and the levels it dispenses; it is one more solution and one more dispense head. Dilution choice INFERRED
+     from the user guide's two examples (not yet checked against D300e Control);
+   - randomization: `plate.randomize: "cellLine"` (+ optional `randomSeed`) shuffles where each well is
+     dispensed, only within the wells of the same cell line, stored in the .tdd; needs `cells.lines`.
+     Readouts are pasted as read; the app maps them back. Tell the user not to re-randomize in D300e Control;
    - replicates: in `primary` = adjacent columns per level, in a partner = adjacent rows per level;
      `plate.replicates` = identical plates per layout;
    - plates: type (384 default), `wellVolumeUL` = what is in the well when the D300e prints (medium + cells;
@@ -40,7 +50,8 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
 3. **Run** from the repo: `bin/d300craft design experiments/<dir>/spec.json --out experiments/<dir>`
    It writes `<name>.tdd`, `<name>.craft.json`, `<name>_plan.md`, `<name>_plan.json`, `<name>_dosemap.svg`
    (colour map of every drug's concentration gradient on every plate) and prints the plan.
-   Errors (grid does not fit, unknown drug, bad unit) are plain sentences: fix the spec or ask the user.
+   Errors (grid does not fit, unknown drug, bad unit) are plain sentences; "does not fit" names what would fit
+   (fewer levels, fewer replicates per plate, no border): fix the spec or ask the user.
 
 4. **Check the plan before presenting it.** If it lists warnings (DMSO over the limit, below the smallest drop,
    missing priming wells), propose a concrete fix (lower top concentration, a diluted stock as a second fluid,
