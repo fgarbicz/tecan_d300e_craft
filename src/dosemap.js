@@ -8,7 +8,7 @@
 // therefore shows one gradient across the columns (left halves) and one down the rows (right halves).
 
 import { wellKey, wellName } from './tdd.js';
-import { unitKind, unitLabel, scrapWellValues, compounds } from './dispense.js';
+import { unitKind, unitLabel, scrapWellValues, compounds, toDisplay } from './dispense.js';
 
 export const DRUG_PALETTE = ['#2f6fde', '#d9480f', '#2b8a3e', '#ae3ec9', '#e8590c', '#1098ad', '#c2255c', '#5c940d', '#f08c00', '#3b5bdb', '#862e9c', '#0b7285'];
 export const fluidColor = (f) => DRUG_PALETTE[((f.id % DRUG_PALETTE.length) + DRUG_PALETTE.length) % DRUG_PALETTE.length];
@@ -65,7 +65,7 @@ function distinct(values) {
  * use up a dispense head would otherwise squeeze the real series into the pale end). Their colour clamps to
  * the darkest step.
  */
-export function drugScales(protocol, { plateIdx = null, skip = null } = {}) {
+export function drugScales(protocol, { plateIdx = null, skip = null, unitOf = null } = {}) {
   // one scale per compound: a diluted stock (fluid shift/extend, RootFluidID) shares its root drug's scale
   const { roots, rootOf } = compounds(protocol.fluids);
   const vals = new Map(), plates = new Map();
@@ -87,7 +87,7 @@ export function drugScales(protocol, { plateIdx = null, skip = null } = {}) {
     const t = (v) => (span > 0 ? Math.max(0, Math.min(1, (Math.log(v) - lmin) / span)) : 1);
     const color = fluidColor(f);
     const ids = protocol.fluids.filter((x) => rootOf(x.id) === f.id).map((x) => x.id);
-    out.set(f.id, { fluid: f, ids, color, unit: wellUnitOf(protocol, f), levels, min, max, t, colorOf: (v) => rampColor(color, t(v)), plates: plates.get(f.id) });
+    out.set(f.id, { fluid: f, ids, color, unit: unitOf ? unitOf(f) : wellUnitOf(protocol, f), levels, min, max, t, colorOf: (v) => rampColor(color, t(v)), plates: plates.get(f.id) });
   }
   return out;
 }
@@ -134,10 +134,11 @@ function wellSvg(cx, cy, r, colors) {
  * opts: { title, plates: [indices] (default all), roleOf(pi, r, c) → experiment role ('pbs' wells tinted,
  *   'vehicle' wells dotted) }
  */
-export function doseMapSvg(protocol, { title = 'Dose map', plates = null, roleOf = null } = {}) {
+export function doseMapSvg(protocol, { title = 'Dose map', plates = null, roleOf = null, unitOf = null } = {}) {
   // marked scrap in the experiment file, or (plates with none marked) recognised by the priming-value signature
   const isScrap = scrapTestFromRoles(protocol, roleOf);
-  const scales = drugScales(protocol, { skip: isScrap });
+  const scales = drugScales(protocol, { skip: isScrap, unitOf });
+  const inUnit = (sc, v) => toDisplay(v, sc.unit); // levels are printed in the drug's display unit
   const idx = (plates || protocol.plates.map((_, i) => i)).filter((i) => protocol.plates[i]);
   const maxCols = Math.max(...idx.map((i) => protocol.plates[i].cols), 1), maxRows = Math.max(...idx.map((i) => protocol.plates[i].rows), 1);
   const cell = maxCols > 24 ? 5 : maxCols > 12 ? 9 : 15, r = cell * 0.42;
@@ -194,7 +195,7 @@ export function doseMapSvg(protocol, { title = 'Dose map', plates = null, roleOf
     sc.levels.forEach((v, i) => {
       const tx = bx + sc.t(v) * barW;
       s += `<line x1="${tx.toFixed(1)}" y1="${ly + 14}" x2="${tx.toFixed(1)}" y2="${ly + 19}" stroke="#1d2433" stroke-width="0.8"/>`;
-      if (i % every === 0 || i === sc.levels.length - 1) s += `<text x="${tx.toFixed(1)}" y="${ly + 30}" font-size="9" text-anchor="middle" fill="#333">${short(v)}</text>`;
+      if (i % every === 0 || i === sc.levels.length - 1) s += `<text x="${tx.toFixed(1)}" y="${ly + 30}" font-size="9" text-anchor="middle" fill="#333">${short(inUnit(sc, v))}</text>`;
     });
     ly += legendRowH;
   }
@@ -203,10 +204,10 @@ export function doseMapSvg(protocol, { title = 'Dose map', plates = null, roleOf
 }
 
 /** The gradients as data (for the plan / Claude): [{ drug, unit, levels, min, max, foldRange, plates (1-based) }]. */
-export function doseLevels(protocol, { skip = scrapBySignature(protocol) } = {}) {
-  return [...drugScales(protocol, { skip }).values()].map((sc) => ({
-    drug: sc.fluid.name || `Fluid ${sc.fluid.id}`, unit: unitLabel(sc.unit), levels: sc.levels.map((v) => +v.toPrecision(4)),
-    min: +sc.min.toPrecision(4), max: +sc.max.toPrecision(4), foldRange: +(sc.max / sc.min).toPrecision(3), plates: [...sc.plates].sort((a, b) => a - b).map((p) => p + 1) }));
+export function doseLevels(protocol, { skip = scrapBySignature(protocol), unitOf = null } = {}) {
+  return [...drugScales(protocol, { skip, unitOf }).values()].map((sc) => ({
+    drug: sc.fluid.name || `Fluid ${sc.fluid.id}`, unit: unitLabel(sc.unit), levels: sc.levels.map((v) => +toDisplay(v, sc.unit).toPrecision(4)),
+    min: +toDisplay(sc.min, sc.unit).toPrecision(4), max: +toDisplay(sc.max, sc.unit).toPrecision(4), foldRange: +(sc.max / sc.min).toPrecision(3), plates: [...sc.plates].sort((a, b) => a - b).map((p) => p + 1) }));
 }
 /** Plain-text summary of the gradients: one line per drug. */
 export function doseSummary(protocol, opts = {}) {

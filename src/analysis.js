@@ -17,6 +17,7 @@
 import { wellKey, wellName } from './tdd.js';
 import { wellRole } from './experiment.js';
 import { computeProtocol, unitKind, toDisplay, unitLabel, compounds } from './dispense.js';
+import { drugUnit } from './units.js';
 
 // ---------- row labels ----------
 /** Row letters as used by wellName(): A..Z, then AA, AB … (1536 plates). */
@@ -290,9 +291,10 @@ export function analyze({ protocol, computed, meta, options = {} }) {
   const comp = computed || computeProtocol(protocol);
   // one column per compound: a diluted stock (fluid shift/extend) counts as its root drug
   const cmp = compounds(protocol.fluids);
-  const fluids = cmp.roots.map((f) => ({ id: f.id, name: f.name, unit: fluidUnit(f) }));
+  // concentrations are reported in each drug's display unit (experiment file: meta.drugUnits; default µM / ng/mL)
+  const fluids = cmp.roots.map((f) => { const u = f.byVol ? null : drugUnit(meta, protocol, f); return { id: f.id, name: f.name, unit: u ? unitLabel(u) : fluidUnit(f), scale: u ? toDisplay(1, u) : 1 }; });
   const col = new Map(cmp.roots.map((f, i) => [f.id, i]));
-  const concOf = (req) => { const v = fluids.map(() => 0); if (req) for (const [id, x] of req) { const i = col.get(cmp.rootOf(id)); if (i != null && finite(x) != null) v[i] += x; } return v; };
+  const concOf = (req) => { const v = fluids.map(() => 0); if (req) for (const [id, x] of req) { const i = col.get(cmp.rootOf(id)); if (i != null && finite(x) != null) v[i] += x * fluids[i].scale; } return v; };
   const clName = new Map((meta.cellLines || []).map((c) => [c.id, c.name]));
   const clOrder = new Map((meta.cellLines || []).map((c, i) => [c.id, i]));
   const warnings = [];
