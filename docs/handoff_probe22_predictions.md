@@ -169,3 +169,12 @@ Dispense rows: the engine as committed (maxTotalTopUp); compare with tools/compa
   exact. The model's target, the three-step top-up and its two switches held on all three unseen groups.
 - Still open, all on the 20 µL plate: E12, H3, G23 (top-ups 0.012–0.025 steps from a tie, both directions),
   E14 (fluid 0.046 steps), I15 (one more iteration step fits; one well).
+
+## probe-31 (blind; "'% of assay volume' heads are planned from the next-step top-ups", fitted on probe-25 head 4)
+Three plates; per plate the dispensed top-ups sum to 193.9588 / 197.1452 / 190.7504 µL and the next-step ones to
+194.0075 / 197.2078 / 190.8079 µL (ties at 194.0, 197.2, 190.8).
+```
+D4+ pc1:172.0936→230  DMSO normalization:194.0075→258  DMSO normalization:197.2078→262  pc1:82.2260→118
+D4+ DMSO normalization:190.8079→254
+   (planned from the dispensed volumes instead: 257, 261, 253)
+```
