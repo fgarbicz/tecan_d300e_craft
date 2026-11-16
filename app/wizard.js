@@ -3,7 +3,7 @@
 // src/experiment.js, which is tested to rebuild the hand-made D3 protocol byte for byte.
 
 import { newProtocol, wellKey } from '../src/tdd.js';
-import { PLATE_TYPES, addFluid, titrationLevels } from '../src/ops.js';
+import { PLATE_TYPES, addFluid, titrationLevels, parseDilution } from '../src/ops.js';
 import { computeProtocol, validRange, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitLabel, fromDisplay, toDisplay } from '../src/dispense.js';
 import { buildExperiment, applyExperiment, newMeta, addCellLine, assignCellLine, isBorder } from '../src/experiment.js';
 import { planRun } from '../src/cassette.js';
@@ -89,17 +89,17 @@ function draw(ctx) {
     const dm = dims(), inner = { rows: dm.rows - 2 * W.border, cols: dm.cols - 2 * W.border };
     const axis = (o, prefix, withNone) => `<select data-a="drug" data-p="${prefix}">${drugOpts(o.drug, withNone)}</select>
       <input data-a="high" data-p="${prefix}" type="number" step="any" value="${o.high}" placeholder="top">
-      <input data-a="factor" data-p="${prefix}" type="number" step="any" min="1.01" value="${o.factor}">
+      <input data-a="factor" data-p="${prefix}" value="${o.factor}" title="Any step: 1:3, 1.5, ÷2, ×0.667, −33 %, 1:0.33 (= remove a third)">
       <input data-a="levels" data-p="${prefix}" type="number" min="0" value="${o.levels}">
       <input data-a="reps" data-p="${prefix}" type="number" min="1" value="${o.reps}">
       <label class="chk"><input data-a="zero" data-p="${prefix}" type="checkbox" ${o.zero ? 'checked' : ''}> 0</label>`;
     b.innerHTML = `<p>The <b>primary drug</b> runs along the columns; each <b>partner</b> runs along the rows and gets its own set of ${W.reps} plate${W.reps > 1 ? 's' : ''}. Replicates sit next to each other. Inside the border there are <b>${inner.rows} rows × ${inner.cols} columns</b>.</p>
-      <div class="wz-row head"><span>Drug</span><span>Top conc. (µM)</span><span>Dilution 1:N</span><span>Levels</span><span>Replicates</span><span>Add 0</span><span>Normalization</span><span></span></div>
+      <div class="wz-row head"><span>Drug</span><span>Top conc. (µM)</span><span>Dilution step</span><span>Levels</span><span>Replicates</span><span>Add 0</span><span>Normalization</span><span></span></div>
       <div class="wz-row">${axis(W.primary, 'p', false)}<span class="muted">columns</span><span></span></div>
       <div class="wz-levels" id="lv_p"></div>
       ${W.partners.map((o, i) => `<div class="wz-row">${axis(o, i, true)}<select data-a="norm" data-p="${i}">${Object.entries(NORM).map(([k, v]) => `<option value="${k}" ${o.norm === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select><button class="small icon-only" data-delp="${i}" title="Remove">${icon('trash', 14)}</button></div><div class="wz-levels" id="lv_${i}"></div>`).join('')}
       <p><button id="w_addP" class="small">${icon('plus', 14)} Add partner drug</button></p>
-      <p class="hint">"Add 0" adds a no-drug level, so the matrix contains each drug alone and the vehicle control (both 0). Levels: top, top/N, top/N², … Concentrations in µM for molar stocks.</p>`;
+      <p class="hint">Dilution step: 1:3 divides by 3 per level; 1.5 or 1:0.33 (remove a third) gives 10 → 6.67 → 4.44 µM. "Add 0" adds a no-drug level, so the matrix contains each drug alone and the vehicle control (both 0). Levels: top, top/N, top/N², … Concentrations in µM for molar stocks.</p>`;
     $w('w_addP').onclick = () => { save(); W.partners.push({ drug: Math.min(W.partners.length + 1, W.drugs.length - 1), high: '', factor: 2, levels: 6, zero: true, reps: 2, norm: 'block' }); draw(ctx); };
     for (const x of b.querySelectorAll('[data-delp]')) x.onclick = () => { save(); W.partners.splice(+x.dataset.delp, 1); draw(ctx); };
     const upd = () => { save(); levelsPreview(ctx); };
@@ -110,9 +110,16 @@ function draw(ctx) {
       <label>Arrangement</label><select id="w_cellMode">
         <option value="same" ${W.cellMode === 'same' ? 'selected' : ''}>One cell line on every plate (the first one)</option>
         <option value="perLine" ${W.cellMode === 'perLine' ? 'selected' : ''}>Each cell line gets its own plates (plates × cell lines)</option>
+        <option value="splitRows" ${W.cellMode === 'splitRows' ? 'selected' : ''}>Two cell lines per plate: top half / bottom half</option>
+        <option value="splitCols" ${W.cellMode === 'splitCols' ? 'selected' : ''}>Two cell lines per plate: left half / right half</option>
         <option value="none" ${W.cellMode === 'none' ? 'selected' : ''}>Assign later (Annotate tab)</option></select></div>
       <p class="hint" id="w_cellInfo"></p>`;
-    const info = () => { save(); const n = splitNames(W.cellLines).length; $w('w_cellInfo').textContent = W.cellMode === 'perLine' ? `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicates × ${Math.max(1, n)} cell lines = ${W.partners.length * W.reps * Math.max(1, n)} plates` : `${W.partners.length * W.reps} plates`; };
+    const info = () => {
+      save(); const n = Math.max(1, splitNames(W.cellLines).length), split = W.cellMode.startsWith('split');
+      const sets = W.cellMode === 'perLine' ? n : split ? Math.ceil(n / 2) : 1;
+      $w('w_cellInfo').textContent = `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''} = ${W.partners.length * W.reps * sets} plates.`
+        + (split ? ' Each half gets the same drug layout, so it must fit in half the plate (check the Layout step).' : '');
+    };
     b.oninput = info; info();
   } else if (W.step === 4) {
     let pv;
@@ -146,14 +153,14 @@ function save() {
   } else if (W.step === 2) {
     for (const el of document.querySelectorAll('#wzBody [data-a]')) {
       const o = el.dataset.p === 'p' ? W.primary : W.partners[+el.dataset.p]; const k = el.dataset.a;
-      o[k] = k === 'zero' ? el.checked : k === 'norm' ? el.value : k === 'high' ? el.value : +el.value;
+      o[k] = k === 'zero' ? el.checked : k === 'norm' || k === 'high' || k === 'factor' ? el.value : +el.value;
     }
   } else if (W.step === 3 && $w('w_cells')) { W.cellLines = v('w_cells'); W.cellMode = v('w_cellMode'); }
 }
 
 function levelsFor(o) {
   const high = +o.high;
-  const lv = o.levels > 0 && high > 0 ? titrationLevels({ mode: 'high', distribution: 'dilution', high, factor: +o.factor, levels: Math.floor(o.levels) }) : [];
+  const lv = o.levels > 0 && high > 0 ? titrationLevels({ mode: 'high', distribution: 'dilution', high, factor: parseDilution(o.factor).factor, levels: Math.floor(o.levels) }) : [];
   return o.zero ? [...lv, 0] : lv;
 }
 function levelsPreview(ctx) {
@@ -167,7 +174,7 @@ function levelsPreview(ctx) {
       const x = W.drugs[o.drug]; const fl = x && { concentration: fromDisplay(x.stock, x.unit), concentrationUnit: x.unit, classId: x.classId, byVol: false };
       const rg = fl && fl.concentration > 0 ? validRange(fl, plateLike, 2) : null;
       const bad = rg ? lv.filter((v) => v && (v < rg.min || v > rg.max)).length : 0;
-      el.innerHTML = `${lv.map((v) => ctx.fmt(v, 3)).join(' · ')} → <b style="color:${n > axisLen ? 'var(--danger)' : 'inherit'}">${n} ${axisName}</b> of ${axisLen}${rg ? ` · valid ${ctx.fmt(rg.min, 2)}–${ctx.fmt(rg.max, 2)}${bad ? ` <span style="color:var(--warn)">(${bad} outside)</span>` : ''}` : ''}`;
+      el.innerHTML = `<span class="pill">${parseDilution(o.factor).label}</span> ${lv.map((v) => ctx.fmt(v, 3)).join(' · ')} → <b style="color:${n > axisLen ? 'var(--danger)' : 'inherit'}">${n} ${axisName}</b> of ${axisLen}${rg ? ` · valid ${ctx.fmt(rg.min, 2)}–${ctx.fmt(rg.max, 2)}${bad ? ` <span style="color:var(--warn)">(${bad} outside)</span>` : ''}` : ''}`;
     } catch (e) { el.textContent = o.high ? e.message : 'Enter the top concentration'; }
   };
   show(W.primary, $w('lv_p'), inner.cols, 'columns');
@@ -207,7 +214,7 @@ function preview(ctx) {
     if (ex) return ex.id;
     return addFluid(protocol, { name: d.name.trim(), concentration: fromDisplay(d.stock, d.unit), concentrationUnit: d.unit, classId: d.classId }).id;
   });
-  const axis = (o) => ({ fluidId: o.drug === -1 ? null : ids[o.drug], high: +o.high, factor: +o.factor, levels: o.drug === -1 ? 0 : Math.floor(o.levels), includeZero: o.drug === -1 ? true : o.zero, replicates: Math.max(1, Math.floor(o.reps)) });
+  const axis = (o) => ({ fluidId: o.drug === -1 ? null : ids[o.drug], high: +o.high, factor: o.drug === -1 ? 2 : parseDilution(o.factor).factor, levels: o.drug === -1 ? 0 : Math.floor(o.levels), includeZero: o.drug === -1 ? true : o.zero, replicates: Math.max(1, Math.floor(o.reps)) });
   const spec = {
     plate: { plateType: W.plateType, assayVolume: W.assayUL * 1000, dmsoLimit: W.dmsoPct / 100, dontShake: W.dontShake },
     border: W.border, plateReplicates: W.reps, scrap: W.scrap,
@@ -217,18 +224,28 @@ function preview(ctx) {
   const first = protocol.plates.length;
   const names = splitNames(W.cellLines);
   const lines = names.map((n) => meta.cellLines.find((c) => c.name === n) || addCellLine(meta, n));
-  const sets = W.cellMode === 'perLine' && lines.length ? lines : [W.cellMode === 'none' ? null : lines[0] || null];
-  for (const cl of sets) {
+  const split = W.cellMode === 'splitRows' ? 'rows' : W.cellMode === 'splitCols' ? 'cols' : null;
+  if (split) spec.split = split;
+  // cell-line sets: one line for all plates, one plate set per line, or pairs of lines sharing plates (split)
+  const sets = W.cellMode === 'perLine' && lines.length ? lines.map((l) => [l])
+    : split ? (lines.length ? Array.from({ length: Math.ceil(lines.length / 2) }, (_, i) => lines.slice(2 * i, 2 * i + 2)) : [[]])
+    : [W.cellMode === 'none' || !lines[0] ? [] : [lines[0]]];
+  for (const set of sets) {
     const built = buildExperiment(spec, protocol.fluids);
     const at = applyExperiment(protocol, meta, built);
-    if (cl) {
-      for (let i = at; i < protocol.plates.length; i++) {
-        const p = protocol.plates[i], cells = [];
-        for (let r = 0; r < p.rows; r++) for (let c = 0; c < p.cols; c++) if (!W.border || !isBorder(r, c, p.rows, p.cols, W.border)) cells.push([r, c]);
+    for (let i = at; i < protocol.plates.length; i++) {
+      const p = protocol.plates[i], d = W.border || 0;
+      const innerR = p.rows - 2 * d, innerC = p.cols - 2 * d;
+      set.forEach((cl, half) => {
+        const cells = [];
+        for (let r = d; r < p.rows - d; r++) for (let c = d; c < p.cols - d; c++) {
+          const h = !split ? 0 : split === 'rows' ? (r - d < Math.floor(innerR / 2) ? 0 : 1) : (c - d < Math.floor(innerC / 2) ? 0 : 1);
+          if (h === half) cells.push([r, c]);
+        }
         assignCellLine(meta, p, i, cells, cl.id);
-      }
-      for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = cl.name;
+      });
     }
+    for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = set.map((c) => c.name).join(' / ');
   }
   const computed = computeProtocol(protocol);
   return { protocol, meta, computed, plan: planRun(protocol, computed), first };
