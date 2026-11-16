@@ -290,17 +290,19 @@ export function computeProtocol(protocol) {
         default: continue; // unknown type: leave unnormalized
       }
       if (b.type !== 'ToAssayVolumePct') {
-        const { n, t, sizing: totalSizing } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
+        const { n, raw, t, sizing: totalSizing } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
         // fluids of a normalized well are sized with the group's final target total (A + class target, or the total)
         const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : totalSizing ?? (b.type === 'ToMaxTotalVolume' ? t : sizing));
         r.normalizationRequested = n;
+        if (n > 0 && raw > 0) r.normalizationExact = raw; // unrounded top-up (cassette planning)
         result[x.w.p].wells.set(x.key, r);
         continue;
       }
       if (b.type === 'ToAssayVolumePct') {
-        const { n, sizing: pctSizing } = pctTopUp(x.req, fluids, b, A, b.param, cls);
+        const { n, raw, sizing: pctSizing } = pctTopUp(x.req, fluids, b, A, b.param, cls);
         const r = computeWell(x.req, fluids, x.plate, n, pctSizing);
         r.normalizationRequested = n;
+        if (n > 0 && raw > 0) r.normalizationExact = raw;
         result[x.w.p].wells.set(x.key, r);
         continue;
       }
@@ -380,7 +382,7 @@ function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t };
+    if (N <= upper || upper === Infinity) return { raw: N, n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t };
     lower = upper;
   }
   return { n: N, t };
@@ -418,7 +420,7 @@ function pctTopUp(req, fluids, b, A, p, cls) {
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, sizing: undefined };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), sizing: Ts[0] };
+    if (N <= upper || upper === Infinity) return { raw: N, n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), sizing: Ts[0] };
     lower = upper;
   }
   return { n: N, sizing: Ts[0] };
@@ -453,7 +455,7 @@ function totalTopUp(cs, vol, A, gap, cls) {
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + gap, sizing };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + gap, sizing };
+    if (N <= upper || upper === Infinity) return { raw: N, n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + gap, sizing };
     lower = upper;
   }
   return { n: N, t: A + gap, sizing };
@@ -496,7 +498,7 @@ function maxTotalTopUp(cT, cAll, vol, A, s, cls) {
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + g, sizing };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + g, sizing };
+    if (N <= upper || upper === Infinity) return { raw: N, n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t: A + g, sizing };
     lower = upper;
   }
   return { n: N, t: A + g, sizing };
