@@ -117,3 +117,16 @@ D4+ tt:41.0156→66  DMSO normalization:195.3576→259 ×3
 T8+ DMSO normalization:20.0000→23.3
    dispense rows: engine as committed (totalTopUp with the previous-top-up sizing check)
 ```
+
+### probe-27a / 27b results (2026-11-16)
+- 27a: head counts and order as predicted (12 D4+ heads, 3 cassettes). Loads: 202, 164, 123, 253 | 202, 202, 213,
+  213 | 213, 202, 202, 202 → the "d to 0.1 µL first" half of the prediction is REFUTED for every head kind (single
+  plate, two plates, ToVolume normalization); D4+ loads use the exact head volume. probe-25 head 4 (258 for
+  193.996 µL, a "% of assay volume" normalization head) is back to an open single case. 610/610 dispense rows.
+- Pre-run summary of 27a shows the per-fluid total to 0.1 µL for fluids (202.4, 164.5, 123.5, 253.4, 404.9, 640.5,
+  202.4, 202.4) and to 1 µL for normalization (202); the report's fluid totals are 202, 164, 123, 253, 405, 640.
+- 27b: cassettes as predicted (D4+ tt 66, normalization 259 ×3; T8+ 23.3; summary: tt 66.3, normalization 801).
+  Top-ups 924/924 (the N₁ → N₂ switch at |V₁ − V₀| / N₁ = 0.1 % holds at all three gaps). Fluids: 29 rows one step
+  low → the "previous top-up" sizing check is REFUTED; D300e keeps V₁ in all 924 wells (k ≤ 0.001). New rule: the
+  fluids are sized at T₁ unless the well total still changes by ≥ 0.1 % (|T₂ − T₁| / T₂), then T₂ — the same
+  convergence check as for a well without normalization. 1848/1848; probe-23 plate 1 stays 664/664.
