@@ -30,19 +30,19 @@ test('top/bottom/levels: log-even levels with both ends exact', () => {
   assert.throws(() => designExperiment(wide({ primary: { bottom: '20 µM' } })), /must be below top/);
 });
 
-test('extend: levels below one drop of the stock go to "Drug - 1:30", the rest stay on the stock', () => {
+test('extend: levels needing up to ~180 nL of "Drug - 1:30" are dispensed from it, the higher ones from the stock', () => {
   const { protocol, meta, stockNotes } = designExperiment(wide());
   const d = protocol.fluids.find((f) => f.name === 'Bortezomib - 1:30');
   const b = protocol.fluids.find((f) => f.name === 'Bortezomib');
   assert.ok(d, protocol.fluids.map((f) => f.name).join());
   assert.equal(d.rootFluidId, b.id); assert.equal(d.dilutionFactor, 30); assert.ok(Math.abs(d.concentration - b.concentration / 30) < 1e-9);
   assert.equal(stockNotes[0].kind, 'extend');
-  // 10 mM, 50 µL, 13 pL drop: the stock reaches down to 0.0026 µM
+  // D300e Control's split (probe-29): a level goes to the 1:30 (333 µM) when it needs ≤ 180 nL of it = ≤ 1.2 µM in 50 µL
   const p = protocol.plates[0];
   for (const [k, m] of p.wells) {
     if (meta.plates[0].roles[k] === 'scrap') continue; // priming wells take ≥ 30 nL of each stock
-    if (m.has(d.id)) assert.ok(m.get(d.id) < 0.0026 && !m.has(b.id));
-    if (m.has(b.id)) assert.ok(m.get(b.id) >= 0.0026);
+    if (m.has(d.id)) assert.ok(m.get(d.id) <= 1.2 && !m.has(b.id));
+    if (m.has(b.id)) assert.ok(m.get(b.id) > 1.2);
   }
   const warn = computeProtocol(protocol).flatMap((x) => [...x.wells.values()].flatMap((w) => w.warnings)).filter((w) => w.code === 'below_min_volume');
   assert.equal(warn.length, 0);
@@ -71,7 +71,7 @@ test('plan: the diluted stock is listed with a pipettable recipe and the levels 
   const d = plan.prepare.find((x) => x.name === 'Bortezomib - 1:30');
   assert.equal(d.dilution.from, 'Bortezomib'); assert.equal(d.dilution.factor, 30);
   assert.ok(d.dilution.stockUL >= 1); assert.equal(d.dilution.solventUL, d.dilution.stockUL * 29);
-  assert.deepEqual(d.dilution.levels.map((v) => +v.toPrecision(3)), [0.00129, 0.000359, 0.0001]);
+  assert.deepEqual(d.dilution.levels.map((v) => +v.toPrecision(3)), [0.774, 0.215, 0.0599, 0.0167, 0.00464, 0.00129, 0.000359, 0.0001]);
 });
 
 test('randomize within each cell line: a permutation that never crosses cell lines or moves role wells', () => {

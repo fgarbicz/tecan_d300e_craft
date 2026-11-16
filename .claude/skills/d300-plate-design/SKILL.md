@@ -24,8 +24,7 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
    - wide ranges: `plate.dilutedStocks` (default true) adds a second stock "Drug - 1:N" when a series needs less
      than one drop (13 pL DMSO) of the stock — D300e's fluid shift (whole series on the dilution) / extend
      (stock for the high levels, dilution for the low ones). The plan lists it under "Prepare" with a recipe
-     and the levels it dispenses; it is one more solution and one more dispense head. Dilution choice INFERRED
-     from the user guide's two examples (not yet checked against D300e Control);
+     and the levels it dispenses; it is one more solution and one more dispense head. Dilution factor and the split (doses needing up to ~180 nL of the dilution use it) match D300e Control's own shift/extend dialog (probe-29);
    - randomization: `plate.randomize: "cellLine"` (+ optional `randomSeed`) shuffles where each well is
      dispensed, only within the wells of the same cell line, stored in the .tdd (without cell lines: within each drug grid).
      Readouts are pasted as read; the app maps them back. Tell the user not to re-randomize in D300e Control;

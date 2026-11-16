@@ -8,7 +8,7 @@
 // adds, removes or reorders plates must call the matching meta helper below (tested).
 
 import { wellKey, splitKey, wellName } from './tdd.js';
-import { newPlate, titrationLevels, addNormalization, setWell, suggestShift, dilutedFluid } from './ops.js';
+import { newPlate, titrationLevels, addNormalization, setWell, suggestShift, dilutedFluid, extendThreshold } from './ops.js';
 import { computeProtocol, PRIMING_VOLUME, stockInBase, validRange } from './dispense.js';
 import { scrapBySignature } from './dosemap.js';
 
@@ -182,7 +182,8 @@ export const rangeStep = (high, low, levels) => (levels > 1 && high > 0 && low >
  * Extra diluted stocks for series that go below one drop of the stock (D300e "fluid shift / extend", guide
  * p.29–31; dilution choice and level split INFERRED from the guide's two worked examples — ops.js suggestShift):
  *  - shift: one diluted stock covers the whole series → the axis uses "Drug - 1:N" only;
- *  - extend: the series needs both → levels the stock can reach stay on the stock, lower levels go to "Drug - 1:N".
+ *  - extend: the series needs both → every level that needs at most ~180 nL of "Drug - 1:N" is dispensed from it
+ *    (ops.js extendThreshold, measured on D300e Control: probe-29), the higher levels from the stock.
  * Mutates `protocol` (adds the diluted fluids, reusing one with the same name) and the axes of `spec`
  * (fluidId / lowFluidId / splitBelow). Returns notes: [{ drug, kind: 'shift'|'extend'|'impossible', factor,
  * fluid (name), stock (in base units), levels (on the diluted fluid) }].
@@ -198,13 +199,15 @@ export function resolveStocks(protocol, spec) {
     const lv = axisLevels(a).filter((v) => v > 0);
     if (!lv.length) continue;
     const high = Math.max(...lv), low = Math.min(...lv);
-    const s = suggestShift(f, plate, high, low);
+    // dilutions of this drug that already exist are reused when one covers the series (probe-29)
+    const existing = protocol.fluids.filter((x) => x.rootFluidId === f.id && x.dilutionFactor > 1).map((x) => x.dilutionFactor);
+    const s = suggestShift(f, plate, high, low, existing);
     if (!s) continue;
     if (s.kind === 'impossible') { notes.push({ drug: f.name, kind: 'impossible', levels: lv.filter((v) => v < validRange(f, plate).min) }); continue; }
     const name = `${f.name} - 1:${s.factor}`;
     const d = protocol.fluids.find((x) => x.name === name) || dilutedFluid(protocol, f, s.factor);
     if (s.kind === 'shift') { a.rootFluidId = f.id; a.fluidId = d.id; notes.push({ drug: f.name, kind: 'shift', factor: s.factor, fluid: d.name, stock: d.concentration, levels: lv }); continue; }
-    a.lowFluidId = d.id; a.splitBelow = validRange(f, plate).min;
+    a.lowFluidId = d.id; a.splitBelow = extendThreshold(d.concentration, plate) * (1 + 1e-9); // levels up to the threshold: extended fluid
     notes.push({ drug: f.name, kind: 'extend', factor: s.factor, fluid: d.name, stock: d.concentration, levels: lv.filter((v) => v < a.splitBelow) });
   }
   return notes;

@@ -4,7 +4,7 @@
 
 import { parseTdd, writeTdd, newProtocol, wellKey, splitKey, wellName } from '../src/tdd.js';
 import { computeProtocol, validRange, fluidTotals, primingIssues, scrapWellValues, PRIMING_VOLUME, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitKind, unitLabel, toDisplay, fromDisplay } from '../src/dispense.js';
-import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid,
+import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, conflicts, clearWells, titrationLevels, applyTitration, suggestShift, dilutedFluid, extendThreshold,
   buildSynergy, synergyLevels, TITRATION_PATTERNS, NORMALIZE_TYPES, NORMALIZE_PARAM, addNormalization, removeNormalization, removePlate, replicatePlate, clearPlate,
   copyWells, pasteWells, copyNormalization, pasteNormalization } from '../src/ops.js';
 import { randomizeByCellLine } from '../src/experiment.js';
@@ -710,7 +710,7 @@ function renderTitration(el) {
     const opts = { replicates: o.replicates, pattern: $('tPat').value };
     await maybeShift(o.fid, Math.max(...levels), Math.min(...levels), (useFid, extendFid, stockMin) => {
       if (extendFid == null) return applyTitration(plate(), cells, useFid, levels, opts);
-      // Extension (INFERRED, §3.6): levels the stock can reach use the stock, lower levels the diluted fluid.
+      // Extension (measured on D300e Control, probe-29): levels up to the threshold use the diluted fluid.
       applyTitration(plate(), cells, useFid, levels.map((l) => (l >= stockMin ? l : 0)), opts);
       applyTitration(plate(), cells, extendFid, levels.map((l) => (l < stockMin ? l : 0)), opts);
     }, 'titration');
@@ -727,7 +727,7 @@ async function maybeShift(fid, high, low, apply, label) {
   const choice = await new Promise((resolve) => {
     dialog(`<h3>Fluid ${s.kind}</h3><p>${esc(f.name)}: the lowest value needs less than one drop from the stock.</p>
       <p>Suggested dilution <b>1:${s.factor}</b> → new fluid <b>${esc(f.name)} - 1:${s.factor}</b> (make this dilution and load it as its own fluid).</p>
-      <p class="hint">${s.kind === 'shift' ? 'The whole series will use the diluted fluid.' : 'Higher levels use the stock and lower levels the diluted fluid.'}</p>
+      <p class="hint">${s.kind === 'shift' ? 'The whole series will use the diluted fluid.' : 'Doses that need up to about 180 nL of the diluted stock use it; higher doses use the original stock (as D300e Control does).'}</p>
       <label class="chk"><input type="radio" name="c" value="use" checked> Use the ${s.kind === 'shift' ? 'shifted' : 'extended'} fluid</label><br>
       <label class="chk"><input type="radio" name="c" value="no"> Do not ${s.kind} (wells below the minimum are flagged)</label>`, (form) => { resolve(new FormData(form).get('c')); return true; }, verb).then((ok) => { if (!ok) resolve(null); });
   });
@@ -737,7 +737,7 @@ async function maybeShift(fid, high, low, apply, label) {
     let d = S.protocol.fluids.find((x) => x.name === `${f.name} - 1:${s.factor}`);
     if (!d) d = dilutedFluid(S.protocol, f, s.factor);
     if (s.kind === 'shift') apply(d.id);
-    else apply(fid, d.id, validRange(f, p).min);
+    else apply(fid, d.id, extendThreshold(d.concentration, p) * (1 + 1e-9)); // levels needing ≤ ~180 nL of the dilution use it (probe-29)
   });
 }
 

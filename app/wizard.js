@@ -6,7 +6,7 @@ import { newProtocol, wellKey } from '../src/tdd.js';
 import { PLATE_TYPES, addFluid, titrationLevels, parseDilution } from '../src/ops.js';
 import { computeProtocol, validRange, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS, unitLabel, fromDisplay, toDisplay } from '../src/dispense.js';
 import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, isBorder, axisLevels, rangeStep, resolveStocks, randomizeByCellLine, seededRng } from '../src/experiment.js';
-import { suggestShift } from '../src/ops.js';
+import { suggestShift, extendThreshold } from '../src/ops.js';
 import { planRun } from '../src/cassette.js';
 import { drugUnit, unitsFor, setDrugUnit } from '../src/units.js';
 import { cassetteSvg, levelStripSvg, plateSvg, plateStackSvg, fluidLook, THEME_VARS, shortNum } from '../src/draw.js';
@@ -241,7 +241,10 @@ function levelsPreview(ctx) {
       const sug = below.length && fl ? suggestShift(fl, plateLike, Math.max(...lv), Math.min(...lv.filter((v) => v > 0))) : null;
       const canDilute = sug && sug.kind !== 'impossible' && W.dilutedStocks;
       const dilName = canDilute ? `${x.name || 'drug'} - 1:${sug.factor}` : null;
-      const kinds = lv.map((v) => ({ v: toDisplay(v, u), kind: v === 0 ? 'zero' : rg && v > rg.max ? 'above' : rg && v < rg.min ? (canDilute ? 'diluted' : 'below') : canDilute && sug.kind === 'shift' ? 'diluted' : 'stock' }));
+      // extension: every dose that needs up to ~180 nL of the diluted stock comes from it (as D300e Control does)
+      const thr = canDilute && sug.kind === 'extend' ? extendThreshold(fl.concentration / sug.factor, plateLike) * (1 + 1e-9) : 0;
+      const onDil = lv.filter((v) => v > 0 && v < thr);
+      const kinds = lv.map((v) => ({ v: toDisplay(v, u), kind: v === 0 ? 'zero' : rg && v > rg.max ? 'above' : canDilute && (sug.kind === 'shift' || v < thr) ? 'diluted' : rg && v < rg.min ? 'below' : 'stock' }));
       const color = ctx.fluidColor({ id: x.existingId ?? o.drug });
       const msgs = [];
       msgs.push(`<div><span class="pill">${stepLabel(o)}</span> <b style="color:${n > axisLen ? 'var(--danger)' : 'inherit'}">${n} ${axisName}</b> of ${axisLen} available${rg ? ` · this ${x.stock} ${unitLabel(x.unit)} stock can give ${sh(rg.min)}–${sh(rg.max)} ${ul} in a well` : ''}</div>`);
@@ -249,7 +252,7 @@ function levelsPreview(ctx) {
         const zero = o.zero ? 1 : 0, maxLv = Math.floor(axisLen / o.reps) - zero, maxRep = Math.floor(axisLen / lv.length);
         msgs.push(`<div style="color:var(--danger)">Too wide for the plate: ${lv.length - zero} doses${zero ? ' + 0' : ''} × ${o.reps} wells each = ${n} ${axisName}, but only ${axisLen} fit${W.split ? ' in half the plate' : ' inside the border'}. Use ${[maxLv >= 1 ? `at most ${maxLv} doses` : null, maxRep >= 1 && maxRep < o.reps ? `${maxRep} well${maxRep > 1 ? 's' : ''} per dose (and more plate replicates)` : null, W.border ? 'no PBS border' : null].filter(Boolean).join(', or ')}.</div>`);
       }
-      if (below.length && canDilute) msgs.push(`<div style="color:var(--accent)">${sug.kind === 'shift' ? `All doses come from a diluted stock, <b>${ctx.esc(dilName)}</b>` : `The ${below.length} lowest dose${below.length > 1 ? 's' : ''} (${below.map(sh).join(', ')} ${ul}) come from a second, diluted stock: <b>${ctx.esc(dilName)}</b>`} (${+(x.stock / sug.factor).toPrecision(3)} ${unitLabel(x.unit)}). You prepare one more tube (1 part stock + ${sug.factor - 1} parts solvent) and it takes one more dispense head. Why: these doses need less than one drop of the ${x.stock} ${unitLabel(x.unit)} stock.</div>`);
+      if (below.length && canDilute) msgs.push(`<div style="color:var(--accent)">${sug.kind === 'shift' ? `All doses come from a diluted stock, <b>${ctx.esc(dilName)}</b>` : `The ${onDil.length} lowest dose${onDil.length > 1 ? 's' : ''} (${onDil.map(sh).join(', ')} ${ul}) come from a second, diluted stock: <b>${ctx.esc(dilName)}</b>`} (${+(x.stock / sug.factor).toPrecision(3)} ${unitLabel(x.unit)}). You prepare one more tube (1 part stock + ${sug.factor - 1} parts solvent) and it takes one more dispense head. Why: the lowest dose${below.length > 1 ? 's need' : ' needs'} less than one drop of the ${x.stock} ${unitLabel(x.unit)} stock.</div>`);
       else if (below.length) msgs.push(`<div style="color:var(--warn)">${below.length} dose${below.length > 1 ? 's are' : ' is'} too low for this stock (below ${sh(rg.min)} ${ul} = less than one drop): ${sug?.kind === 'impossible' ? 'even a 1:9000 dilution is not enough. Start from a less concentrated stock.' : 'tick "Add a diluted stock automatically" on the Plates step, or start from a less concentrated stock.'}</div>`);
       if (above.length) msgs.push(`<div style="color:var(--danger)">${above.length} dose${above.length > 1 ? 's are' : ' is'} too high for this stock (above ${sh(rg.max)} ${ul}): the well would get more DMSO than the ${W.dmsoPct} % limit${two ? ', which the two drugs share' : ''}. Use a more concentrated stock or a lower highest dose.</div>`);
       el.innerHTML = pic(levelStripSvg(kinds, color, { unit: ul, replicates: o.reps, theme: THEME_VARS, dilutedName: dilName })) + `<div class="wz-msg">${msgs.join('')}</div>`;
