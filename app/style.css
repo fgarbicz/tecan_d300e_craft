@@ -187,3 +187,6 @@ dialog.wizard[open] { display: flex; flex-direction: column; }
 .wz-preview { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
 .wz-levels { font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
 .pill { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; margin-right: 4px; }
+.syn-card { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin: 8px 0; background: var(--panel); }
+.syn-figs { display: flex; flex-wrap: wrap; gap: 6px; }
+.syn-figs svg { max-width: 100%; height: auto; border-radius: 6px; }

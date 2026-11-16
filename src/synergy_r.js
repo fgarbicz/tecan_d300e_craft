@@ -21,7 +21,8 @@ export const ANALYSIS_R = String.raw`#!/usr/bin/env Rscript
 OPTIONS <- list(
   title            = "__TITLE__",
   methods          = c("ZIP", "HSA", "Bliss", "Loewe"),   # reference models (CalculateSynergy)
-  formats          = c("png", "pdf", "svg", "rds"),       # add "html" for interactive 3D surfaces (htmlwidgets)
+  # add "html" for interactive 3D surfaces (htmlwidgets); the app can override with SYNERGY_FORMATS="png,pdf"
+  formats          = if (nzchar(Sys.getenv("SYNERGY_FORMATS"))) trimws(strsplit(Sys.getenv("SYNERGY_FORMATS"), ",")[[1]]) else c("png", "pdf", "svg", "rds"),
   dpi              = 300,                                 # PNG resolution
   width            = 6.5,                                 # figure size, inches
   height           = 5.5,

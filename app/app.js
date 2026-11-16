@@ -12,6 +12,7 @@ import { newMeta, reconcileMeta, serializeMeta, parseMeta, sidecarName, wellRole
 import { planRun } from '../src/cassette.js';
 import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
+import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
 
 export const APP_NAME = 'Tecan D300 Craft';
 const APP_VERSION = '0.2.0';
@@ -887,7 +888,8 @@ async function renderResultsTab(el) {
     <h3>Plates with data: ${withData} / ${S.protocol.plates.length}</h3>
     <ul class="warnlist">${S.meta.plates.map((x, i) => `<li>${x.readout ? '✓' : '·'} Plate ${i + 1}${x.readout ? ` <span class="muted">${esc(x.readout.importedAt?.slice(0, 16).replace('T', ' ') || '')}</span>` : ''}</li>`).join('')}</ul>
     <div class="callout">The Excel file has one row per well (cell line, role, every drug's concentration, DMSO %, raw signal, % of vehicle), replicate statistics per condition, and Bliss synergy for drug pairs. Mark <b>blank</b> wells (medium only) in Annotate to subtract background.</div>
-    <div class="actions"><button id="rExport" class="primary" ${withData ? '' : 'disabled'}>${icon('excel', 15)} Export Excel…</button></div>`;
+    <div class="actions"><button id="rExport" class="primary" ${withData ? '' : 'disabled'}>${icon('excel', 15)} Export Excel…</button></div>
+    <div id="rSynergy"></div>`;
   $('rRead').onclick = async () => {
     let A; try { A = await import('../src/analysis.js'); } catch (e) { return toast('The analysis module is not available in this build'); }
     const text = $('rPaste').value; if (!text.trim()) return toast('Paste the values first');
@@ -901,6 +903,63 @@ async function renderResultsTab(el) {
   };
   $('rDrop')?.addEventListener('click', async () => { if (await ask(`Remove the readout of plate ${pi + 1}?`, 'Remove', { danger: true })) mutate('remove readout', () => { S.meta.plates[pi].readout = null; }); });
   $('rExport').onclick = exportExcel;
+  if (withData) renderSynergySection($('rSynergy'));
+}
+
+// ---- synergy: in-app figures + SynergyFinder package ----
+const FIG_FORMATS = ['png', 'pdf', 'svg', 'rds'];
+async function renderSynergySection(el) {
+  let A; try { A = await import('../src/analysis.js'); } catch { return; }
+  let result; try { result = A.analyze({ protocol: S.protocol, computed: S.computed, meta: S.meta }); } catch (e) { el.innerHTML = `<div class="callout warn">${esc(e.message)}</div>`; return; }
+  const mats = synergyMatrices(result);
+  if (!mats.length) { el.innerHTML = '<h3>Synergy</h3><p class="hint">No drug pairs with single-agent and combination wells measured yet.</p>'; return; }
+  const lim = Math.max(10, ...mats.flatMap((m) => [...m.bliss.values()].map((v) => Math.abs(v))));
+  S.synFormats ||= { png: true, pdf: true, svg: true, rds: true, html: false };
+  el.innerHTML = `<h3>${icon('synergy', 16)} Synergy (${mats.length} cell line × drug pair${mats.length > 1 ? 's' : ''})</h3>
+    <p class="hint">Bliss independence from the condition means. For ZIP, HSA, Loewe and fitted surfaces, use SynergyFinder below.</p>
+    ${mats.map((m, i) => `<div class="syn-card"><div class="syn-figs">${heatmapSvg(m, 'viability')}${heatmapSvg(m, 'bliss', { limit: lim })}</div>
+      <div class="actions"><button class="small" data-fig="${i}" data-f="svg">SVG</button><button class="small" data-fig="${i}" data-f="png">PNG</button></div></div>`).join('')}
+    <h3>SynergyFinder (R)</h3>
+    <p class="hint">A complete package: the input CSV in SynergyFinder's format, an annotated well table, analysis.R with styled figures (dose–response, response matrix, ZIP/HSA/Bliss/Loewe maps and 3D surfaces), README and the conda environment.</p>
+    <div class="actions" style="flex-wrap:wrap">${['png', 'pdf', 'svg', 'rds', 'html'].map((f) => `<label class="chk"><input type="checkbox" data-fmt="${f}" ${S.synFormats[f] ? 'checked' : ''}> ${f.toUpperCase()}${f === 'html' ? ' (3D)' : ''}</label>`).join('')}</div>
+    <div class="actions"><button id="synPkg">${icon('save', 15)} Save package (CSV + R code)…</button><button id="synRender" class="primary">${icon('run', 15)} Save + render figures…</button></div>
+    <div id="synMsg"></div>`;
+  for (const b of el.querySelectorAll('[data-fmt]')) b.onchange = () => { S.synFormats[b.dataset.fmt] = b.checked; };
+  for (const b of el.querySelectorAll('[data-fig]')) b.onclick = () => {
+    const m = mats[+b.dataset.fig], base = `${m.cellLine}_${m.drugA}_x_${m.drugB}`.replace(/[^\w.-]+/g, '_');
+    exportFigure(heatmapSvg(m, 'viability'), base + '_viability', b.dataset.f, saveBlob).then(() => exportFigure(heatmapSvg(m, 'bliss', { limit: lim }), base + '_bliss', b.dataset.f, saveBlob));
+  };
+  const pkg = async () => {
+    const SX = await import('../src/synergy_export.js');
+    const { files } = SX.synergyPackage(result, S.protocol, S.meta, { title: S.meta.experiment.title || S.fileName.replace(/\.tdd$/, ''), appVersion: `${APP_NAME} ${APP_VERSION}` });
+    const name = `${S.fileName.replace(/\.tdd$/, '')}_synergyfinder`;
+    if (!TAURI) { for (const f of files) download(f.path.replace(/\//g, '_'), f.text, 'text/plain'); toast('In the browser each file downloads separately; the desktop app writes a folder and a .zip'); return null; }
+    return invoke('save_package', { suggested: name, files });
+  };
+  $('synPkg').onclick = async () => {
+    try { const r = await pkg(); if (r) { $('synMsg').innerHTML = `<div class="callout">Saved <code>${esc(r.dir)}</code>${r.zip ? ' and a .zip next to it' : ''}. Run <code>conda run -n synergyfinder Rscript analysis.R</code> in it, or use Save + render.</div><button class="small" id="synReveal">Show in Finder</button>`; $('synReveal').onclick = () => invoke('reveal_path', { path: r.dir }); } }
+    catch (e) { toast(`Package failed: ${e?.message ?? e}`, 9000); }
+  };
+  $('synRender').onclick = async () => {
+    if (!TAURI) return toast('Rendering with R needs the desktop app');
+    let r; try { r = await pkg(); } catch (e) { return toast(`Package failed: ${e?.message ?? e}`, 9000); }
+    if (!r) return;
+    const formats = Object.entries(S.synFormats).filter(([, v]) => v).map(([k]) => k);
+    $('synMsg').innerHTML = `<div class="callout">Rendering figures with R (${formats.join(', ')})… this takes a few minutes for a full screen.</div>`;
+    try {
+      const out = await invoke('render_package', { dir: r.dir, formats });
+      $('synMsg').innerHTML = `<div class="callout ${out.ok ? '' : 'warn'}">${out.ok ? '✓ Done' : '⚠ R reported a problem'}: ${out.figures_ok} files written${out.figures_skipped ? `, ${out.figures_skipped} skipped` : ''}${out.figures_failed ? `, ${out.figures_failed} failed` : ''}. Figures are in <code>figures/</code>, tables in <code>results/</code>.</div>
+        ${out.ok ? '' : `<pre style="white-space:pre-wrap;font-size:11px">${esc(out.log_tail)}</pre>`}<button class="small" id="synReveal">Show in Finder</button>`;
+      $('synReveal').onclick = () => invoke('reveal_path', { path: r.dir });
+    } catch (e) { $('synMsg').innerHTML = `<div class="callout warn">${esc(String(e))}</div>`; }
+  };
+}
+
+function saveBlob(name, data, type) {
+  if (TAURI && typeof data === 'string') return invoke('save_text', { suggested: name, text: data, extension: name.split('.').pop() }).then((p) => p && toast(`Saved ${p}`));
+  if (TAURI) return data.arrayBuffer().then((b) => invoke('save_bytes', { suggested: name, bytes: Array.from(new Uint8Array(b)), extension: name.split('.').pop() })).then((p) => p && toast(`Saved ${p}`));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type })); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 async function exportExcel() {
@@ -1017,6 +1076,7 @@ function bind() {
   bindGrid();
   // icons on buttons that declare data-icon
   for (const b of document.querySelectorAll('[data-icon]')) b.insertAdjacentHTML('afterbegin', icon(b.dataset.icon, b.classList.contains('tb') ? 20 : 15));
+  for (const b of $('opTabs').querySelectorAll('button')) b.title ||= b.textContent.trim();
 }
 
 // ---------------- themes ----------------

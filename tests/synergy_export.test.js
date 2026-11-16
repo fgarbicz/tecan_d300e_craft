@@ -112,7 +112,7 @@ test('package: file list, relative paths, CSV contents, R script, environment', 
   assert.match(R, /ReshapeData\(input, data_type = "viability", impute = OPTIONS\$impute, noise = FALSE/);
   assert.match(R, /CalculateSynergy\(/); assert.match(R, /CalculateSensitivity\(/);
   assert.match(R, /methods\s+= c\("ZIP", "HSA", "Bliss", "Loewe"\)/);
-  assert.match(R, /formats\s+= c\("png", "pdf", "svg", "rds"\)/);
+  assert.match(R, /formats .*else c\("png", "pdf", "svg", "rds"\)/);
   assert.ok(/^[\x00-\x7f]*$/.test(R), 'analysis.R is ASCII (non-ASCII as \\u escapes), whatever the R locale');
   const readme = file('README.md');
   assert.match(readme, /Ianevski A, Giri AK, Aittokallio T\. SynergyFinder 3\.0/);

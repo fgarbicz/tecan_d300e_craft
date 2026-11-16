@@ -9,6 +9,9 @@
 //                 and must never reach the dispenser;
 //   * save_sidecar — the experiment file "<name>.craft.json" next to the .tdd (cell lines, PBS border, roles,
 //                 readouts); open_tdd returns it when it exists. The .tdd itself never carries this data;
+//   * save_package / render_package / reveal_path — SynergyFinder data package (CSV + R code, src/synergy_export.js)
+//                 written to a folder (+ .zip), figures rendered by running its analysis.R in the conda env
+//                 "synergyfinder" (tools/synergyfinder/environment.yml);
 //   * save_text — CSV export;
 //   * save_xlsx — Excel export of a readout analysis (workbook model from src/analysis.js, see xlsx.rs).
 // Files are written atomically (temporary file + rename) so a failed save never truncates a protocol.
@@ -16,7 +19,7 @@
 
 mod xlsx;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -132,6 +135,170 @@ async fn save_sidecar(tdd_path: String, text: String) -> Result<String, String> 
     write_sidecar(Path::new(&tdd_path), &text).map(|p| p.to_string_lossy().into_owned())
 }
 
+#[derive(Deserialize)]
+struct PackageFile {
+    path: String,
+    text: String,
+}
+
+/// A package-relative path ("data/x.csv"): no absolute paths, no "..", no empty parts.
+fn safe_relative(p: &str) -> Result<PathBuf, String> {
+    let path = Path::new(p);
+    let ok = !p.is_empty()
+        && !path.is_absolute()
+        && path.components().all(|c| matches!(c, std::path::Component::Normal(_)));
+    if ok {
+        Ok(path.to_path_buf())
+    } else {
+        Err(format!("Refusing to write outside the package folder: {p}"))
+    }
+}
+
+/// `<parent>/<name>`, or `<name> (2)`, `(3)`… if that exists already (never overwrite an earlier package).
+fn unique_dir(parent: &Path, name: &str) -> PathBuf {
+    let mut d = parent.join(name);
+    let mut n = 2;
+    while d.exists() {
+        d = parent.join(format!("{name} ({n})"));
+        n += 1;
+    }
+    d
+}
+
+fn write_package(dir: &Path, files: &[PackageFile]) -> Result<(), String> {
+    for f in files {
+        let rel = safe_relative(&f.path)?;
+        let full = dir.join(rel);
+        if let Some(parent) = full.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("Could not create {}: {e}", parent.display()))?;
+        }
+        write_atomic(&full, f.text.as_bytes())?;
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct SavedPackage {
+    dir: String,
+    zip: Option<String>,
+}
+
+/// Ask for a parent folder, write the package into a new subfolder and zip it next to it (macOS `ditto`).
+#[tauri::command]
+async fn save_package(app: AppHandle, suggested: String, files: Vec<PackageFile>) -> Result<Option<SavedPackage>, String> {
+    let picked = app.dialog().file().set_title("Choose where to save the SynergyFinder package").blocking_pick_folder();
+    let Some(fp) = picked else { return Ok(None) };
+    let parent = to_path(fp)?;
+    let name: String = suggested.chars().map(|c| if c == '/' || c == ':' { '_' } else { c }).collect();
+    let dir = unique_dir(&parent, &name);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Could not create {}: {e}", dir.display()))?;
+    write_package(&dir, &files)?;
+    let zip = dir.with_extension("zip");
+    let zipped = !zip.exists()
+        && std::process::Command::new("ditto")
+            .args(["-c", "-k", "--keepParent"])
+            .arg(&dir)
+            .arg(&zip)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    Ok(Some(SavedPackage {
+        dir: dir.to_string_lossy().into_owned(),
+        zip: zipped.then(|| zip.to_string_lossy().into_owned()),
+    }))
+}
+
+/// conda executable: $CONDA_EXE, then the usual per-user and Homebrew install locations (an app started
+/// from the Finder does not get the shell's PATH).
+fn find_conda() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("CONDA_EXE") {
+        let p = PathBuf::from(p);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    let home = std::env::var("HOME").map(PathBuf::from).ok();
+    let mut cands: Vec<PathBuf> = vec![];
+    if let Some(h) = &home {
+        for d in ["miniforge3", "mambaforge", "miniconda3", "anaconda3", "opt/miniforge3", "opt/anaconda3"] {
+            cands.push(h.join(d).join("bin/conda"));
+        }
+    }
+    for p in ["/opt/homebrew/bin/conda", "/usr/local/bin/conda", "/opt/homebrew/Caskroom/miniforge/base/bin/conda"] {
+        cands.push(PathBuf::from(p));
+    }
+    cands.into_iter().find(|p| p.is_file())
+}
+
+#[derive(Serialize)]
+struct RenderResult {
+    ok: bool,
+    exit_code: Option<i32>,
+    figures_ok: usize,
+    figures_skipped: usize,
+    figures_failed: usize,
+    log_tail: String,
+}
+
+/// Run the package's analysis.R in the "synergyfinder" conda env (minutes for a large screen).
+#[tauri::command]
+async fn render_package(dir: String, formats: Vec<String>) -> Result<RenderResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let conda = find_conda().ok_or(
+            "conda was not found. Install Miniforge, then create the environment: conda env create -f environment.yml (in the package folder).",
+        )?;
+        let dir = PathBuf::from(dir);
+        if !dir.join("analysis.R").is_file() {
+            return Err(format!("{} has no analysis.R", dir.display()));
+        }
+        let formats: Vec<String> = formats.into_iter().filter(|f| ["png", "pdf", "svg", "rds", "html"].contains(&f.as_str())).collect();
+        let out = std::process::Command::new(conda)
+            .args(["run", "-n", "synergyfinder", "Rscript", "analysis.R"])
+            .current_dir(&dir)
+            .env("SYNERGY_PACKAGE_DIR", &dir)
+            .env("SYNERGY_FORMATS", formats.join(","))
+            .output()
+            .map_err(|e| format!("Could not start R: {e}"))?;
+        let log = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+        std::fs::write(dir.join("results").join("render_log.txt"), &log).ok();
+        let manifest = std::fs::read_to_string(dir.join("results").join("figure_manifest.csv")).unwrap_or_default();
+        let count = |s: &str| manifest.lines().skip(1).filter(|l| l.split(',').any(|c| c.trim_matches('"') == s)).count();
+        let tail: String = log.lines().rev().take(25).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        Ok(RenderResult {
+            ok: out.status.success(),
+            exit_code: out.status.code(),
+            figures_ok: count("ok"),
+            figures_skipped: count("skipped"),
+            figures_failed: count("failed"),
+            log_tail: tail,
+        })
+    })
+    .await
+    .map_err(|e| format!("Rendering stopped: {e}"))?
+}
+
+/// Save binary data (e.g. a PNG figure) with the native dialog.
+#[tauri::command]
+async fn save_bytes(app: AppHandle, suggested: String, bytes: Vec<u8>, extension: String) -> Result<Option<String>, String> {
+    let picked = app
+        .dialog()
+        .file()
+        .add_filter(extension.to_uppercase(), &[extension.as_str()])
+        .set_file_name(&suggested)
+        .blocking_save_file();
+    let Some(fp) = picked else { return Ok(None) };
+    let path = to_path(fp)?;
+    write_atomic(&path, &bytes)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Show a file or folder in the Finder.
+#[tauri::command]
+fn reveal_path(path: String) -> Result<(), String> {
+    std::process::Command::new("open").arg("-R").arg(&path).status().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 async fn save_text(app: AppHandle, suggested: String, text: String, extension: String) -> Result<Option<String>, String> {
     let picked = app
@@ -173,7 +340,7 @@ async fn save_xlsx(app: AppHandle, suggested: String, workbook: xlsx::Workbook) 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_sidecar, save_text, save_xlsx])
+        .invoke_handler(tauri::generate_handler![open_tdd, save_tdd, save_sidecar, save_text, save_xlsx, save_package, render_package, reveal_path, save_bytes])
         .run(tauri::generate_context!())
         .expect("error while running Tecan D300 Craft");
 }
@@ -182,6 +349,22 @@ fn main() {
 mod tests {
     use super::{cross_check, sidecar_path, write_sidecar, write_xlsx, xlsx};
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn package_paths_stay_inside_the_package_and_never_overwrite() {
+        use super::{safe_relative, unique_dir, write_package, PackageFile};
+        assert!(safe_relative("data/x.csv").is_ok());
+        for bad in ["", "/etc/x", "../x", "data/../../x", "./x"] {
+            assert!(safe_relative(bad).is_err(), "{bad}");
+        }
+        let root = std::env::temp_dir().join(format!("d300craft-pkg-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("pkg")).unwrap();
+        assert_eq!(unique_dir(&root, "pkg"), root.join("pkg (2)"));
+        let files = vec![PackageFile { path: "data/a.csv".into(), text: "x,y\n".into() }];
+        write_package(&root.join("pkg"), &files).unwrap();
+        assert_eq!(std::fs::read_to_string(root.join("pkg/data/a.csv")).unwrap(), "x,y\n");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn a_protocol_saved_by_the_interface_passes_the_cross_check() {
