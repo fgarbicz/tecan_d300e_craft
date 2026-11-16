@@ -37,12 +37,17 @@ UNDISPENSED_NORM_PLATES = {m['plate'] for m in mine if m['fluid'] == 'norm'} - r
 seen = set()
 for r in td[1:]:
     if len(r) < 18 or not r[1]: continue
-    plate, well, fluid = int(r[1]), norm_well(r[2]), int(r[8])
+    # rows are keyed by the design ("Non-random") well; the "Dispensed" well must equal the protocol's randomization
+    plate, well, fluid = int(r[1]), norm_well(r[5]), int(r[8])
+    disp = norm_well(r[2])
     vol, conc, total = float(r[15]), (float(r[13]) if r[13] else None), float(r[17])
     key = (plate, well, 'norm' if fluid in norm_ids else fluid)
     seen.add(key)
     m = idx.get(key)
     if m is None: stats['missing_in_engine'] += 1; bad.append(('missing', key, vol)); continue
+    stats['randomized_rows'] += disp != well
+    if m.get('dispensedWell', well) != disp:
+        stats['wrong_dispensed_well'] += 1; bad.append(('dispensed well', key, 'report', disp, 'engine', m.get('dispensedWell')))
     ok_v = abs(m['volume'] - vol) < 1e-6
     ok_t = abs(m['total'] - total) < 1e-6
     ok_c = conc is None or (m['conc'] is not None and abs(m['conc'] - conc) <= 1e-9 * max(1, abs(conc)) + 5e-12)
@@ -57,6 +62,6 @@ for r in td[1:]:
     if not ok_v and plate >= int(__import__('os').environ.get('MINPLATE','1')) and len(bad) < 15: bad.append((key, 'report', vol, conc, total, 'engine', m['volume'], m['conc'], m['total']))
 extra = [k for k in idx if k not in seen]
 print(dict(stats), '| normalization planned but not dispensed (aborted run) on plates', sorted(UNDISPENSED_NORM_PLATES), '| engine norm rows absent from report:', len(extra))
-if stats['rows'] and stats['vol_ok'] == stats['total_ok'] == stats['conc_ok'] == stats['rows']: print('ALL ROWS MATCH')
+if stats['rows'] and stats['vol_ok'] == stats['total_ok'] == stats['conc_ok'] == stats['rows'] and not stats['wrong_dispensed_well'] and not stats['missing_in_engine']: print('ALL ROWS MATCH')
 for pl in sorted(per): print('plate', pl, dict(per[pl]))
 for b in bad[:15]: print(b)

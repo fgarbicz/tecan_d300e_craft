@@ -143,7 +143,14 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
     ['fixtures/reference/probes/probe-25-blind.tdd', 'fixtures/reference/reports/probes/probe-25-blind.xml'],
     // probe-26: "to volume" 900 nL + unnormalized plate (fluid ties: strict rounding, first-step sizing check)
     ['fixtures/reference/probes/probe-26-blind.tdd', 'fixtures/reference/reports/probes/probe-26-blind.xml'],
-    ['fixtures/reference/probes/probe-22l-sweepnonorm.tdd', 'fixtures/reference/reports/probes/probe-22l-sweepnonorm.xml']]) {
+    ['fixtures/reference/probes/probe-22l-sweepnonorm.tdd', 'fixtures/reference/reports/probes/probe-22l-sweepnonorm.xml'],
+    // probe-27a (D4+ tie heads; ToVolume 1499.6) and 27b ("to total" at gaps 400 / 700 / 1000 nL, k 0.00075…0.001:
+    // fluids sized at T₁ unless the well total still moves by ≥ 0.1 %), both blind runs of 2026-11-16
+    ['fixtures/reference/probes/probe-27a-d4ties.tdd', 'fixtures/reference/reports/probes/probe-27a-d4ties.xml'],
+    ['fixtures/reference/probes/probe-27b-totalstep.tdd', 'fixtures/reference/reports/probes/probe-27b-totalstep.xml'],
+    // probe-28: written by Craft's wizard/CLI — a diluted stock (RootFluidID / DilutionFactor) for the low levels and
+    // a <Randomize> map within each cell line; the comparison also checks every row's Dispensed Well
+    ['fixtures/reference/probes/probe-28-craft-wide.tdd', 'fixtures/reference/reports/probes/probe-28-craft-wide.xml']]) {
     const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' });
     assert.match(out, /ALL ROWS MATCH/, tdd + ': ' + out.split('\n')[0]);
   }

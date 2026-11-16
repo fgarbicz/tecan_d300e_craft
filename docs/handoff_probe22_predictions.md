@@ -101,3 +101,51 @@ T8+ g3:11.8 g3:9 g3:11.8 g3:9.1
   (k < 0.001 → T = A; also fixes probe-22l E14), (b) fluid volumes round like .NET Math.Round on v/inc in doubles
   with no tie tolerance, and A·(1+p) is computed as A + A·p. All 1920 rows now match; probe-25 and D3 still exact.
 - OPEN: D4+ load at exact .5 — probe-25 257.495 → 258, probe-26 213.499 → 213 (tests: todo).
+
+## probe-27a / 27b (blind; prediction at commit 7c1212b + tools/cassette/make_probe27.mjs, before the runs, 2026-11-16)
+Validates two rules fitted on one datapoint each: D4+ load at an exact .5 (whole-plate head: d to 0.1 µL first;
+equal share: exact), and the "to total" fluid sizing step (|Vⱼ − Vⱼ₋₁| / Nⱼ₋₁ < 0.1 %).
+```
+== probe-27a-d4ties.tdd warn wells 0
+D4+ h1:149.9600→203  h2:119.5800→165  h3:86.7800→124  h4:190.7600→254
+D4+ e2:149.9600→202  e2:149.9600→202  e3:158.7960→213  e3:158.7960→213
+D4+ e3:158.7960→213  m1:149.9600→203  m2:149.9600→203  DMSO normalization:149.9600→203
+   ("exact d everywhere" would give 202, 164, 123, 253 | 202, 202, 213 ×3 | 202, 202, 202;
+    "0.1 µL everywhere" 203, 165, 124, 254 | 203, 203, 214 ×3 | 203, 203, 203; m2 per-plate rounding → 202)
+== probe-27b-totalstep.tdd warn wells 0
+D4+ tt:41.0156→66  DMSO normalization:195.3576→259 ×3
+T8+ DMSO normalization:20.0000→23.3
+   dispense rows: engine as committed (totalTopUp with the previous-top-up sizing check)
+```
+
+### probe-27a / 27b results (2026-11-16)
+- 27a: head counts and order as predicted (12 D4+ heads, 3 cassettes). Loads: 202, 164, 123, 253 | 202, 202, 213,
+  213 | 213, 202, 202, 202 → the "d to 0.1 µL first" half of the prediction is REFUTED for every head kind (single
+  plate, two plates, ToVolume normalization); D4+ loads use the exact head volume. probe-25 head 4 (258 for
+  193.996 µL, a "% of assay volume" normalization head) is back to an open single case. 610/610 dispense rows.
+- Pre-run summary of 27a shows the per-fluid total to 0.1 µL for fluids (202.4, 164.5, 123.5, 253.4, 404.9, 640.5,
+  202.4, 202.4) and to 1 µL for normalization (202); the report's fluid totals are 202, 164, 123, 253, 405, 640.
+- 27b: cassettes as predicted (D4+ tt 66, normalization 259 ×3; T8+ 23.3; summary: tt 66.3, normalization 801).
+  Top-ups 924/924 (the N₁ → N₂ switch at |V₁ − V₀| / N₁ = 0.1 % holds at all three gaps). Fluids: 29 rows one step
+  low → the "previous top-up" sizing check is REFUTED; D300e keeps V₁ in all 924 wells (k ≤ 0.001). New rule: the
+  fluids are sized at T₁ unless the well total still changes by ≥ 0.1 % (|T₂ − T₁| / T₂), then T₂ — the same
+  convergence check as for a well without normalization. 1848/1848; probe-23 plate 1 stays 664/664.
+
+## probe-28 (Craft-generated: diluted stock "Bortezomib - 1:30" with RootFluidID / DilutionFactor + a <Randomize>
+## map that shuffles wells within each cell line; prediction before the run, 2026-11-16)
+```
+T8+ Bortezomib:1.9454→2.5  MEN:1.3359→2  Bortezomib - 1:30:0.0376→2  DMSO normalization:16.8000→19.6
+```
+Expected: opens without a message, shows the diluted fluid, wells marked randomized; the report's Dispensed Well for
+each Non-random Well equals the file's <Randomize> map (308 wells); every volume as the engine computes it.
+
+### probe-28 result (2026-11-16)
+- Opens without any message; fluid list shows "Bortezomib - 1:30, DMSO @ 0.33 mM" with the dilution marker; wells
+  carry the "Randomized" tag (tooltip "Plate 1 Well G7 (C13)"); the run screen shows the plate as dispensed.
+- Pre-run summary 4 T8+ heads; loads 2.5, 2.0, 2.0, 19.6 (summary: normalization 20) — as predicted.
+- Dispense rows 850/850 (volumes, totals, concentrations; "to highest" across the stock and its dilution).
+- <Randomize> DIRECTION: the report's Dispensed Well ↔ Non-random Well shows that <Well R C ToR ToC/> means
+  "the D300e dispenses into R,C the contents of design well ToR,ToC" — the inverse of what src/tdd.js assumed.
+  Fixed in the reader/writer (JS + Rust): in memory { r, c } design → { toR, toC } dispensed, as all callers
+  expect. Files written before this fix (incl. probe-28 itself) hold the inverse permutation: still a valid
+  shuffle within each cell line, but Craft < this commit would have mapped readouts back wrongly.

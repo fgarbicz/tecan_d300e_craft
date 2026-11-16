@@ -592,16 +592,16 @@ fn parse_plate(n: &Element) -> Result<Plate> {
                 }
             }
             "Randomize" => {
-                // Confirmed (fixtures/reference/t09-randomize.tdd): <Well R C ToR ToC/> maps each design well to the
-                // well it is dispensed into; well contents stay at their design (non-random) positions.
+                // <Well R C ToR ToC/>: R,C is the well dispensed into, ToR,ToC the design well whose contents go
+                // there (probe-28 run report, see src/tdd.js). In memory: r,c design → to_r,to_c dispensed.
                 p.randomization = c
                     .children_named("Well")
                     .map(|w| {
                         Ok(RandomMap {
-                            r: uint_of(w.attr("R"), "Randomize R")?,
-                            c: uint_of(w.attr("C"), "Randomize C")?,
-                            to_r: uint_of(w.attr("ToR"), "Randomize ToR")?,
-                            to_c: uint_of(w.attr("ToC"), "Randomize ToC")?,
+                            r: uint_of(w.attr("ToR"), "Randomize ToR")?,
+                            c: uint_of(w.attr("ToC"), "Randomize ToC")?,
+                            to_r: uint_of(w.attr("R"), "Randomize R")?,
+                            to_c: uint_of(w.attr("C"), "Randomize C")?,
                         })
                     })
                     .collect::<Result<_>>()?;
@@ -936,7 +936,7 @@ fn write_plate(p: &Plate) -> Result<Node> {
                     }
                 }
                 let mut list = p.randomization.clone();
-                list.sort_by_key(|m| (m.r, m.c)); // stable, as JS sort
+                list.sort_by_key(|m| (m.to_r, m.to_c)); // by dispensed well; stable, as JS sort
                 kids.push(
                     Element::new(
                         "Randomize",
@@ -946,10 +946,10 @@ fn write_plate(p: &Plate) -> Result<Node> {
                                 Element::new(
                                     "Well",
                                     vec![
-                                        ("R".into(), m.r.to_string()),
-                                        ("C".into(), m.c.to_string()),
-                                        ("ToR".into(), m.to_r.to_string()),
-                                        ("ToC".into(), m.to_c.to_string()),
+                                        ("R".into(), m.to_r.to_string()),
+                                        ("C".into(), m.to_c.to_string()),
+                                        ("ToR".into(), m.r.to_string()),
+                                        ("ToC".into(), m.c.to_string()),
                                     ],
                                     vec![],
                                 )

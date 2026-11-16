@@ -423,7 +423,7 @@ function pctTopUp(req, fluids, b, A, p, cls) {
  * stops at the first i with |Vᵢ − Vᵢ₋₁| / Nᵢ < 0.1 % and returns Nᵢ (at most 4 steps, i ≤ 3: the three
  * largest-k wells stop at i = 3 although their ratio is 0.10–0.11 %). Wells whose fluids add < 0.1 % of the gap
  * therefore get the whole gap. The fluids are dispensed as sized at step j = min(max(i, 1), 2), i.e. with Tⱼ.
- * E21 (ratio 0.1048 % at i = 1): see the sizing step below.
+ * The fluids' sizing step is independent of i: see below (probe-27b).
  */
 function totalTopUp(cs, vol, A, gap, cls) {
   // the sequence (Tᵢ, Vᵢ, Nᵢ) for i = 0…3
@@ -432,13 +432,16 @@ function totalTopUp(cs, vol, A, gap, cls) {
   for (let k = 0; k < 4; k++) { const T = A + Np + Vp, V = vol(cs, T), N = gap - Vp; Ts.push(T); Vs.push(V); Ns.push(N); Vp = V; Np = N; }
   let i = 3;
   for (let k = 0; k < 4; k++) if (Math.abs(Vs[k] - (k ? Vs[k - 1] : 0)) / Math.max(Math.abs(Ns[k]), 1e-12) < SIZING_TOLERANCE) { i = k; break; }
-  // Fluid sizing step j ≤ min(max(i, 1), 2): the first j ≥ 1 whose fluid change is < 0.1 % of the PREVIOUS top-up,
-  // |Vⱼ − Vⱼ₋₁| / Nⱼ₋₁. Only E21 separates this from "j = i": its top-up stops at i = 2 (0.1048 % of N₁) but its
-  // fluid is V₁ (0.0979 % of N₀); F13 (0.163 % of N₀) is V₂. FITTED on that one well.
-  // (was: sizing = Ts[min(max(i, 1), 2)], E21 one 0.4 nL step low)
-  let j = 2;
-  for (let k = 1; k <= 2; k++) if (Math.abs(Vs[k] - Vs[k - 1]) / Math.max(Math.abs(Ns[k - 1]), 1e-12) < SIZING_TOLERANCE) { j = k; break; }
-  const N = Ns[i], sizing = Ts[Math.min(j, Math.max(i, 1))];
+  // Fluid sizing: the well total Tⱼ of this same sequence is iterated like any well's total (computeWell) — stop
+  // when it changes by < 0.1 % and keep the step before: T₁ if |T₂ − T₁| / T₂ < 0.1 % (≈ k < 0.001), else T₂.
+  // probe-27b (blind, 2026-11-16; gaps 400 / 700 / 1000 nL, k 0.00075…0.001, 924 wells): the fluid is V₁ in every
+  // well, also where the top-up has already moved on to N₂ and where |V₁ − V₀| is 0.112 % of N₀; probe-23: V₂ from
+  // k = 0.00148 on. Independent of the top-up's stop step i.
+  // (was: Ts[min(max(i, 1), 2)], then "first j with |Vⱼ − Vⱼ₋₁| / Nⱼ₋₁ < 0.1 %" — fitted on probe-23 E21 alone and
+  //  refuted by probe-27b: 29 of 85 informative wells one 0.4 nL step low.)
+  let j = 1;
+  if (Math.abs(Ts[2] - Ts[1]) / Ts[2] >= SIZING_TOLERANCE) j = 2;
+  const N = Ns[i], sizing = Ts[j];
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + gap, sizing };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {

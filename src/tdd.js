@@ -156,9 +156,13 @@ function parsePlate(n) {
         }
         break;
       case 'Randomize':
-        // Confirmed (fixtures/reference/t09-randomize.tdd): <Well R C ToR ToC/> maps each design well to the
-        // well it is dispensed into; well contents stay at their design (non-random) positions.
-        p.randomization = childrenNamed(c, 'Well').map((w) => ({ r: Number(attr(w, 'R')), c: Number(attr(w, 'C')), toR: Number(attr(w, 'ToR')), toC: Number(attr(w, 'ToC')) }));
+        // <Well R C ToR ToC/>: R,C is the well the D300e DISPENSES INTO; ToR,ToC is the design (non-random) well
+        // whose contents go there. Confirmed with the run report of probe-28 (2026-11-16): for all 850 dispense
+        // rows, "Non-random Well" = the file's To of the "Dispensed Well" (D300e's tooltip "Well G7 (C13)" is the
+        // entry R=2 C=12 → ToR=6 ToC=6). Well contents stay at their design positions in <Wells>.
+        // In memory the map reads the natural way: { r, c } design well → { toR, toC } dispensed well.
+        // (was: R,C read as the design well — the inverse permutation; T09 alone could not tell the two apart.)
+        p.randomization = childrenNamed(c, 'Well').map((w) => ({ r: Number(attr(w, 'ToR')), c: Number(attr(w, 'ToC')), toR: Number(attr(w, 'R')), toC: Number(attr(w, 'C')) }));
         p._randomizeRaw = c; p._randomizeJson = JSON.stringify(p.randomization);
         break;
       default: p._extra[c.name] = c;
@@ -278,8 +282,9 @@ function writePlate(p) {
       case 'Randomize': {
         const list = p.randomization || [];
         if (p._randomizeRaw && JSON.stringify(list) === p._randomizeJson) { kids.push(p._randomizeRaw); break; }
-        kids.push(el('Randomize', [], [...list].sort((a, b) => a.r - b.r || a.c - b.c)
-          .map((m) => el('Well', [['R', String(m.r)], ['C', String(m.c)], ['ToR', String(m.toR)], ['ToC', String(m.toC)]]))));
+        // file attributes: R,C = dispensed well, ToR,ToC = design well; D300e lists them by dispensed well
+        kids.push(el('Randomize', [], [...list].sort((a, b) => a.toR - b.toR || a.toC - b.toC)
+          .map((m) => el('Well', [['R', String(m.toR)], ['C', String(m.toC)], ['ToR', String(m.r)], ['ToC', String(m.c)]]))));
         break;
       }
       default: if (p._extra && p._extra[k]) kids.push(p._extra[k]);
