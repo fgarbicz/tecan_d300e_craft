@@ -126,7 +126,7 @@ export const STEPS = [
   { chapter: 'Results', title: 'Read them in', target: '#rRead', do: click('#rRead'),
     text: '"Use for plate 1" matches every value to its well — on a randomized plate, to the well the dose was really printed in.' },
   { chapter: 'Results', title: 'Heat map and synergy', target: '#rSynergy',
-    text: 'The map now shows the signal. Below: viability and Bliss synergy per cell line (red = the pair kills more than expected). The SynergyFinder package adds ZIP, HSA and Loewe in R.' },
+    text: 'The map now shows the signal. Below: viability, Bliss synergy and Chou–Talalay combination index and isobolograms per cell line (red = synergy). The SynergyFinder package adds ZIP, HSA and Loewe in R.' },
   { chapter: 'Results', title: 'Excel', target: '#rExport',
     text: 'Export Excel: one row per well with cell line, every drug\'s concentration, DMSO, raw signal and % of vehicle, plus replicate statistics. That is the whole cycle.' },
 ];

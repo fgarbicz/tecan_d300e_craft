@@ -198,7 +198,7 @@ test('workbook: sheets, headers, shapes, JSON-safe values', () => {
   meta.experiment.title = 'Synthetic CTG';
   const res = analyze({ protocol, meta });
   const wb = toWorkbook(res, protocol, meta, { appVersion: '0.1.0', generatedAt: '2026-11-15T12:00:00Z' });
-  assert.deepEqual(wb.sheets.map((s) => s.name), ['Info', 'Wells', 'Conditions', 'Synergy (Bliss)', 'Synergy matrix', 'Raw']);
+  assert.deepEqual(wb.sheets.map((s) => s.name), ['Info', 'Wells', 'Conditions', 'Synergy (Bliss)', 'Synergy matrix', 'Chou-Talalay CI', 'Median-effect fits', 'Raw']);
   for (const s of wb.sheets) {
     assert.ok(s.name.length <= 31 && !/[[\]:*?/\\]/.test(s.name));
     assert.equal(s.freeze.length, 2);
@@ -206,7 +206,7 @@ test('workbook: sheets, headers, shapes, JSON-safe values', () => {
     if (s.autofilter) for (const row of s.rows) assert.equal(row.length, s.columns.length, `${s.name} row width`);
   }
   assert.deepEqual(JSON.parse(JSON.stringify(wb)), wb); // nothing JSON would silently change (NaN, undefined)
-  const [info, wells, conds, syn, matrix, raw] = wb.sheets;
+  const [info, wells, conds, syn, matrix, , , raw] = wb.sheets;
   assert.deepEqual(info.rows[0], ['Experiment', 'Synthetic CTG']);
   assert.ok(info.rows.some((r) => r[0] === 'Exported by' && r[1] === 'Tecan D300 Craft 0.1.0'));
   assert.ok(info.rows.some((r) => r[0] === 'Drugs' && /Bortezomib \(stock 1 mM\)/.test(r[1])), JSON.stringify(info.rows.find((r) => r[0] === 'Drugs')));
@@ -240,7 +240,7 @@ test('workbook: degenerate results (no combinations, no readout) still give vali
   for (const p of empty.meta.plates) p.readout = null;
   const wb2 = toWorkbook(analyze(empty), empty.protocol, empty.meta);
   assert.deepEqual(wb2.sheets.map((s) => s.rows.length).slice(1, 4), [0, 0, 0]);
-  assert.equal(wb2.sheets[5].rows.length, 0);
+  assert.equal(wb2.sheets[7].rows.length, 0); // Raw
   assert.deepEqual(JSON.parse(JSON.stringify(wb2)), wb2);
 });
 

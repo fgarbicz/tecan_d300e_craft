@@ -194,6 +194,8 @@ dialog.wizard[open] { display: flex; flex-direction: column; }
 .syn-card { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin: 8px 0; background: var(--panel); }
 .syn-figs { display: flex; flex-wrap: wrap; gap: 6px; }
 .syn-figs svg { max-width: 100%; height: auto; border-radius: 6px; }
+.syn-card .hint { margin: 6px 4px; line-height: 1.5; }
+.warnTxt { color: var(--warn, #c0392b); }
 
 /* dose (concentration-gradient) layer */
 .well.scrap-ring { outline: 1px dashed var(--ink); outline-offset: -1px; }

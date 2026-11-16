@@ -15,7 +15,7 @@ import { drugUnit, setDrugUnit, unitsFor, unitOfFn } from '../src/units.js';
 import { cassetteSvg, fluidLook, THEME_VARS, standalone, LIGHT } from '../src/draw.js';
 import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
-import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
+import { synergyMatrices, heatmapSvg, exportFigure, chouFor, ciHeatmapSvg, isobologramSvg, normalizedIsobologramSvg, faCiSvg, chouSummaryHtml } from './synergy_view.js';
 import { fluidColor as rootFluidColor, DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapTest } from '../src/dosemap.js';
 // Shortcut glyphs: the interface is written with Mac keys; Windows and Linux show Ctrl / Shift instead.
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
@@ -985,7 +985,7 @@ async function renderResultsTab(el) {
     <div id="rMsg"></div>
     <h3>Plates with data: ${withData} / ${S.protocol.plates.length}</h3>
     <ul class="warnlist">${S.meta.plates.map((x, i) => `<li>${x.readout ? '✓' : '·'} Plate ${i + 1}${x.readout ? ` <span class="muted">${esc(x.readout.importedAt?.slice(0, 16).replace('T', ' ') || '')}</span>` : ''}</li>`).join('')}</ul>
-    <div class="callout">The Excel file has one row per well (cell line, role, every drug's concentration, DMSO %, raw signal, % of vehicle), replicate statistics per condition, and Bliss synergy for drug pairs. Mark <b>blank</b> wells (medium only) in Annotate to subtract background.</div>
+    <div class="callout">The Excel file has one row per well (cell line, role, every drug's concentration, DMSO %, raw signal, % of vehicle), replicate statistics per condition, Bliss synergy and Chou–Talalay combination indices (with the median-effect fits) for drug pairs. Mark <b>blank</b> wells (medium only) in Annotate to subtract background.</div>
     <div class="actions"><button id="rExport" class="primary" ${withData ? '' : 'disabled'}>${icon('excel', 15)} Export Excel…</button></div>
     <div id="rSynergy"></div>`;
   $('rRead').onclick = async () => {
@@ -1013,20 +1013,26 @@ async function renderSynergySection(el) {
   const mats = synergyMatrices(result);
   if (!mats.length) { el.innerHTML = '<h3>Synergy</h3><p class="hint">No drug pairs with single-agent and combination wells measured yet.</p>'; return; }
   const lim = Math.max(10, ...mats.flatMap((m) => [...m.bliss.values()].map((v) => Math.abs(v))));
+  const figsOf = (m, ch) => [{ name: 'viability', svg: heatmapSvg(m, 'viability') }, { name: 'bliss', svg: heatmapSvg(m, 'bliss', { limit: lim }) },
+    ...(ch ? [{ name: 'chou_ci', svg: ciHeatmapSvg(m, ch) }, { name: 'isobologram', svg: isobologramSvg(m, ch) },
+      { name: 'normalized_isobologram', svg: normalizedIsobologramSvg(m, ch) }, { name: 'fa_ci', svg: faCiSvg(m, ch) }] : [])];
   S.synFormats ||= { png: true, pdf: true, svg: true, rds: true, html: false };
   el.innerHTML = `<h3>${icon('synergy', 16)} Synergy (${mats.length} cell line × drug pair${mats.length > 1 ? 's' : ''})</h3>
-    <p class="hint">Bliss excess: how much more (red) or less (blue) the combination kills than expected if the two drugs acted independently, from the mean of the replicates. For ZIP, HSA, Loewe and fitted surfaces use the SynergyFinder package below.</p>
-    ${mats.map((m, i) => `<div class="syn-card"><div class="syn-figs">${heatmapSvg(m, 'viability')}${heatmapSvg(m, 'bliss', { limit: lim })}</div>
-      <div class="actions"><button class="small" data-fig="${i}" data-f="svg">SVG</button><button class="small" data-fig="${i}" data-f="png">PNG</button></div></div>`).join('')}
+    <p class="hint"><b>Bliss excess</b>: how much more (red) or less (blue) the combination kills than expected if the two drugs acted independently, from the mean of the replicates.
+      <b>Chou–Talalay</b>: each drug alone is fitted to the median-effect equation; the combination index CI = d<sub>A</sub>/D<sub>x,A</sub> + d<sub>B</sub>/D<sub>x,B</sub> compares each combination with the doses of the drugs alone that give the same effect (CI &lt; 1 synergy, ≈ 1 additive, &gt; 1 antagonism). The isobologram shows, for 50, 75 and 90 % effect, the additive line (dashed) and where the combination actually reaches that effect (solid; below the line = synergy).
+      For ZIP, HSA, Loewe and fitted surfaces use the SynergyFinder package below.</p>
+    ${mats.map((m, i) => { const ch = chouFor(result, m); return `<div class="syn-card"><div class="syn-figs">${figsOf(m, ch).map((f) => f.svg).join('')}</div>
+      ${ch ? chouSummaryHtml(ch, esc) : ''}
+      <div class="actions"><button class="small" data-fig="${i}" data-f="svg">Save figures (SVG)</button><button class="small" data-fig="${i}" data-f="png">PNG</button></div></div>`; }).join('')}
     <h3>SynergyFinder (R)</h3>
     <p class="hint">A complete package: the input CSV in SynergyFinder's format, an annotated well table, analysis.R with styled figures (dose–response, response matrix, ZIP/HSA/Bliss/Loewe maps and 3D surfaces), README and the conda environment.</p>
     <div class="actions" style="flex-wrap:wrap">${['png', 'pdf', 'svg', 'rds', 'html'].map((f) => `<label class="chk"><input type="checkbox" data-fmt="${f}" ${S.synFormats[f] ? 'checked' : ''}> ${f.toUpperCase()}${f === 'html' ? ' (3D)' : ''}</label>`).join('')}</div>
     <div class="actions"><button id="synPkg">${icon('save', 15)} Save package (CSV + R code)…</button><button id="synRender" class="primary">${icon('run', 15)} Save + render figures…</button></div>
     <div id="synMsg"></div>`;
   for (const b of el.querySelectorAll('[data-fmt]')) b.onchange = () => { S.synFormats[b.dataset.fmt] = b.checked; };
-  for (const b of el.querySelectorAll('[data-fig]')) b.onclick = () => {
+  for (const b of el.querySelectorAll('[data-fig]')) b.onclick = async () => {
     const m = mats[+b.dataset.fig], base = `${m.cellLine}_${m.drugA}_x_${m.drugB}`.replace(/[^\w.-]+/g, '_');
-    exportFigure(heatmapSvg(m, 'viability'), base + '_viability', b.dataset.f, saveBlob).then(() => exportFigure(heatmapSvg(m, 'bliss', { limit: lim }), base + '_bliss', b.dataset.f, saveBlob));
+    for (const f of figsOf(m, chouFor(result, m))) await exportFigure(f.svg, `${base}_${f.name}`, b.dataset.f, saveBlob);
   };
   const pkg = async () => {
     const SX = await import('../src/synergy_export.js');

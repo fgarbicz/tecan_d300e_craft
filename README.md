@@ -7,7 +7,8 @@ Craft walks you through an experiment in five steps (plates, drugs, doses, cell 
 it into a D300e protocol (`.tdd`) that D300e Control opens as it is. Along the way it tells you what to
 prepare at the bench: which stocks and diluted stocks, which cassettes, how much to pipette into each
 dispense head, where the cells and the PBS border go. After the plate reader, paste the values back in and
-get viability, Bliss synergy and an Excel workbook, matched to the wells where each dose was really printed.
+get viability, Bliss and Chou–Talalay synergy (combination index, isobolograms) and an Excel workbook, matched to
+the wells where each dose was really printed.
 
 Runs on **Mac, Windows and Linux**. Current version: **0.3.0**.
 
@@ -141,6 +142,23 @@ Export an Excel workbook (one row per well plus replicate statistics), or a Syne
 ZIP / HSA / Loewe.
 
 <img src="docs/manual/shots/36.webp" width="860" alt="Results: viability heat map and Bliss synergy matrices">
+
+### Chou–Talalay: combination index and isobolograms
+Each drug alone is fitted to the median-effect equation between 10 and 90 % effect (m, Dm and r shown; warnings for
+r < 0.90 and for an effect that levels off at the top — usually a reader floor: mark blank wells).
+Every combination then gets a **combination index** — CI = d<sub>A</sub>/D<sub>x,A</sub> + d<sub>B</sub>/D<sub>x,B</sub>,
+comparing it with the doses of each drug alone that give the same effect: CI < 1 synergy, ≈ 1 additive, > 1
+antagonism, with Chou's categories (Pharmacol Rev 2006) and dose-reduction indices. Four figures per cell line and
+pair, each saved as SVG or PNG: the CI matrix, a **classic isobologram** at 50 / 75 / 90 % effect (dashed: additive;
+solid: where the combination really reaches that effect — below the line is synergy), the **normalized
+isobologram** and the **Fa–CI plot**. The Excel export gets a *Chou-Talalay CI* and a *Median-effect fits* sheet.
+
+<img src="docs/images/chou-talalay.webp" width="860" alt="CI matrix, isobologram at ED50/75/90, normalized isobologram and Fa–CI plot">
+
+<sub>Figures from the tour's simulated readout, where the two drugs act independently: within the doses tested alone
+the CI stays near 1. Each drug alone is fitted between 10 and 90 % effect, so that well-to-well noise near 0 and the
+reader floor near 100 % do not bend the slope (CompuSyn fits every point; that fit is listed in Excel for comparison).
+CIs that need doses beyond those tested alone are shown faded / open and are not counted in the summary.</sub>
 
 ---
 

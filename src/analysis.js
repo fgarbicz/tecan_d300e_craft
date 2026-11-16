@@ -14,6 +14,7 @@
 //   * Synergy uses condition MEANS (not per-well values). Inhibition is not clamped to [0, 1]: a
 //     viability above 100 % gives a negative inhibition, which is reported as measured.
 
+import { medianEffectFit, combinationIndex, ciClass } from './chou.js';
 import { wellKey, wellName } from './tdd.js';
 import { wellRole } from './experiment.js';
 import { computeProtocol, unitKind, toDisplay, unitLabel, compounds } from './dispense.js';
@@ -285,7 +286,7 @@ function stats(xs) {
  * @param {{ protocol, computed?, meta, options? }} args
  *   computed: computeProtocol(protocol) result (computed here when missing; only used for DMSO %).
  *   options.plates: plate indices to analyze (default: every plate with a readout).
- * @returns {{ wells: object[], conditions: object[], synergy: object[], warnings: string[], fluids: object[] }}
+ * @returns {{ wells: object[], conditions: object[], synergy: object[], chou: object[], warnings: string[], fluids: object[] }}
  */
 export function analyze({ protocol, computed, meta, options = {} }) {
   const comp = computed || computeProtocol(protocol);
@@ -401,7 +402,55 @@ export function analyze({ protocol, computed, meta, options = {} }) {
   }
   synergy.sort((x, y) => clRank(x.cellLineId) - clRank(y.cellLineId) || String(x.cellLine).localeCompare(String(y.cellLine)) ||
     x.fluidA - y.fluidA || x.fluidB - y.fluidB || x.concA - y.concA || x.concB - y.concB);
-  return { wells, conditions, synergy, warnings, fluids };
+  return { wells, conditions, synergy, chou: chouTalalay(conditions, synergy, fluids), warnings, fluids };
+}
+
+/**
+ * Chou–Talalay for every cell line × drug pair in `synergy`: a median-effect fit of each drug alone (all its
+ * single-agent conditions for that cell line), then the combination index of every combination from its
+ * mean effect fa = 1 − viability/100. Doses in each drug's display unit (the CI does not depend on it).
+ */
+function chouTalalay(conditions, synergy, fluids) {
+  const singles = new Map(); // `${cl}|${i}` → [{dose, fa}]
+  for (const c of conditions) {
+    if (c.agents !== 1 || c.mean == null) continue;
+    const i = c.conc.findIndex((x) => x !== 0);
+    const k = `${c.cellLineId}|${i}`;
+    if (!singles.has(k)) singles.set(k, []);
+    singles.get(k).push({ dose: c.conc[i], fa: 1 - c.mean / 100 });
+  }
+  const fits = new Map();
+  const fitOf = (cl, fluidId) => {
+    const i = fluids.findIndex((f) => f.id === fluidId), k = `${cl}|${i}`;
+    if (!fits.has(k)) { const pts = singles.get(k) || []; fits.set(k, { ...medianEffectFit(pts), all: medianEffectFit(pts, { range: [Number.MIN_VALUE, 1 - Number.EPSILON / 2] }) }); }
+    return fits.get(k);
+  };
+  const pairs = new Map();
+  for (const s of synergy) {
+    const k = `${s.cellLineId}|${s.fluidA}|${s.fluidB}`;
+    if (!pairs.has(k)) pairs.set(k, {
+      cellLineId: s.cellLineId, cellLine: s.cellLine, fluidA: s.fluidA, drugA: s.drugA, unitA: s.unitA, fluidB: s.fluidB, drugB: s.drugB, unitB: s.unitB,
+      fitA: fitOf(s.cellLineId, s.fluidA), fitB: fitOf(s.cellLineId, s.fluidB), points: [],
+    });
+    const p = pairs.get(k), fa = s.inhibitionAB;
+    const ci = combinationIndex(p.fitA, p.fitB, s.concA, s.concB, fa);
+    const cls = ci ? ciClass(ci.ci) : null;
+    p.points.push({
+      concA: s.concA, concB: s.concB, fa, ci: ci?.ci ?? null, xA: ci?.xA ?? null, xB: ci?.xB ?? null, dxA: ci?.dxA ?? null, dxB: ci?.dxB ?? null,
+      driA: ci?.driA ?? null, driB: ci?.driB ?? null, extrapolated: ci?.extrapolated ?? false,
+      interpretation: cls ? `${cls.label} (${cls.symbol})` : '',
+      note: ci ? '' : !p.fitA.ok || !p.fitB.ok ? 'no median-effect fit for a drug alone' : 'effect not between 0 and 1',
+    });
+  }
+  return [...pairs.values()].map((p) => {
+    // summary over the CIs inside the single-agent data only; extrapolated ones are counted separately
+    const withCI = p.points.filter((x) => x.ci != null), cis = withCI.filter((x) => !x.extrapolated).map((x) => x.ci);
+    const count = (f) => cis.filter(f).length;
+    return { ...p, summary: {
+      n: cis.length, extrapolated: withCI.length - cis.length, geoMeanCI: cis.length ? Math.exp(cis.reduce((s, x) => s + Math.log(x), 0) / cis.length) : null,
+      synergistic: count((x) => x < 0.9), additive: count((x) => x >= 0.9 && x <= 1.1), antagonistic: count((x) => x > 1.1),
+    } };
+  });
 }
 
 // ---------- workbook model ----------
@@ -418,6 +467,8 @@ export function sheetName(name, taken = new Set()) {
 const NORMALIZATION_TEXT = 'Viability % = (signal − background) / (vehicle mean − background) × 100. Background = mean signal of the blank wells (medium, no cells) on the same plate; 0 when a plate has no blank wells. Vehicle mean = mean signal of the vehicle wells (cells, no drug) with the same cell line on the same plate. Wells without a signal are left out of every mean. PBS, scrap, excluded and empty wells are listed but not normalized.';
 const CONDITIONS_TEXT = 'Treated and vehicle wells pooled over all analyzed plates by cell line and requested concentrations (rounded to 10 significant digits). Wells with the same concentrations are pooled even when they come from different plate sets, e.g. a drug alone appears in every combination block; DMSO normalization can differ between those sets (see DMSO % in Wells). SD is the sample SD (n − 1); SEM = SD / √n; CV % = SD / mean × 100.';
 const SYNERGY_TEXT = 'From condition means, for combinations of exactly two drugs whose single-agent conditions (same concentrations, all other drugs 0) were measured for the same cell line. Inhibition I = 1 − viability/100 (not clamped). Bliss expected = I_A + I_B − I_A·I_B; Bliss excess = I_A+B − expected; HSA excess = I_A+B − max(I_A, I_B). Positive = more inhibition than expected (synergy), negative = antagonism.';
+
+const CHOU_TEXT = 'Chou–Talalay (Chou & Talalay 1984; Chou, Pharmacol Rev 2006). Effect fa = 1 − viability/100 from condition means. Each drug alone: median-effect fit log(fa/(1−fa)) = m·log D − m·log Dm over its single-agent conditions with 0 < fa < 1 (m = slope, Dm = median-effect dose, r = linear correlation; r ≥ 0.90 is the usual quality bar for cell-based data). For each combination (dA, dB) with effect fa: Dx = Dm·(fa/(1−fa))^(1/m) for each drug alone; CI = dA/DxA + dB/DxB (mutually exclusive, as CompuSyn; non-constant ratio). CI < 1 synergism, ≈ 1 additive, > 1 antagonism (categories from Chou 2006, Table 2). DRI = Dx / d. The fit uses the single-agent conditions with 10 % ≤ fa ≤ 90 % (outside that range the median-effect line is dominated by well-to-well noise near 0 and by the reader floor / background near 1); with fewer than 2 such doses it uses all 0 < fa < 1 and says so. CompuSyn fits every 0 < fa < 1: that fit is listed too (Median-effect fits sheet) for comparison. "Extrapolated": a Dx lies outside the doses the fit was made on — such CIs are listed but not counted in the summaries. Mark blank wells so that background is subtracted: an unsubtracted floor caps the effect near 100 %.';
 
 function stockText(f) {
   // <Concentration> is in the base unit; <ConcentrationUnit> is the display unit (dispense.js stockInBase)
@@ -449,7 +500,7 @@ export function toWorkbook(result, protocol, meta, opts = {}) {
     ['Plates analyzed', analyzed.map((i) => `${i + 1}${protocol.plates[i]?.name ? ` (${protocol.plates[i].name})` : ''}`).join(', ')],
     ['Drugs', protocol.fluids.map((f) => `${f.name}${f.byVol ? ' (by volume)' : ` (stock ${stockText(f)})`}`).join(', ')],
     ['Concentrations', 'Requested concentrations as designed in the protocol (base units: µM for molar drugs, ng/mL for mass, nL for volume fluids).'],
-    ['Normalization', NORMALIZATION_TEXT], ['Conditions', CONDITIONS_TEXT], ['Synergy', SYNERGY_TEXT],
+    ['Normalization', NORMALIZATION_TEXT], ['Conditions', CONDITIONS_TEXT], ['Synergy', SYNERGY_TEXT], ['Chou–Talalay', CHOU_TEXT],
     ['Exported by', `Tecan D300 Craft ${opts.appVersion || ''}`.trim()],
     ['Exported at', generatedAt.toISOString()],
   ];
@@ -527,6 +578,38 @@ export function toWorkbook(result, protocol, meta, opts = {}) {
     rows: mRows, header: false,
   };
 
+  const chou = result.chou || [];
+  const ciSheet = {
+    name: sheetName('Chou-Talalay CI', taken), freeze: [1, 1], autofilter: true,
+    columns: [{ header: 'Cell line', width: 12 }, { header: 'Drug A', width: 12 }, { header: 'Conc A', width: 9 }, { header: 'Unit A', width: 6 },
+      { header: 'Drug B', width: 12 }, { header: 'Conc B', width: 9 }, { header: 'Unit B', width: 6 },
+      { header: 'Fa (A+B)', width: 9, format: '0.000' }, { header: 'CI', width: 9, format: '0.000' }, { header: 'Interpretation', width: 26 },
+      { header: 'Dx A', width: 10, format: '0.000E+00' }, { header: 'Dx B', width: 10, format: '0.000E+00' },
+      { header: 'DRI A', width: 9, format: '0.00' }, { header: 'DRI B', width: 9, format: '0.00' },
+      { header: 'Extrapolated', width: 11 }, { header: 'Note', width: 34 }],
+    rows: chou.flatMap((p) => p.points.map((x) => [p.cellLine, p.drugA, x.concA, p.unitA, p.drugB, x.concB, p.unitB, nn(x.fa), nn(x.ci), x.interpretation,
+      nn(x.dxA), nn(x.dxB), nn(x.driA), nn(x.driB), x.ci == null ? '' : x.extrapolated ? 'yes' : 'no', x.note])),
+  };
+  const fitRows = [];
+  for (const p of chou) for (const [drug, unit, f] of [[p.drugA, p.unitA, p.fitA], [p.drugB, p.unitB, p.fitB]]) {
+    fitRows.push([p.cellLine, drug, unit, f.ok ? nn(f.m) : null, f.ok ? nn(f.Dm) : null, nn(f.r), f.n, f.excluded,
+      f.ok ? nn(f.doseMin) : null, f.ok ? nn(f.doseMax) : null,
+      f.all?.ok ? nn(f.all.m) : null, f.all?.ok ? nn(f.all.Dm) : null, f.all?.ok ? nn(f.all.r) : null,
+      [f.ok ? '' : f.reason, f.fallback ? 'fewer than 2 doses between 10 and 90 % effect: fitted on all points' : '',
+        f.plateau != null ? `highest doses level off at ${(f.plateau * 100).toFixed(1)} % effect (floor? mark blank wells)` : '',
+        f.ok && f.r < 0.9 ? 'r < 0.90: poor fit' : ''].filter(Boolean).join('; ')]);
+  }
+  const fitSheet = {
+    name: sheetName('Median-effect fits', taken), freeze: [1, 1], autofilter: true,
+    columns: [{ header: 'Cell line', width: 12 }, { header: 'Drug', width: 14 }, { header: 'Unit', width: 6 },
+      { header: 'm (slope)', width: 9, format: '0.000' }, { header: 'Dm (median-effect dose)', width: 14, format: '0.000E+00' }, { header: 'r', width: 8, format: '0.0000' },
+      { header: 'Points used', width: 8 }, { header: 'Points left out (outside 10–90 %)', width: 14 },
+      { header: 'Lowest dose', width: 11, format: '0.000E+00' }, { header: 'Highest dose', width: 11, format: '0.000E+00' },
+      { header: 'm, all points (CompuSyn)', width: 11, format: '0.000' }, { header: 'Dm, all points', width: 12, format: '0.000E+00' }, { header: 'r, all points', width: 10, format: '0.0000' },
+      { header: 'Note', width: 34 }],
+    rows: fitRows,
+  };
+
   // Raw grids, as pasted, with row letters and column numbers.
   const maxCols = Math.max(1, ...analyzed.map((i) => protocol.plates[i].cols));
   const rawRows = [], rawBold = [];
@@ -545,5 +628,5 @@ export function toWorkbook(result, protocol, meta, opts = {}) {
   };
 
   const infoSheet = { name: sheetName('Info', taken), freeze: [0, 0], columns: [{ header: 'Item', width: 16 }, { header: 'Value', width: 110 }], rows: info };
-  return { sheets: [infoSheet, wellsSheet, condSheet, synSheet, matrixSheet, rawSheet] };
+  return { sheets: [infoSheet, wellsSheet, condSheet, synSheet, matrixSheet, ciSheet, fitSheet, rawSheet] };
 }
