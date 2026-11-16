@@ -988,15 +988,15 @@ fn max_total_top_up(
     let x1 = vol(c_all, a + 2.0 * g);
     let x2 = vol(c_all, t2);
     let small = |d: f64, n: f64| d.abs() / js_max(n.abs(), 1e-12) < SIZING_TOLERANCE;
-    let (x, used2) = if small(x1 - x0, g - x0) {
-        (x0, false)
+    let x = if small(x1 - x0, g - x0) {
+        x0
     } else if small(x2 - x1, g - x1) {
-        (x1, false)
+        x1
     } else {
-        (x2, x2 != x1)
+        x2
     };
     let n = g - x;
-    let sizing = if used2 { t2 } else { t1 };
+    let sizing = t2; // fluids always at T₂ (probe-30)
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
         return (0.0, a + g, sizing);

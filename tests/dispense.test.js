@@ -192,6 +192,9 @@ test('normalization probes 20 and 21: documented accuracy (regression guard)', a
   const rows = (tdd, rep) => +execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' }).match(/'vol_ok': (\d+)/)[1];
   // probe-20: every row since the "to highest total" model of 2026-11-16 (it was not used to derive that model)
   assert.equal(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml'), 1007);
+  // probe-30 (blind run of the "to highest total" model: 1222/1239 as predicted, 1232 after sizing all fluids at T₂;
+  // the 7 open rows are on the 20 µL plate — see maxTotalTopUp)
+  assert.ok(rows('fixtures/reference/probes/probe-30-maxtotal.tdd', 'fixtures/reference/reports/probes/probe-30-maxtotal.xml') >= 1232);
   // probe-23: plate 1 "to total" 664/664, plate 2 "to highest total" 660/665 (five near-ties within 0.013 steps)
   assert.ok(rows('fixtures/reference/probes/probe-23-totalsweep.tdd', 'fixtures/reference/reports/probes/probe-23-totalsweep.xml') >= 1324);
   assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1320);

@@ -127,8 +127,9 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   two-fluid group, validation: probe-30). Target: the largest well is sized as a "to total" well whose gap is its
   own plain sizing s; its fluid volume at that total is the target gap g (probe-23: s = 556.05, g = 556.2504).
   Every well: N = g − X with X stepping X₀ = V(A) → X₁ = V(A + 2g) → X₂ = V(T₂), stopping when the step changes
-  X by < 0.1 % of the top-up; fluids at T₁ = A + g + X₀, or T₂ once X₂ is used. probe-23 plate 2 660/665 (five
-  near-ties within 0.013 steps: G3, I19, K6, N4 fluids, L8 top-up), probe-20 1007/1007.
+  X by < 0.1 % of the top-up; fluids at T₂. probe-23 plate 2 660/665 (five near-ties within 0.013 steps: G3, I19,
+  K6, N4 fluids, L8 top-up), probe-20 1007/1007; blind probe-30 1222/1239 as predicted, 1232/1239 after sizing
+  every fluid at T₂ (open: 7 rows on its 20 µL plate — near-ties, and one well, I15, that fits a further step).
   (earlier notes, kept for the record: the implied gap looked k-dependent — 556.25 → 555.7 → 555.4 → 556.25 —
   because the middle band subtracts X₁, not V₀ or V₁; no single-volume model could fit.)
 - "% of assay volume": lagged iteration from T₀ = A(1+p) (Nᵢ = p·Tᵢ − Vᵢ₋₁), stop |ΔV|/N < 0.1 %, fluids sized at

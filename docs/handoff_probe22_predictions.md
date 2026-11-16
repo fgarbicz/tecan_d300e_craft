@@ -161,3 +161,11 @@ T8+ ht1:10.0000→11.8  ht1:4.3128→5.3  ht2:8.6324→10.2  ht1:5.9180→7.1
 D4+ DMSO normalization:154.0100→208
 ```
 Dispense rows: the engine as committed (maxTotalTopUp); compare with tools/compare/compare_report.py.
+
+### probe-30 result (2026-11-16)
+- Cassettes, heads, loads and the pre-run totals (24.2 / 10.2 / 208) exactly as predicted.
+- Dispense rows: 1222/1239 as predicted (plate 1 350/352, plate 2 404/413, plate 3 468/474). Ten of the 17 misses
+  were fluids sized at T₁ in the low / middle bands; D300e sizes them at T₂ too → 1232/1239 with plates 1 and 3
+  exact. The model's target, the three-step top-up and its two switches held on all three unseen groups.
+- Still open, all on the 20 µL plate: E12, H3, G23 (top-ups 0.012–0.025 steps from a tie, both directions),
+  E14 (fluid 0.046 steps), I15 (one more iteration step fits; one well).

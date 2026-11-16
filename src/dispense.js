@@ -465,9 +465,14 @@ function totalTopUp(cs, vol, A, gap, cls) {
  *    still use X₂). On probe-23 the switches sit at k = 4.67e-4 | 4.88e-4 and 8.81e-4 | 9.19e-4, exactly where
  *    these two ratios cross 0.1 %. (X₁'s total A + 2g counts the first top-up twice — N₀ + N₁ + V₀ — which is what
  *    the reported volumes show: 15/15 wells of that band; g − V₁ fits 4.)
- *  - Fluids: sized at T₁ = A + g + X₀ while the top-up uses X₀ or X₁, at T₂ once it uses X₂.
+ *  - Fluids: sized at T₂.
  *  Result: probe-23 plate 2 660/665 rows, probe-20 1007/1007 (all five types). Left on probe-23: four fluid
  *  volumes 0.0004–0.006 steps below a rounding tie (G3, I19, K6, N4) and one top-up 0.013 steps above one (L8).
+ *  Blind validation, probe-30 (three unseen groups; 50 µL one fluid, 20 µL two fluids, largest well with two
+ *  fluids): 1222/1239 rows as predicted; with the T₂ sizing above 1232/1239 — plates 1 and 3 exact. OPEN on the
+ *  20 µL plate (7 rows, 5 wells): three top-ups 0.012–0.025 steps from a tie in both directions (E12, H3, G23), one
+ *  fluid 0.046 steps (E14), and I15 (k = 0.0179, top-up 44 nL), which matches one more step (X₃, T₃) although wells
+ *  with larger relative changes (up to 0.7 % of the top-up) stay at step 2.
  * (was: the "to highest" class model with a moving target — fluids 305/331, top-ups 216/334 on that plate.)
  */
 function maxTotalTopUp(cT, cAll, vol, A, s, cls) {
@@ -477,9 +482,10 @@ function maxTotalTopUp(cT, cAll, vol, A, s, cls) {
   const X1 = vol(cAll, A + 2 * g), X2 = vol(cAll, T2);
   const small = (d, n) => Math.abs(d) / Math.max(Math.abs(n), 1e-12) < SIZING_TOLERANCE;
   const X = small(X1 - X0, g - X0) ? X0 : small(X2 - X1, g - X1) ? X1 : X2;
-  // fluids: T₂ exactly when the top-up went on to X₂, else T₁ (probe-23 E23 / F2, k = 0.001: top-up from X₂ and
-  // fluid V₂ although |T₂ − T₁| / T₂ is 0.098 %; the "to total" total-change rule would keep T₁ there)
-  const N = g - X, sizing = X === X2 && X2 !== X1 ? T2 : T1;
+  // fluids: always at T₂ (probe-30, blind: sizing at T₁ for the X₀ / X₁ bands left 10 fluid rows one step high;
+  // on probe-23 the two totals round alike in those bands, so that run could not tell)
+  // (was: T₂ only once the top-up used X₂, else T₁)
+  const N = g - X, sizing = T2;
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + g, sizing };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {

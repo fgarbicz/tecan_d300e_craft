@@ -191,3 +191,9 @@ test('per-fluid total load = exact head loads summed, rounded once (run report "
   assert.equal(tot('probe-27b-totalstep.tdd')['DMSO normalization'], 801);  // 3 × 259 + 23.3 on a T8+ head
   assert.equal(tot('probe-2-split.tdd').m6, 24.7);                          // T8+ heads 12.4 + 12.4
 });
+
+test('probe-30 (blind): heads and loads of a three-plate "to highest total" run', () => {
+  assert.deepEqual(heads(plan(R + 'probe-30-maxtotal.tdd')), [
+    ['T8+', ['ht1 11.8', 'ht1 5.3', 'ht2 10.2', 'ht1 7.1']],
+    ['D4+', ['DMSO normalization 208']]]);
+});
