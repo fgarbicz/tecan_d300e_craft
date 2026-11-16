@@ -189,3 +189,16 @@ test('targeted titration reproduces D300e Control (T11)', async () => {
   applyTitration(p, Array.from({ length: 16 }, (_, r) => [r, 9]), 0, lv, { pattern: 'colsTL' });
   for (let r = 0; r < 16; r++) close(p.wells.get(`${r},9`).get(0), ref.wells.get(`${r},9`).get(0), 1e-12, `row ${r}`);
 });
+
+test('copy/paste carries normalization groups (guide §3.9)', async () => {
+  const { copyNormalization, pasteNormalization, newPlate, addNormalization } = await import('../src/ops.js');
+  const p = { fluids: [], plates: [newPlate(), newPlate()], backfills: [] };
+  addNormalization(p, 0, 'ToMaxVolume', undefined, [{ p: 0, r: 1, c: 1 }, { p: 0, r: 1, c: 2 }]);
+  addNormalization(p, 0, 'ToAssayVolumePct', 0.01, [{ p: 1, r: 5, c: 5 }]);
+  const cells = [[1, 1], [1, 2], [1, 3]];
+  const groups = copyNormalization(p, 0, cells);
+  assert.deepEqual(groups, [[0], [0], []]);
+  const clip = cells.map(([r, c], i) => ({ dr: r - 1, dc: c - 1, groups: groups[i] }));
+  pasteNormalization(p, 1, clip, 5, 4, 16, 24); // (5,4),(5,5),(5,6): (5,5) leaves the % group
+  assert.deepEqual(p.backfills.map((b) => b.wells.map((w) => `${w.p}:${w.r},${w.c}`)), [['0:1,1', '0:1,2', '1:5,4', '1:5,5']]);
+});

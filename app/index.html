@@ -3,75 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>D300 Designer</title>
+<title>Tecan D300 Craft</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="topbar">
-  <strong class="brand">D300 Designer</strong>
-  <button id="btnNew" title="New protocol (⌘N)">New</button>
-  <button id="btnOpen" title="Open .tdd (⌘O)">Open…</button>
-  <button id="btnSave" title="Save (⌘S)">Save</button>
-  <button id="btnSaveAs">Save as…</button>
-  <span class="sep"></span>
-  <button id="btnUndo" title="Undo (⌘Z)">Undo</button>
-  <button id="btnRedo" title="Redo (⇧⌘Z)">Redo</button>
-  <span class="sep"></span>
-  <button id="btnReport" title="Per-well volumes as CSV">Export volumes (CSV)</button>
+<header class="topbar" id="topbar">
+  <button class="brand" id="btnHome" title="Start screen"><span class="logo"></span><span>D300 Craft</span></button>
+  <div class="tb-group">
+    <button class="tb" id="btnNew" title="New blank protocol (⌘N)" data-icon="new">New</button>
+    <button class="tb" id="btnOpen" title="Open a .tdd protocol (⌘O)" data-icon="open">Open</button>
+    <button class="tb" id="btnSave" title="Save (⌘S) — writes the .tdd and its experiment file" data-icon="save">Save</button>
+    <button class="tb" id="btnSaveAs" title="Save as… (⇧⌘S)" data-icon="saveAs">Save as</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb" id="btnUndo" title="Undo (⌘Z)" data-icon="undo">Undo</button>
+    <button class="tb" id="btnRedo" title="Redo (⇧⌘Z)" data-icon="redo">Redo</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb accent" id="btnWizard" title="Build a whole experiment step by step" data-icon="wizard">Experiment wizard</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb" id="btnCopy" title="Copy selected wells, with their drugs, normalization, cell lines and roles (⌘C)" data-icon="copy">Copy</button>
+    <button class="tb" id="btnPaste" title="Paste with the top-left at the first selected well (⌘V)" data-icon="paste">Paste</button>
+    <button class="tb" id="btnClearSel" title="Remove drugs from the selected wells (Delete)" data-icon="trash">Clear</button>
+  </div>
+  <div class="tb-group">
+    <button class="tb" id="btnRunPlan" title="Cassettes, dispense heads and how much to pipette into each" data-icon="cassette">Run plan</button>
+    <button class="tb" id="btnResults" title="Paste plate-reader data and export an annotated Excel file" data-icon="results">Results</button>
+  </div>
+  <span class="spacer"></span>
   <span id="fileName" class="filename">untitled.tdd</span>
+  <span id="dirty" class="dirty" hidden title="Unsaved changes">●</span>
   <span class="theme-pick" id="themePick" title="Colour theme"></span>
-  <span id="dirty" class="dirty" hidden>● unsaved</span>
   <input id="fileInput" type="file" accept=".tdd,.xml" hidden>
+  <input id="metaInput" type="file" accept=".json" hidden>
 </header>
 
-<main class="layout">
+<main class="layout" id="layout">
   <aside class="side">
     <section>
-      <h2>Fluids <button id="btnAddFluid" class="small">+ Add</button></h2>
+      <h2><span>Drugs (fluids)</span> <button id="btnAddFluid" class="small" title="Add a drug or other fluid" data-icon="plus">Add</button></h2>
       <table class="fluids" id="fluidTable"></table>
     </section>
     <section>
-      <h2>Plates <button id="btnAddPlate" class="small">+ Add</button></h2>
+      <h2><span>Cell lines</span> <button id="btnAddCellLine" class="small" title="Add a cell line" data-icon="plus">Add</button></h2>
+      <div id="cellLineList" class="chips"></div>
+    </section>
+    <section>
+      <h2><span>Plates</span>
+        <span class="row-btns">
+          <button id="btnAddPlate" class="small icon-only" title="Add a plate" data-icon="plus"></button>
+          <button id="btnReplicatePlate" class="small icon-only" title="Duplicate this plate (drugs, normalization, cell lines)" data-icon="dup"></button>
+          <button id="btnRemovePlate" class="small icon-only danger" title="Remove this plate" data-icon="trash"></button>
+        </span></h2>
       <ol id="plateList" class="plates"></ol>
-      <div class="row-btns">
-        <button id="btnReplicatePlate" class="small">Replicate</button>
-        <button id="btnClearPlate" class="small">Clear</button>
-        <button id="btnRemovePlate" class="small danger">Remove</button>
-      </div>
     </section>
     <section id="plateParams"></section>
-    <section id="protocolSettings"></section>
+    <details id="protocolSettingsBox"><summary>Protocol settings</summary><section id="protocolSettings"></section></details>
   </aside>
 
   <section class="center">
     <div class="plate-toolbar">
-      <label>Show <select id="showFluid"></select></label>
-      <label class="chk"><input type="checkbox" id="showNorm" checked> normalization</label>
-      <span id="selInfo" class="muted"></span>
-      <button id="btnSelectAll" class="small">Select all</button>
-      <button id="btnSelectNone" class="small">Select none</button>
-      <button id="btnCopy" class="small" title="⌘C">Copy</button>
-      <button id="btnPaste" class="small" title="⌘V at top-left selected well">Paste</button>
-      <button id="btnClearSel" class="small danger" title="Delete">Clear wells</button>
+      <div class="seg" id="layerSeg" title="What the plate map shows">
+        <button data-layer="drugs" data-icon="drop">Drugs</button>
+        <button data-layer="cells" data-icon="cells">Cell lines</button>
+        <button data-layer="roles" data-icon="tag">Roles</button>
+        <button data-layer="results" data-icon="results">Results</button>
+      </div>
+      <label id="showFluidBox">Show <select id="showFluid"></select></label>
+      <label class="chk" title="Mark normalized wells"><input type="checkbox" id="showNorm" checked> normalization</label>
+      <span class="spacer"></span>
+      <button id="btnSelectAll" class="small" data-icon="select">All</button>
+      <button id="btnSelectInner" class="small" title="Select everything inside the PBS border" data-icon="border">Inside border</button>
+      <button id="btnSelectNone" class="small">None</button>
     </div>
-    <div id="plateGrid" class="plate-grid" tabindex="0"></div>
+    <div class="grid-wrap"><div id="plateGrid" class="plate-grid" tabindex="0"></div></div>
     <div id="legend" class="legend"></div>
     <section id="inspector" class="inspector"></section>
   </section>
 
   <aside class="ops">
     <nav class="tabs" id="opTabs">
-      <button data-tab="set" class="active">Set value</button>
-      <button data-tab="titration">Titration</button>
-      <button data-tab="synergy">Synergy</button>
-      <button data-tab="normalize">Normalize</button>
-      <button data-tab="check">Check</button>
+      <button data-tab="set" data-icon="set" class="active">Set</button>
+      <button data-tab="titration" data-icon="titrate">Titrate</button>
+      <button data-tab="synergy" data-icon="synergy">Synergy</button>
+      <button data-tab="normalize" data-icon="normalize">Normalize</button>
+      <button data-tab="annotate" data-icon="cells">Annotate</button>
+      <button data-tab="check" data-icon="check">Check</button>
+      <button data-tab="run" data-icon="cassette">Run</button>
+      <button data-tab="results" data-icon="results">Results</button>
     </nav>
     <div id="opPanel" class="op-panel"></div>
   </aside>
 </main>
+
+<footer class="statusbar"><span id="statusHint"></span><span class="spacer"></span><span id="statusInfo"></span></footer>
+
+<div id="start" class="start" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<dialog id="wiz" class="wizard"></dialog>
 <script type="module" src="app.js"></script>
 </body>
 </html>

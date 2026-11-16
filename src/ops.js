@@ -447,6 +447,34 @@ export function pasteWells(plate, clip, r0, c0) {
   return { truncated };
 }
 
+/** Normalization groups of copied wells (guide §3.9: copy/paste carries normalization; randomization is not
+ *  copied). Returns, per cell in `cells` order, the indices of the backfill groups the well belongs to. */
+export function copyNormalization(protocol, plateIndex, cells) {
+  return cells.map(([r, c]) => protocol.backfills.map((b, i) => (b.wells.some((w) => w.p === plateIndex && w.r === r && w.c === c) ? i : -1)).filter((i) => i >= 0));
+}
+
+/** Paste: the target wells join the copied wells' normalization groups (one group per class per well, so
+ *  each target well leaves any other group of that class); target wells whose source was not normalized
+ *  leave their groups. `clip` items are {dr, dc, groups}. */
+export function pasteNormalization(protocol, plateIndex, clip, r0, c0, rows, cols) {
+  const groups = protocol.backfills;
+  const joins = new Map(); // group -> wells to add
+  const leave = [];
+  for (const { dr, dc, groups: gi } of clip) {
+    const r = r0 + dr, c = c0 + dc; if (r >= rows || c >= cols) continue;
+    const w = { p: plateIndex, r, c };
+    if (!gi || !gi.length) { leave.push(w); continue; }
+    for (const i of gi) if (groups[i]) { if (!joins.has(groups[i])) joins.set(groups[i], []); joins.get(groups[i]).push(w); }
+  }
+  if (leave.length) removeNormalization(protocol, leave);
+  for (const [g, ws] of joins) {
+    const keys = new Set(ws.map((w) => `${w.p},${w.r},${w.c}`));
+    for (const b of protocol.backfills) if (b !== g && b.classId === g.classId) b.wells = b.wells.filter((w) => !keys.has(`${w.p},${w.r},${w.c}`));
+    g.wells = g.wells.filter((w) => !keys.has(`${w.p},${w.r},${w.c}`)).concat(ws);
+  }
+  protocol.backfills = protocol.backfills.filter((b) => b.wells.length);
+}
+
 /** Tab-separated grid for Excel (one block per fluid), guide Appendix B style (UNVERIFIED exact format). */
 export function plateToTsv(plate, fluid) {
   const lines = [];

@@ -218,7 +218,8 @@ export function buildExperiment(spec, fluids) {
       const groups = nz.scope === 'plate' || nz.type === 'ToAssayVolumePct' && nz.scope !== 'block' ? blockPlates.map((p) => [p]) : [blockPlates];
       for (const g of groups) backfills.push({ classId: nz.classId ?? 0, type: nz.type, param: nz.param, wells: g.flatMap((p) => grid.map(([r, c]) => ({ p, r, c }))) });
     }
-    blocks.push({ name: `${fl.get(prim.fluidId)?.name} × ${fl.get(part.fluidId)?.name}`, plates: blockPlates, primary: prim.fluidId, partner: part.fluidId,
+    // A partner with fluidId null and only the 0 level makes a single-drug block (dose response, `replicates` rows).
+    blocks.push({ name: part.fluidId == null ? `${fl.get(prim.fluidId)?.name}` : `${fl.get(prim.fluidId)?.name} × ${fl.get(part.fluidId)?.name}`, plates: blockPlates, primary: prim.fluidId, partner: part.fluidId,
       region: { r0, c0, rows: nRows, cols: nCols }, primaryLevels: pLv, partnerLevels: qLv });
   });
   return { plates, backfills, plateMeta, blocks };
