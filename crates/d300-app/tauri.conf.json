@@ -33,10 +33,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
+    "targets": "all",
     "category": "public.app-category.education",
     "shortDescription": "Tecan D300e protocol and experiment designer",
     "icon": [

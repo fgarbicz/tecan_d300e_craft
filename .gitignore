@@ -8,3 +8,4 @@ crates/d300-app/gen/
 tools/synergyfinder/example/*
 !tools/synergyfinder/example/README.md
 experiments/
+.claude/worktrees/
