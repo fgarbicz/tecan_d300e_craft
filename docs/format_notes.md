@@ -73,16 +73,21 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
 - A fluid needing k = ⌈d/20⌉ heads: whole plates per head if next-fit packing in plate order fits in k heads,
   else equal split (a well can be dispensed by two heads: "multiple" in the report).
 - D4+ (4 heads, "Use high-volume cassettes", ticked by default): used when a fluid needs > 2 T8+ heads.
-  ≤ 200 µL per head; load = 1.25·d + 15 µL, shown to 1 µL. Remainder above whole D4+ heads ≤ 40 µL goes to
-  T8+ heads filled to 20 µL; otherwise one more D4+ head, equal split.
+  ≤ 200 µL per head; load = 1.25·d + 15 µL (aqueous too, probe-13), shown to 1 µL. A remainder above whole
+  D4+ heads of ≤ 20 µL goes to one T8+ head filled to 20 µL; a larger one adds a D4+ head (probe-13 230 µL →
+  2 × 115). (was: "≤ 40 µL to T8+", corrected by probe-13.)
+- D4+ over several plates: next-fit in plate order, else largest-first (ties: later plate first), else equal
+  (probe-13, probe-19, and the D3 run's 265 µL normalization head).
 - Normalization ("DMSO normalization") is planned like a fluid, after the fluids.
-- Head order: T8+ cassettes first, then D4+; by first plate dispensed, then fluid, then head index.
+- Run order: the cassette type fluid 1 needs comes first; each cassette takes the heads needed first, scanning
+  from the plate where the previous cassette finished (probe-13, probe-15). (was: "T8+ first, then D4+".)
 - The summary's total per fluid can differ by 0.1 µL from the sum of the per-head loads (e.g. 24.1 vs 12.0+12.0).
-- Volume solve: D300e runs 3 fixed-point steps (T = fixed·(1+k+k²)), not the exact solution; visible from
-  ~1 µL per well (probe-2/10 reports). One ToVolume-normalized well (probe-7 A1) still differs by 0.4 nL: open.
-- UNVERIFIED: aqueous on D4+; D4+ remainder 20–40 µL; whole-plate packing on D4+; the D3 run's normalization
-  heads (that run used a modified, unsaved protocol); behaviour with "Use high-volume cassettes" unticked
-  (the summary did not update when unticked).
+- Volume solve: see the next section (iteration with a 0.1 % stop; the earlier "3 fixed steps" was a
+  partial fit, and the probe-7 A1 0.4 nL difference is resolved by it).
+- UNVERIFIED: "Use high-volume cassettes" unticked (the summary did not update when unticked); the aqueous
+  minimum load (one point); the largest-first tie-break (from the aborted D3 run); D300e's pre-run warning
+  "plate fluid is split between multiple dispense heads, and there are no wells greater than 30 nL in some
+  cases" is not produced by this app.
 
 ## Volume sizing and the DMSO warning (simulated runs, 2026-11-15, second session)
 - Fluids are sized by fixed-point iteration V_i = C_i·T/S_i, T = fixed + ΣV_i, from V = 0. D300e stops once the
@@ -95,8 +100,12 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   bracket the factor to 1.000999–1.001001. The D3 wells at 1.0005 % (after the % top-up) are not flagged.
 - Pre-run summary also lists "A well of 30 nL or greater is recommended for each fluid on each plate".
 - Cassette order follows the fluids: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first (probe-15).
-- T05 row A ("to highest class volume"): the group's largest well is an exact rounding tie; D300e dispenses
-  505.2 nL and tops the others up against that; this engine gives 504.8 (13 dispenses 0.4 nL off). Rows B–E
-  (other four types) match. A rule fixing T05 breaks D3 (1,848 to-highest wells) — open.
+- OPEN — "to highest class volume" (ToMaxVolume): T05 row A and two one-change copies (t05-lim2: limit 2 %;
+  t05-a10-90: A10 90 µM) all differ in 13 row-A dispenses by 0.4 nL, so it is neither the rounding tie nor the
+  DMSO limit. A rule with target = max UNROUNDED class volume, fluids sized with T = A + target and the top-up
+  rounded to nearest on the normal drop grid (0.02 nL below 3.6 nL) matches all three T05 reports (321 rows)
+  but breaks 16 D3 top-ups (L14/M14-type wells: 15.6 vs 15.2 nL); the current rule (target = max rounded class
+  volume, top-up floored to 0.4 nL, ≥ 1 nL) matches all of D3 and misses those 39 T05 rows. Kept: the D3 rule.
+  The real rule must depend on something neither captures (all reports in fixtures/reference/reports/probes).
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.

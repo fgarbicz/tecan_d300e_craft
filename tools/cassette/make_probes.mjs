@@ -181,3 +181,27 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 'probe-18-guide89.tdd'), writeTdd(p));
   console.log('wrote probe-18-guide89');
 }
+
+// D4+ over several plates where neither next-fit nor largest-first fits: 3 × 130 µL → expect 2 heads × 195.
+{
+  const p = newProtocol();
+  const f = addFluid(p, { name: 'e1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  for (let pi = 0; pi < 3; pi++) {
+    const pl = newPlate({ plateType: 'Default384', name: `probe-19 ${pi + 1}`, dmsoLimit: 0.1 });
+    p.plates.push(pl);
+    for (let i = 0; i < 26; i++) setWell(pl, 1 + Math.floor(i / 22), 1 + (i % 22), f.id, concFor(5000)); // 26 × 5 µL = 130 µL
+  }
+  writeFileSync(join(process.argv[2], 'probe-19-d4equal.tdd'), writeTdd(p));
+  console.log('wrote probe-19-d4equal');
+}
+// T05 with one change each, to separate the rounding tie from the DMSO limit in row A ("to highest class volume").
+{
+  const { parseTdd } = await import('../../src/tdd.js');
+  const { readFileSync } = await import('node:fs');
+  const base = readFileSync(join(import.meta.dirname, '..', '..', 'fixtures', 'reference', 't05-normalize.tdd'), 'utf8');
+  const a = parseTdd(base); a.plates[0].dmsoLimit = 0.02; delete a.plates[0]._dmsoText;
+  writeFileSync(join(process.argv[2], 't05-lim2.tdd'), writeTdd(a));
+  const b = parseTdd(base); b.plates[0].wells.get('0,9').set(0, 90);
+  writeFileSync(join(process.argv[2], 't05-a10-90.tdd'), writeTdd(b));
+  console.log('wrote t05 variants');
+}

@@ -51,7 +51,7 @@ test('probe-9: 40 µL stays on two T8+ heads, 60 and 90 µL go to D4+', () => {
   assert.deepEqual(heads(r), [['T8+', ['b1 23.3', 'b1 23.3']], ['D4+', ['b2 90', 'b3 128']]]);
 });
 
-test('probe-10: boundaries (20 µL T8+ cap, D4+ cap 200, remainder ≤ 40 µL to T8+)', () => {
+test('probe-10: boundaries (20 µL T8+ cap, D4+ cap 200, a remainder ≤ 20 µL goes to one T8+ head)', () => {
   assert.deepEqual(heads(plan('fixtures/reference/probes/probe-10-bounds.tdd')), [
     ['T8+', ['x1 12', 'x1 12', 'x2 12.3', 'x2 12.3', 'x6 23.3', 'x8 14.6', 'x8 14.6', 'x9 19.7']],
     ['T8+', ['x9 19.7']],
@@ -97,4 +97,8 @@ test('probe-13: D4+ largest-first packing, remainder > 20 µL on D4+, aqueous on
 
 test('probe-15: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first', () => {
   assert.deepEqual(heads(plan('fixtures/reference/probes/probe-15-dmsorule.tdd')), [['D4+', ['d1 78']], ['T8+', ['d2 2']]]);
+});
+
+test('probe-19: a D4+ fluid over 3 plates that no whole-plate packing fits is split evenly (259 + 259 µL)', () => {
+  assert.deepEqual(heads(plan('fixtures/reference/probes/probe-19-d4equal.tdd')), [['D4+', ['e1 259', 'e1 259']]]);
 });

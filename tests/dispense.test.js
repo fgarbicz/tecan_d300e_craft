@@ -131,10 +131,8 @@ test('priming: fluids below 30 nL on a plate are flagged; scrap well values reac
 
 test('T05 run report (D300e Control 4.0.1 simulation): normalization types', async () => {
   // Rows B–E (to volume, to % of total, to highest total, to total) match every dispense of the report.
-  // KNOWN MISMATCH, row A ("to highest class volume"): the group's largest well (A10, 100 µM of 10 mM, k = 0.01)
-  // sits on an exact rounding tie (505.0 nL). D300e dispenses 505.2 there and tops the other wells up against it;
-  // this engine gives 504.8, so 13 row-A dispenses differ by 0.4 nL. A rule that fixes T05 breaks D3 (whose
-  // 1,848 to-highest wells all match), so it is left until a probe separates the two.
+  // KNOWN MISMATCH, row A ("to highest class volume"): 13 row-A dispenses differ by 0.4 nL, also in the two
+  // one-change copies t05-lim2 / t05-a10-90 — see docs/format_notes.md (OPEN). The rule that fixes them breaks D3.
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
   const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', 'fixtures/reference/t05-normalize.tdd',
