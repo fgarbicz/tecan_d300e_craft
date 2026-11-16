@@ -110,7 +110,6 @@ export function designExperiment(spec) {
   }
   if (pl.randomize) {
     if (pl.randomize !== 'cellLine' && pl.randomize !== true) throw new Error(`plate.randomize must be "cellLine" (or false), not "${pl.randomize}"`);
-    if (!lines.length) throw new Error('plate.randomize "cellLine" needs cells.lines (wells are shuffled within each cell line)');
     const seed = pl.randomSeed ?? 1;
     randomizeByCellLine(protocol, meta, protocol.plates.map((_, i) => i), seededRng(seed));
     meta.experiment.randomSeed = seed;

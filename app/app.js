@@ -317,16 +317,23 @@ function renderGrid() {
   const res = S.layer === 'results' ? resultsScale(S.plateIdx) : null;
   const doseSkip = S.layer === 'doses' ? doseScrap() : null;
   const doses = doseSkip ? drugScales(S.protocol, { skip: doseSkip }) : null;
+  // Randomized plate, "as printed" view: every position shows the planned well that the D300e dispenses INTO it.
+  const printed = printedView(), from = new Map(), to = new Map();
+  for (const x of p.randomization || []) { from.set(wellKey(x.toR, x.toC), [x.r, x.c]); to.set(wellKey(x.r, x.c), [x.toR, x.toC]); }
+  g.classList.toggle('printed', printed);
   for (let r = 0; r < p.rows; r++) {
     hdr(rowLabel(r), (e) => selectLine('row', r, e), `Row ${rowLabel(r)}`);
     for (let c = 0; c < p.cols; c++) {
-      const k = wellKey(r, c), m = p.wells.get(k), d = document.createElement('div');
+      const pk = wellKey(r, c), d = document.createElement('div');
+      const [sr, sc] = printed ? from.get(pk) || [r, c] : [r, c];   // planned well shown at this position
+      const [vr, vc] = printed ? [r, c] : to.get(pk) || [r, c];     // position where its signal is read
+      const k = wellKey(sr, sc), m = p.wells.get(k);
       d.className = 'well'; d.dataset.r = r; d.dataset.c = c;
-      if (S.sel.has(k)) d.classList.add('sel');
-      const role = wellRole(S.meta, p, S.plateIdx, r, c);
+      if (S.sel.has(pk) && !printed) d.classList.add('sel');
+      const role = wellRole(S.meta, p, S.plateIdx, sr, sc);
       if (role === 'pbs') d.classList.add('pbs');
       if (role === 'exclude') d.classList.add('excl');
-      const wr = wellResult(r, c);
+      const wr = wellResult(sr, sc);
       if (wr && wr.warnings.length && S.layer === 'drugs') d.classList.add('warn');
       if (S.layer === 'drugs') {
         if (m && m.size) {
@@ -344,7 +351,8 @@ function renderGrid() {
         if (role === 'scrap' || doseSkip(S.plateIdx, k)) { d.classList.add('scrap-ring'); mark(d, 'S'); }
         else if (role === 'vehicle') mark(d, 'V');
       } else if (S.layer === 'cells') {
-        const cl = pm?.cellLines[k] && cellLineById(pm.cellLines[k]);
+        const clk = wellKey(vr, vc); // cells are where they were seeded
+        const cl = pm?.cellLines[clk] && cellLineById(pm.cellLines[clk]);
         if (cl) d.style.background = tint(cl.color, m && m.size ? 0.85 : 0.45);
         if (role === 'blank' || role === 'scrap') mark(d, ROLE_MARK[role]);
       } else if (S.layer === 'roles') {
@@ -352,15 +360,41 @@ function renderGrid() {
         if (role === 'blank') d.style.border = '1px solid var(--muted)';
         if (ROLE_MARK[role]) mark(d, ROLE_MARK[role]);
       } else if (S.layer === 'results' && res) {
-        const v = res.value(r, c);
+        const v = res.value(vr, vc);
         if (v != null) d.style.background = res.color(v);
       }
-      d.title = wellTitle(r, c, role);
+      d.title = (printed && (sr !== r || sc !== c) ? `Position ${wellName(r, c)} is printed with planned well ${wellName(sr, sc)}\n` : !printed && (vr !== r || vc !== c) ? `Printed into ${wellName(vr, vc)} (randomized)\n` : '') + wellTitle(sr, sc, role);
       frag.appendChild(d);
     }
   }
   g.replaceChildren(frag);
   renderLegend(showId, range, res, doses);
+  renderRandBar();
+}
+/** A randomized plate can be looked at as planned (editable) or as the D300e prints it (shuffled, read-only). */
+const printedView = () => !!(plate()?.randomization?.length && S.viewPrinted !== false);
+function renderRandBar() {
+  const bar = $('randBar'), p = plate(), n = p?.randomization?.length || 0;
+  if (!n) { bar.hidden = true; bar.innerHTML = ''; return; }
+  const moved = p.randomization.filter((x) => x.r !== x.toR || x.c !== x.toC).length, pr = printedView();
+  bar.hidden = false;
+  bar.innerHTML = `<b>${icon('dup', 14)} Randomized</b><span>${moved} wells change place</span>
+    <span class="seg"><button class="${pr ? 'active' : ''}" id="rvPrinted" title="Where the D300e actually puts each dose: this is what is on the plate">As printed</button><button class="${pr ? '' : 'active'}" id="rvPlanned" title="The tidy layout you designed. Edit here.">As planned</button></span>
+    <button id="rvAgain" title="A new random order, still within each cell line">Shuffle again</button>
+    <button id="rvOff" class="danger" title="Remove the randomization: the D300e prints the plate exactly as planned">De-randomize</button>
+    <span class="muted">${pr ? 'Read-only view. Switch to "As planned" to edit.' : 'Each well is printed somewhere else on the plate; hover a well to see where.'}</span>`;
+  $('rvPrinted').onclick = () => { S.viewPrinted = true; S.sel.clear(); render(); };
+  $('rvPlanned').onclick = () => { S.viewPrinted = false; render(); };
+  $('rvAgain').onclick = () => mutate('randomize plate', () => randomizeByCellLine(S.protocol, S.meta, [S.plateIdx]));
+  $('rvOff').onclick = async () => {
+    const all = S.protocol.plates.filter((x) => x.randomization?.length).length;
+    if (all > 1) {
+      const which = await new Promise((resolve) => { dialog(`<h3>De-randomize</h3><p>${all} plates are randomized.</p><label class="chk"><input type="radio" name="w" value="one" checked> Only plate ${S.plateIdx + 1}</label><br><label class="chk"><input type="radio" name="w" value="all"> All ${all} plates</label>`, (form) => { resolve(new FormData(form).get('w')); return true; }, 'De-randomize').then((ok) => { if (!ok) resolve(null); }); });
+      if (!which) return;
+      mutate('de-randomize', () => { for (const x of which === 'all' ? S.protocol.plates : [p]) x.randomization = []; });
+    } else mutate('de-randomize', () => { p.randomization = []; });
+    toast('De-randomized: the plate is printed exactly as planned (⌘Z brings the shuffle back)');
+  };
 }
 function mark(d, t) { const s = document.createElement('span'); s.className = 'lbl'; s.textContent = t; d.appendChild(s); }
 
@@ -504,6 +538,7 @@ function bindGrid() {
   const g = $('plateGrid');
   g.addEventListener('mousedown', (e) => {
     const cell = cellFromEvent(e); if (!cell) return;
+    if (printedView()) { e.preventDefault(); toast('This is the plate as printed (shuffled). Switch to "As planned" above the plate to select and edit wells.'); return; }
     e.preventDefault(); g.focus();
     const add = e.metaKey || e.ctrlKey;
     if (e.shiftKey && S.anchor) { selectRect(S.anchor[0], S.anchor[1], cell[0], cell[1], add); return; }
@@ -744,7 +779,7 @@ function renderAnnotate(el) {
     <div class="actions"><button id="aAllPlates" title="Copy this plate's cell-line map to every plate">${icon('dup', 15)} Same layout on all plates</button></div>
     <h3>${icon('cells', 16)} Randomize</h3>
     <p class="hint">Shuffles which well gets which dose, only among wells of the same cell line, so you still seed the cells as drawn. The D300e prints the shuffled positions; when you paste the read-out, the app sorts it back for you. ${plate().randomization?.length ? `<b>This plate is randomized (${plate().randomization.length} wells).</b>` : ''}</p>
-    <div class="actions"><button id="aRand">Randomize this plate</button><button id="aRandAll">All plates</button><button id="aRandOff" ${plate().randomization?.length ? '' : 'disabled'}>Remove</button></div>
+    <div class="actions" style="flex-wrap:wrap"><button id="aRand">Randomize this plate</button><button id="aRandAll">All plates</button><button id="aRandOff" class="danger" ${plate().randomization?.length ? '' : 'disabled'}>De-randomize this plate</button><button id="aRandOffAll" class="danger" ${S.protocol.plates.some((x) => x.randomization?.length) ? '' : 'disabled'}>De-randomize all</button></div>
     <h3>${icon('tag', 16)} Well roles</h3>
     <p class="hint">Wells with drug (treated) and wells with cells but no drug (vehicle control) are recognised automatically. Mark the others:</p>
     <div class="actions" style="flex-wrap:wrap">
@@ -770,14 +805,17 @@ function renderAnnotate(el) {
     mutate('cell lines on all plates', () => { const src = S.meta.plates[S.plateIdx].cellLines; S.meta.plates.forEach((pm, i) => { if (i !== S.plateIdx) pm.cellLines = { ...src }; }); });
   };
   const randomize = (idx, label) => {
-    const lacking = idx.filter((i) => !Object.keys(S.meta.plates[i]?.cellLines || {}).length);
-    if (lacking.length === idx.length) return toast('Assign cell lines first: wells are shuffled within each cell line');
+    const before = idx.map((i) => S.protocol.plates[i].randomization);
+    S.viewPrinted = true;
     mutate(label, () => randomizeByCellLine(S.protocol, S.meta, idx));
-    toast(`Randomized ${idx.length - lacking.length} plate(s) within each cell line${lacking.length ? `; ${lacking.length} without cell lines left as they are` : ''}`);
+    const done = idx.filter((i) => S.protocol.plates[i].randomization?.length).length;
+    toast(done ? `Randomized ${done} plate${done > 1 ? 's' : ''}. The plate now shows where each dose is printed; "De-randomize" above the plate undoes it.` : 'Nothing to shuffle: these plates have no drug wells yet');
+    void before;
   };
   $('aRand').onclick = () => randomize([S.plateIdx], 'randomize plate');
   $('aRandAll').onclick = () => randomize(S.protocol.plates.map((_, i) => i), 'randomize all plates');
-  $('aRandOff').onclick = () => mutate('remove randomization', () => { plate().randomization = []; });
+  $('aRandOff').onclick = () => mutate('de-randomize', () => { plate().randomization = []; });
+  $('aRandOffAll').onclick = () => mutate('de-randomize all plates', () => { for (const x of S.protocol.plates) x.randomization = []; });
   for (const b of el.querySelectorAll('[data-role]')) b.onclick = () => { if (!S.sel.size) return toast('Select wells first'); mutate('set role', () => setRole(S.meta, S.plateIdx, selectedCells(), b.dataset.role || null)); if (S.layer === 'drugs') { S.layer = 'roles'; render(); } };
   panelUpdate = () => { $('aSel').textContent = selCount(); $('aAssign').disabled = $('aClear').disabled = !S.sel.size || !S.meta.cellLines.length; $('aAssignAll').disabled = $('aAllPlates').disabled = !S.meta.cellLines.length; };
 }

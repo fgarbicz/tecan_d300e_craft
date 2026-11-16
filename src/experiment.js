@@ -10,6 +10,7 @@
 import { wellKey, splitKey, wellName } from './tdd.js';
 import { newPlate, titrationLevels, addNormalization, setWell, suggestShift, dilutedFluid } from './ops.js';
 import { computeProtocol, PRIMING_VOLUME, stockInBase, validRange } from './dispense.js';
+import { scrapBySignature } from './dosemap.js';
 
 export const META_VERSION = 1;
 export const ROLE = { PBS: 'pbs', SCRAP: 'scrap', BLANK: 'blank', EXCLUDE: 'exclude' };
@@ -218,6 +219,8 @@ export function seededRng(seed) {
  * Randomize where each design well is dispensed, keeping every well inside its own cell line: the wells seeded
  * with one cell line (meta) are shuffled among themselves, so drugs move but cells stay put (two cell lines on a
  * plate stay in their halves). Wells with a set role (PBS, scrap/priming, blank, excluded) are not moved.
+ * A plate without cell lines is shuffled within each drug grid of its design, or among its drug wells.
+ * Each group gets a uniform random permutation (Fisher–Yates), so a well may keep its place by chance.
  * Writes plate.randomization (the D300e <Randomize> map, design well → dispensed well). D300e Control shows the
  * plate as one randomized group; re-randomizing there would mix the cell lines again.
  */
@@ -230,6 +233,28 @@ export function randomizeByCellLine(protocol, meta, plateIndices, rng = Math.ran
       if (pm.roles?.[k]) continue;
       if (!groups.has(id)) groups.set(id, []);
       groups.get(id).push(splitKey(k));
+    }
+    if (!groups.size) {
+      // no cell lines on this plate: shuffle within each drug grid of the design (wizard blocks: the halves of a
+      // split plate stay apart), or, on a hand-made plate, among all wells that get a drug
+      const blocks = (meta.blocks || []).filter((b) => b.plates.includes(pi));
+      blocks.forEach((b, bi) => (b.copies || [b.region]).forEach((g, gi) => {
+        const cells = [];
+        for (let r = g.r0; r < g.r0 + g.rows; r++) for (let c = g.c0; c < g.c0 + g.cols; c++) if (!pm.roles?.[wellKey(r, c)]) cells.push([r, c]);
+        if (cells.length) groups.set(`grid${bi}.${gi}`, cells);
+      }));
+      if (!groups.size) {
+        // hand-made plate: the rectangle spanned by its drug wells (so the no-drug control wells inside it take
+        // part), leaving out priming wells (marked, or recognised by their value) and other marked wells
+        const scrap = scrapBySignature(protocol);
+        const drug = [...p.wells.entries()].filter(([k, m]) => m.size && !pm.roles?.[k] && !scrap(pi, k)).map(([k]) => splitKey(k));
+        if (drug.length > 1) {
+          const r0 = Math.min(...drug.map((x) => x[0])), r1 = Math.max(...drug.map((x) => x[0])), c0 = Math.min(...drug.map((x) => x[1])), c1 = Math.max(...drug.map((x) => x[1]));
+          const cells = [];
+          for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) { const k = wellKey(r, c); if (!pm.roles?.[k] && !scrap(pi, k)) cells.push([r, c]); }
+          groups.set('drugs', cells);
+        }
+      }
     }
     const list = [];
     for (const cells of groups.values()) {

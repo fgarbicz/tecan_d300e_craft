@@ -2,9 +2,10 @@
 // each cell line: builder, CLI spec path, analysis and dose maps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { axisLevels, rangeStep } from '../src/experiment.js';
+import { axisLevels, rangeStep, randomizeByCellLine, newMeta, seededRng } from '../src/experiment.js';
+import { readFileSync } from 'node:fs';
 import { designExperiment, designAndPlan } from '../src/design.js';
-import { parseTdd } from '../src/tdd.js';
+import { parseTdd, writeTdd as writeTddOf } from '../src/tdd.js';
 import { computeProtocol } from '../src/dispense.js';
 import { analyze } from '../src/analysis.js';
 import { doseLevels } from '../src/dosemap.js';
@@ -91,7 +92,13 @@ test('randomize within each cell line: a permutation that never crosses cell lin
   // reproducible from the seed
   const again = designExperiment(wide({ plate: { randomize: 'cellLine', randomSeed: 3 } })).protocol.plates[0].randomization;
   assert.deepEqual(again, p.randomization);
-  assert.throws(() => designExperiment({ ...wide({ plate: { randomize: 'cellLine' } }), cells: { lines: [] } }), /needs cells.lines/);
+  // without cell lines: shuffled within each drug grid (the two halves of a split plate stay apart)
+  const nc = designExperiment({ ...wide({ plate: { randomize: 'cellLine' } }), cells: { lines: [], arrangement: 'splitRows' } });
+  const rz = nc.protocol.plates[0].randomization, blk = nc.meta.blocks[0];
+  assert.equal(rz.length, blk.copies.reduce((n, g) => n + g.rows * g.cols, 0));
+  const half = (r) => blk.copies.findIndex((g) => r >= g.r0 && r < g.r0 + g.rows);
+  for (const m of rz) assert.equal(half(m.r), half(m.toR));
+  assert.ok(rz.some((m) => m.r !== m.toR || m.c !== m.toC));
 });
 
 test('analysis: readouts of a randomized plate are read at the dispensed well; a diluted stock is the same drug', () => {
@@ -116,4 +123,17 @@ test('analysis: readouts of a randomized plate are read at the dispensed well; a
   const dl = doseLevels(protocol);
   assert.deepEqual(dl.map((x) => x.drug), ['Bortezomib', 'MEN']);
   assert.equal(dl[0].levels.length, 10);
+});
+
+test('randomizing a hand-made plate (no experiment file): priming wells and the border stay, the grid is shuffled', () => {
+  const protocol = parseTdd(readFileSync(new URL('../fixtures/reference/2026.08.28 synergy D3.tdd', import.meta.url), 'utf8'));
+  const meta = newMeta(protocol);
+  randomizeByCellLine(protocol, meta, [0], seededRng(11));
+  const rz = protocol.plates[0].randomization;
+  assert.equal(rz.length, 14 * 22); // B2–O23: the drug grid with its no-drug controls
+  for (const m of rz) for (const [r, c] of [[m.r, m.c], [m.toR, m.toC]]) assert.ok(r >= 1 && r <= 14 && c >= 1 && c <= 22, `${r},${c} is outside the grid`);
+  assert.equal(new Set(rz.map((m) => `${m.toR},${m.toC}`)).size, rz.length);
+  // de-randomize = an empty map; the .tdd then has no <Randomize> wells
+  protocol.plates[0].randomization = [];
+  assert.ok(!/<Well R="\d+" C="\d+" ToR=/.test(writeTddOf(protocol)));
 });

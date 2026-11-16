@@ -227,3 +227,12 @@ dialog.wizard[open] { display: flex; flex-direction: column; }
 .flow li span { color: var(--muted); }
 .drawing.zoomable { cursor: zoom-in; } .drawing.zoomable svg { max-width: none; }
 .tabs { flex-shrink: 0; }
+/* randomized plate: view switch + de-randomize, right above the plate */
+.rand-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); font-size: 12px; }
+.rand-bar b { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); }
+.rand-bar .seg { display: inline-flex; }
+.rand-bar .seg button { border-radius: 0; padding: 3px 9px; }
+.rand-bar .seg button:first-child { border-radius: 6px 0 0 6px; } .rand-bar .seg button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.rand-bar .seg button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rand-bar > button { padding: 3px 9px; }
+.plate-grid.printed .well { cursor: default; }

@@ -27,7 +27,7 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
      and the levels it dispenses; it is one more solution and one more dispense head. Dilution choice INFERRED
      from the user guide's two examples (not yet checked against D300e Control);
    - randomization: `plate.randomize: "cellLine"` (+ optional `randomSeed`) shuffles where each well is
-     dispensed, only within the wells of the same cell line, stored in the .tdd; needs `cells.lines`.
+     dispensed, only within the wells of the same cell line, stored in the .tdd (without cell lines: within each drug grid).
      Readouts are pasted as read; the app maps them back. Tell the user not to re-randomize in D300e Control;
    - replicates: in `primary` = adjacent columns per level, in a partner = adjacent rows per level;
      `plate.replicates` = identical plates per layout;

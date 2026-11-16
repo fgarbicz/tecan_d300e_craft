@@ -163,7 +163,7 @@ function draw(ctx) {
     const info = () => {
       save(); const n = Math.max(1, splitNames(W.cellLines).length), split = W.cellMode.startsWith('split');
       const sets = W.cellMode === 'perLine' ? n : split ? Math.ceil(n / 2) : 1, tot = W.partners.length * W.reps * sets;
-      $w('w_cellInfo').textContent = (W.randomize && W.cellMode === 'none' ? 'Shuffling needs the cell lines to be set here. ' : '') + `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''} = ${tot} plate${tot > 1 ? 's' : ''}.`
+      $w('w_cellInfo').textContent = `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''} = ${tot} plate${tot > 1 ? 's' : ''}.`
         + (split ? ' Each half gets the same drug layout, so the layout must fit in half the plate.' : '')
         + (W.cellMode === 'same' && n > 1 ? ' Only the first cell line is used with this arrangement.' : '');
       clearTimeout(tmr); tmr = setTimeout(() => picture(ctx, $w('w_pic')), 200);
@@ -276,7 +276,7 @@ function needsLines(pv, ctx) {
     if (n.kind === 'impossible') L.notes.push(`<span style="color:var(--warn)">⚠ ${esc(n.drug)}: ${n.levels.length} dose(s) stay below one drop even after a 1:9000 dilution.</span>`);
     else L.notes.push(`<span style="color:var(--accent)">Prepare <b>${esc(n.fluid)}</b>: ${esc(n.drug)} stock diluted 1:${n.factor} (striped head).</span>`);
   }
-  if (W.randomize) L.notes.push(W.cellMode === 'none' || !names.length ? '<span style="color:var(--warn)">Randomizing was skipped: it needs cell lines (step 4).</span>' : 'Wells are shuffled within each cell line when printed; the picture shows the planned positions.');
+  if (W.randomize) L.notes.push(`The plate picture shows the wells <b>as printed</b>: shuffled ${W.cellMode === 'none' || !names.length ? 'within the drug grid' : 'within each cell line'}, a different order on every plate. You can de-randomize later with one click.`);
   L.notes.push(dmso || low ? `<span style="color:var(--warn)">⚠ ${[dmso ? `${dmso} wells get more DMSO than the limit` : '', low ? `${low} wells need less than one drop` : ''].filter(Boolean).join(', ')}. See the notes under each drug.</span>` : '<span style="color:var(--ok)">✓ Every well can be printed as planned.</span>');
   return L;
 }
@@ -292,7 +292,10 @@ function pictureHtml(pv, ctx) {
   const regions = b0 ? (b0.copies || [b0.region]).map((g, i) => ({ ...g, label: names[i] ?? (names.length === 1 ? names[0] : ''), color: names[i] ? lineColor(names[i]) : names.length === 1 ? lineColor(names[0]) : '#6b7385' })) : [];
   const groups = blocks.map((bl) => ({ label: `${bl.name}${bl.cellLine ? ' · ' + bl.cellLine : ''}`, count: bl.plates.length, first: bl.plates[0] + 1, color: ctx.fluidColor(fl.get(bl.primary) || { id: 0 }), split: (bl.copies || []).length > 1 }));
   const L = needsLines(pv, ctx);
-  return `<h4>Plate ${first + 1}${regions.some((g) => g.label) ? ' · outlined = where each cell line is seeded' : ''}</h4>${pic(plateSvg(p, { colorOf: (id) => ctx.fluidColor(fl.get(id) || { id }), border: W.border, scrap, regions, theme: THEME_VARS }))}
+  // a randomized plate is drawn as printed: each planned well at the position the D300e dispenses it into
+  const moved = new Map((p.randomization || []).map((x) => [`${x.r},${x.c}`, `${x.toR},${x.toC}`]));
+  const shown = moved.size ? { rows: p.rows, cols: p.cols, wells: new Map([...p.wells].map(([k, m]) => [moved.get(k) || k, m])) } : p;
+  return `<h4>Plate ${first + 1}${moved.size ? ' as printed (shuffled)' : ''}${regions.some((g) => g.label) ? ' · outlined = where each cell line is seeded' : ''}</h4>${pic(plateSvg(shown, { colorOf: (id) => ctx.fluidColor(fl.get(id) || { id }), border: W.border, scrap, regions, theme: THEME_VARS }))}
     <div class="wz-key">${[...new Set([...p.wells.values()].flatMap((m) => [...m.keys()]).map((id) => fl.get(id)).filter(Boolean).map((f) => (f.rootFluidId != null ? fl.get(f.rootFluidId) || f : f)))].map((f) => `<span><i style="background:${ctx.fluidColor(f)}"></i>${ctx.esc(f.name)}</span>`).join('')}${scrap.size ? '<span><i style="border:1px dashed var(--ink);box-sizing:border-box"></i>priming well</span>' : ''}${W.border ? '<span><i style="background:var(--accent);opacity:.25"></i>PBS border</span>' : ''}</div>
     <h4>Plates to print</h4>${pic(plateStackSvg(groups, { theme: THEME_VARS }))}<div class="wz-msg"><div>${L.plates}</div></div>
     <h4>Cassettes and dispense heads</h4>${pic(cassetteSvg(plan.cassettes, (h) => fluidLook(protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS }))}
@@ -360,7 +363,7 @@ function preview(ctx) {
     seedBlocks(meta, protocol, meta.blocks.slice(-built.blocks.length), set);
     for (const bl of meta.blocks.slice(-built.blocks.length)) bl.cellLine = set.map((c) => c.name).join(' / ');
   }
-  if (W.randomize && W.cellMode !== 'none' && lines.length) {
+  if (W.randomize) { // within each cell line; without cell lines, within each drug grid
     randomizeByCellLine(protocol, meta, protocol.plates.map((_, i) => i).filter((i) => i >= first), seededRng(W.seed));
     meta.experiment.randomSeed = W.seed;
   }
