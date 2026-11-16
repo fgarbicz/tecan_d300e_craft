@@ -130,3 +130,11 @@ T8+ DMSO normalization:20.0000→23.3
   low → the "previous top-up" sizing check is REFUTED; D300e keeps V₁ in all 924 wells (k ≤ 0.001). New rule: the
   fluids are sized at T₁ unless the well total still changes by ≥ 0.1 % (|T₂ − T₁| / T₂), then T₂ — the same
   convergence check as for a well without normalization. 1848/1848; probe-23 plate 1 stays 664/664.
+
+## probe-28 (Craft-generated: diluted stock "Bortezomib - 1:30" with RootFluidID / DilutionFactor + a <Randomize>
+## map that shuffles wells within each cell line; prediction before the run, 2026-11-16)
+```
+T8+ Bortezomib:1.9454→2.5  MEN:1.3359→2  Bortezomib - 1:30:0.0376→2  DMSO normalization:16.8000→19.6
+```
+Expected: opens without a message, shows the diluted fluid, wells marked randomized; the report's Dispensed Well for
+each Non-random Well equals the file's <Randomize> map (308 wells); every volume as the engine computes it.
