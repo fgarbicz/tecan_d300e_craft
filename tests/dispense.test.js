@@ -77,9 +77,9 @@ test('guide p.89 row B: ToMaxVolume normalization volumes and totals', () => {
   // [well col, requested µM, fluid nL, normalization nL, total nL]
   const rows = [[0, 10, 100, 0, 100100], [2, 0.6309573, 6.4, 93.6, 100100], [3, 0.1584893, 1.58, 98.4, 100099.98],
     [4, 0.03981072, 0.4, 99.6, 100100],
-    // B06: the guide figure (older software) shows 100 nL (nearest step); D300e Control 4.0.1 rounds the
-    // top-up DOWN (see the D3 run-report test), giving 99.6 nL. We follow 4.0.1.
-    [5, 0.01, 0.1, 99.6, 100099.7]];
+    // B06: 100 nL as in the guide figure. (An earlier floor rule gave 99.6; the iterated top-up, fitted on D3,
+    // T05 and probe-20/21 run reports, agrees with the guide here.)
+    [5, 0.01, 0.1, 100, 100100.1]];
   const plate = { assayVolume: 100000, dmsoLimit: 0.01, wells: new Map(rows.map(([c, conc]) => [`1,${c}`, new Map([[2, conc]])])) };
   const protocol = { fluids: [{ id: 2, byVol: false, concentration: 10000, classId: 0 }], plates: [plate],
     backfills: [{ classId: 0, type: 'ToMaxVolume', wells: rows.map(([c]) => ({ p: 0, r: 1, c })) }] };
@@ -129,17 +129,27 @@ test('priming: fluids below 30 nL on a plate are flagged; scrap well values reac
   assert.deepEqual(lack, []);
 });
 
-test('T05 run report (D300e Control 4.0.1 simulation): normalization types', async () => {
-  // Rows B–E (to volume, to % of total, to highest total, to total) match every dispense of the report.
-  // KNOWN MISMATCH, row A ("to highest class volume"): 13 row-A dispenses differ by 0.4 nL, also in the two
-  // one-change copies t05-lim2 / t05-a10-90 — see docs/format_notes.md (OPEN). The rule that fixes them breaks D3.
+test('normalization run reports: D3, T05 and its two one-change copies match every dispense', async () => {
+  // T05 has all five normalization types; t05-lim2 / t05-a10-90 change one thing each. With the iterated top-up
+  // (src/dispense.js iteratedTopUp) every row matches (was: 13 row-A mismatches per file).
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
-  const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', 'fixtures/reference/t05-normalize.tdd',
-    'fixtures/reference/reports/probes/t05-normalize.xml'], { cwd: root, encoding: 'utf8' });
-  assert.match(out, /'rows': 107, 'vol_ok': 94/, out.split('\n')[0]);
-  const bad = [...out.matchAll(/\(\(1, '([A-Z])\d+'/g)].map((m) => m[1]);
-  assert.ok(bad.length && bad.every((r) => r === 'A'), `only row A may differ: ${bad.join(',')}`);
+  for (const [tdd, rep] of [['fixtures/reference/t05-normalize.tdd', 'fixtures/reference/reports/probes/t05-normalize.xml'],
+    ['fixtures/reference/probes/t05-lim2.tdd', 'fixtures/reference/reports/probes/t05-lim2.xml'],
+    ['fixtures/reference/probes/t05-a10-90.tdd', 'fixtures/reference/reports/probes/t05-a10-90.xml']]) {
+    const out = execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' });
+    assert.match(out, /ALL ROWS MATCH/, tdd + ': ' + out.split('\n')[0]);
+  }
+});
+
+test('normalization hold-outs (probe-20 random wells, all types; probe-21 sweep): documented accuracy', async () => {
+  // Not used to fit the rules' structure. Every fluid volume but one matches; the remaining differences are
+  // single top-ups one 0.4 nL step off (mostly the two "total volume" types). Guard against regressions.
+  const { execFileSync } = await import('node:child_process');
+  const root = join(import.meta.dirname, '..');
+  const rows = (tdd, rep) => +execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' }).match(/'vol_ok': (\d+)/)[1];
+  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 969);
+  assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1312);
 });
 
 test('synergy shares the DMSO limit between its fluids (T06/T07 valid ranges)', () => {

@@ -205,3 +205,44 @@ for (const [name, spec] of Object.entries(P)) {
   writeFileSync(join(process.argv[2], 't05-a10-90.tdd'), writeTdd(b));
   console.log('wrote t05 variants');
 }
+
+// Hold-out for the normalization rules: random (seeded) concentrations of two DMSO fluids in groups of every
+// type, a "to highest class volume" group spanning both plates. Not used for fitting.
+{
+  let seed = 20261115; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const p = newProtocol();
+  const a = addFluid(p, { name: 'h1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  const b = addFluid(p, { name: 'h2', concentration: 1000, concentrationUnit: 'mM', classId: 0 });
+  for (let pi = 0; pi < 2; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-20 ${pi + 1}`, dmsoLimit: 0.02 }));
+  const groups = [['ToMaxVolume', undefined, [[0, 1, 4], [1, 1, 4]]], ['ToVolume', 600, [[0, 5, 7]]], ['ToAssayVolumePct', 0.012, [[0, 8, 10]]],
+    ['ToMaxTotalVolume', undefined, [[1, 5, 7]]], ['ToTotalVolume', 50700, [[1, 8, 10]]]];
+  for (const [type, param, ranges] of groups) {
+    const wells = [];
+    for (const [pi, r0, r1] of ranges) for (let r = r0; r <= r1; r++) for (let c = 1; c < 23; c++) {
+      const u = rnd();
+      if (u > 0.15) setWell(p.plates[pi], r, c, a.id, +(Math.exp(Math.log(0.01) + rnd() * Math.log(80 / 0.01))).toPrecision(5)); // 0.01–80 µM
+      if (u > 0.6) setWell(p.plates[pi], r, c, b.id, +(Math.exp(Math.log(0.001) + rnd() * Math.log(5 / 0.001))).toPrecision(5));
+      wells.push({ p: pi, r, c });
+    }
+    addNormalization(p, 0, type, param, wells);
+  }
+  writeFileSync(join(process.argv[2], 'probe-20-normholdout.tdd'), writeTdd(p));
+  console.log('wrote probe-20-normholdout');
+}
+
+// Top-up as a function of k = C/S (single fluid per well): plate 1 "to highest class volume" with one fixed
+// largest well (k = 0.011), plate 2 "to specified volume" 560 nL (known target). k sweeps 1e-5 … 0.0105.
+{
+  const p = newProtocol();
+  const f = addFluid(p, { name: 'z1', concentration: 10000, concentrationUnit: 'mM', classId: 0 });
+  for (let pi = 0; pi < 2; pi++) p.plates.push(newPlate({ plateType: 'Default384', name: `probe-21 ${pi + 1}`, dmsoLimit: 0.03 }));
+  const n = 330, ks = Array.from({ length: n }, (_, i) => (i < 110 ? 1e-5 * Math.pow(1e-3 / 1e-5, i / 109) : 1e-3 + ((0.0105 - 1e-3) * (i - 110)) / (n - 111)));
+  for (let pi = 0; pi < 2; pi++) {
+    const wells = [];
+    ks.forEach((k, i) => { const r = Math.floor(i / 22), c = 1 + (i % 22); setWell(p.plates[pi], r, c, f.id, +(k * 10000).toPrecision(6)); wells.push({ p: pi, r, c }); });
+    if (pi === 0) { setWell(p.plates[0], 15, 23, f.id, 110); wells.push({ p: 0, r: 15, c: 23 }); }
+    addNormalization(p, 0, pi === 0 ? 'ToMaxVolume' : 'ToVolume', pi === 0 ? undefined : 560, wells);
+  }
+  writeFileSync(join(process.argv[2], 'probe-21-normsweep.tdd'), writeTdd(p));
+  console.log('wrote probe-21-normsweep');
+}

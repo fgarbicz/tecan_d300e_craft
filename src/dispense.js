@@ -93,6 +93,20 @@ export function normalizationVolume(target, currentRounded, currentExact, cls, g
   return cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, n));
 }
 
+/** "To highest class volume" top-up: nothing below 1 nL; otherwise the gap on the class's drop grid (0.02 nL up to
+ *  3.6 nL, then 0.4 nL), rounded up only from 0.51 of a step: floor(steps + 0.49). D3 and T05 bracket the
+ *  switch between 0.5084 (down) and 0.5115 (up) of a step; an exact half (T05: 505.0 nL) goes down. Min 1 nL. */
+export const TOPUP_ROUND_OFFSET = 0.49;
+export function maxVolumeTopUp(gap, cls) {
+  if (!(gap >= MIN_NORMALIZATION_VOLUME - 1e-9)) return 0;
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (gap <= upper || upper === Infinity) return cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, Math.floor(gap / inc + TOPUP_ROUND_OFFSET) * inc));
+    lower = upper;
+  }
+  return gap;
+}
+
 /** Largest dispensable volume ≤ v on the class's increment grid. */
 export function floorVolume(v, cls) {
   if (v < cls.minVolume) return 0;
@@ -244,7 +258,8 @@ export function computeProtocol(protocol) {
       const r = result[w.p].wells.get(key) || computeWell(emptyReq, fluids, plate, 0);
       return { w, key, plate, req: plate.wells.get(key) || emptyReq,
         classVol: (r.classVolumes && r.classVolumes.get(b.classId)) || 0,
-        exactClassVol: (r.exactClassVolumes && r.exactClassVolumes.get(b.classId)) || 0 };
+        exactClassVol: (r.exactClassVolumes && r.exactClassVolumes.get(b.classId)) || 0,
+        exactAll: (r.fluids || []).reduce((s, f) => s + f.exactVolume, 0) }; // unnormalized, before any well of the group is updated
     });
     // Type names confirmed in fixtures/reference/t05-normalize.tdd (one row per UI option).
     // "Total" volume = additional volume + every dispensed fluid (all classes), before normalization.
@@ -253,6 +268,7 @@ export function computeProtocol(protocol) {
       x.totalVol = r && Number.isFinite(r.totalVolume) ? r.totalVolume : x.plate.assayVolume;
     }
     const maxClass = Math.max(0, ...base.map((x) => x.classVol));
+    const maxExactClass = Math.max(0, ...base.map((x) => x.exactClassVol));
     const maxTotal = Math.max(0, ...base.map((x) => x.totalVol));
     for (const x of base) {
       // Target of the group, and the fixed well volume used to size the fluids of a normalized well.
@@ -261,7 +277,11 @@ export function computeProtocol(protocol) {
       const A = x.plate.assayVolume;
       let target, sizing, totalBased = false;
       switch (b.type) {
-        case 'ToMaxVolume': target = maxClass; sizing = null; break; // iterative sizing incl. N (plates 1-2: 1628/1628)
+        // Target = the largest UNROUNDED class volume of the group (fluids sized as usual, no normalization);
+        // every well's fluids are then sized with the fixed total A + target. Fitted on D3 plates 1-2 (616
+        // wells) and T05 row A plus two one-change copies (72 wells): 688/688 top-ups.
+        // (was: target = largest rounded class volume, iterative sizing incl. N, top-up floored — 637/688)
+        case 'ToMaxVolume': target = maxExactClass; sizing = A + target; break;
         case 'ToVolume': target = b.param; sizing = A + target; break; // UNVERIFIED sizing
         // Fluids are sized with a fixed well volume A·(1+p); the class target is p × that volume, and the
         // top-up rounds to nearest (ties to even). Fitted on the D3 report, plate 9 (308 normalized wells).
@@ -270,6 +290,14 @@ export function computeProtocol(protocol) {
         case 'ToTotalVolume': target = b.param; sizing = target; totalBased = true; break; // UNVERIFIED sizing
         default: continue; // unknown type: leave unnormalized
       }
+      if (b.type !== 'ToAssayVolumePct') {
+        const { n, t } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls, result);
+        // fluids of a normalized well are sized with the group's final target total (A + class target, or the total)
+        const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : b.type === 'ToMaxTotalVolume' ? t : sizing);
+        r.normalizationRequested = n;
+        result[x.w.p].wells.set(x.key, r);
+        continue;
+      }
       // The gap uses the volumes as sized for this group: iterative for ToMaxVolume, A·(1+p) for % of total.
       const r0 = computeWell(x.req, fluids, x.plate, 0, sizing);
       const cr = (r0.classVolumes && r0.classVolumes.get(b.classId)) || 0;
@@ -277,13 +305,58 @@ export function computeProtocol(protocol) {
       const curRounded = totalBased ? r0.totalVolume : cr;
       const curExact = totalBased ? r0.totalVolume - cr + ce : ce;
       // Rounding of the top-up: floor for ToMaxVolume (plates 1-2), nearest for % of total (plate 9).
-      const n = normalizationVolume(target, curRounded, curExact, cls, 0.4, b.type === 'ToAssayVolumePct' ? 'nearest' : 'floor');
+      const n = b.type === 'ToMaxVolume' ? maxVolumeTopUp(target - curExact, cls)
+        : normalizationVolume(target, curRounded, curExact, cls, 0.4, b.type === 'ToAssayVolumePct' ? 'nearest' : 'floor');
       const r = computeWell(x.req, fluids, x.plate, n, sizing);
       r.normalizationRequested = target - curExact;
       result[x.w.p].wells.set(x.key, r);
     }
   }
   return result;
+}
+
+/**
+ * Top-up for the "to volume / to highest / to total" normalization types, as D300e Control 4.0.1 computes it
+ * (fitted on D3, T05 + two copies, probe-20 and probe-21; see docs/format_notes.md):
+ *  - k = Σ C/S of the well's fluids (class fluids for class types, all fluids for total types);
+ *  - start from the well's unnormalized volumes (V) and, for the "highest" types, the group's largest well's
+ *    unnormalized volume as target t;
+ *  - step: N = t − V (class) or t − (A + V) (total); stop when N changed by < 0.08 % (relative to the new N)
+ *    and keep the previous N; otherwise V ← k·(A + N + V) and, for "highest" types, the target's own well
+ *    ← k_max·(A + its volume) — the target moves with the iteration;
+ *  - round N on the drop grid: "to highest class volume" with floor(steps + 0.49) (D3: 15.4034 → 15.2), the
+ *    others to nearest (ties even); nothing below 1 nL; at least 1 nL.
+ *  Matches every top-up of D3 and T05 (+ copies); probe-20/21 hold-outs: to-highest 498/505, to-volume 392/396,
+ *  to-total 52/66, to-highest-total 44/65 (each miss one 0.4 nL step).
+ */
+const TOPUP_TOLERANCE = 0.0008;
+function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls, result) {
+  const kOf = (req, classOnly) => { let k = 0; for (const [id, c] of req) { const f = fluids.get(id); if (!f || f.byVol || !c) continue; if (classOnly && f.classId !== b.classId) continue; k += c / stockInBase(f); } return k; };
+  const exactOf = (y, classOnly) => (classOnly ? y.exactClassVol : y.exactAll); // snapshot taken before the group
+  const highest = b.type === 'ToMaxVolume' || b.type === 'ToMaxTotalVolume';
+  let km = 0, tV = 0;
+  if (highest) {
+    for (const y of base) { const v = exactOf(y, !totalBased); if (v > tV) { tV = v; km = kOf(y.req, !totalBased); } }
+  }
+  const k = kOf(x.req, !totalBased), kAll = kOf(x.req, false);
+  let V = exactOf(x, !totalBased), Vall = exactOf(x, false);
+  let Nprev = null, N = 0, t = 0;
+  for (let it = 0; it < 100; it++) {
+    t = highest ? (totalBased ? A + tV : tV) : fixedTarget;
+    N = totalBased ? t - (A + V) : t - V;
+    if (Nprev != null && Math.abs(N - Nprev) / Math.max(Math.abs(N), 1e-12) < TOPUP_TOLERANCE) { N = Nprev; break; }
+    Nprev = N;
+    const T = A + N + Vall;
+    V = k * T; Vall = kAll * T;
+    if (highest) tV = km * (A + tV);
+  }
+  if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t };
+  let lower = 0;
+  for (const [upper, inc] of cls.bands) {
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, (b.type === 'ToMaxVolume' ? Math.floor(N / inc + 0.49) : roundHalfEven(N / inc)) * inc)), t };
+    lower = upper;
+  }
+  return { n: N, t };
 }
 
 function solvePctNormalization(x, p, fluids, classId) {
