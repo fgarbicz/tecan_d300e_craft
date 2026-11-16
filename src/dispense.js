@@ -289,7 +289,7 @@ export function computeProtocol(protocol) {
         default: continue; // unknown type: leave unnormalized
       }
       if (b.type !== 'ToAssayVolumePct') {
-        const { n, t } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls, result);
+        const { n, t } = iteratedTopUp(x, base, b, A, totalBased, target, fluids, cls);
         // fluids of a normalized well are sized with the group's final target total (A + class target, or the total)
         const r = computeWell(x.req, fluids, x.plate, n, b.type === 'ToMaxVolume' ? A + t : b.type === 'ToMaxTotalVolume' ? t : sizing);
         r.normalizationRequested = n;
@@ -314,47 +314,73 @@ export function computeProtocol(protocol) {
 }
 
 /**
- * Top-up for the "to volume / to highest / to total" normalization types, as D300e Control 4.0.1 computes it
- * (fitted on D3, T05 + two copies, probe-20 and probe-21; see docs/format_notes.md):
- *  - k = Σ C/S of the well's fluids (class fluids for class types, all fluids for total types);
- *  - start from the well's unnormalized volumes (V) and, for the "highest" types, the group's largest well's
- *    unnormalized volume as target t;
- *  - step: N = t − V (class) or t − (A + V) (total); stop when N changed by < 0.08 % (relative to the new N)
- *    and keep the previous N; otherwise V ← k·(A + N + V) and, for "highest" types, the target's own well
- *    ← k_max·(A + its volume) — the target moves with the iteration;
- *  - round N on the drop grid: "to highest class volume" with floor(steps + 0.49) (D3: 15.4034 → 15.2), the
- *    others to nearest (ties even); nothing below 1 nL; at least 1 nL.
- *  Matches every top-up of D3 and T05 (+ copies); probe-20/21 hold-outs: to-highest 498/505, to-volume 392/396,
- *  to-total 52/66, to-highest-total 44/65 (each miss one 0.4 nL step).
+ * Top-up for the "to volume / to highest / to total" normalization types, as D300e Control 4.0.1 computes it.
+ * Fitted on probe-21 (single-fluid sweep, k = ΣC/S 1e-5…0.011; plate 2 "to 560 nL" pins the stop rule, plate 1
+ * "to highest" the target) and checked on D3, T05 + two one-change copies and probe-20:
+ *  - volumes are C·T/S per fluid, summed (this float order decides exact rounding ties: D3 N2, T05 A5);
+ *  - the well starts from its fluids sized at the bare assay volume, V₀ = Σ C·A/S;
+ *  - "highest" types: the target is the group's largest well, sized like any well but with the convergence check
+ *    from the FIRST step (D3: k_max 0.00032 stays at Σ C·A/S; probe-21: k_max 0.011 takes one step), and it then
+ *    takes one more step with every iteration of the well, t_V ← Σ C·(A + t_V)/S;
+ *  - step i: N = t − V (class) or t − (A + V) (total); V ← Σ C·(A + N + V_all)/S;
+ *  - stop when the well's fluid volume changed by < 0.1 % of N (|ΔV| / N, SIZING_TOLERANCE) and keep the
+ *    PREVIOUS N; "total" types first take a step from V = 0 (N = t − A), so a well whose fluids add < 0.1 % of N
+ *    gets the full t − A (probe-20: 0.38–0.66 nL of drug → 700 nL);
+ *  - round N to the drop grid like .NET Math.Round (nearest, exact binary ties to even); none below 1 nL; ≥ 1 nL.
+ * Result: probe-21 1320/1321 rows (L20 sits 0.0002 steps below a tie), D3 / T05 ×3 exact; probe-20 (not used to
+ * derive it): to-highest 175/175, to-volume 66/66, to-total 58/66, to-highest-total 44/65 — OPEN: in both total
+ * types some wells come out one 0.4 nL step low (K8 vs K9: similar wells, opposite sides), and under
+ * to-highest-total empty wells get 290.4 = the largest well's DISPENSED total while others follow the exact one.
+ * (was: start from the sized volumes, |ΔN|/N < 0.08 %, floor(steps + 0.49) for "highest": probe-21 1312/1321)
  */
-const TOPUP_TOLERANCE = 0.0008;
-function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls, result) {
-  const kOf = (req, classOnly) => { let k = 0; for (const [id, c] of req) { const f = fluids.get(id); if (!f || f.byVol || !c) continue; if (classOnly && f.classId !== b.classId) continue; k += c / stockInBase(f); } return k; };
+function iteratedTopUp(x, base, b, A, totalBased, fixedTarget, fluids, cls) {
+  const conc = (req, classOnly) => {
+    const out = [];
+    for (const [id, c] of req) { const f = fluids.get(id); if (!f || f.byVol || !c) continue; if (classOnly && f.classId !== b.classId) continue; out.push([c, stockInBase(f)]); }
+    return out;
+  };
+  const vol = (cs, T) => { let v = 0; for (const [c, S] of cs) v += (c * T) / S; return v; };
   const exactOf = (y, classOnly) => (classOnly ? y.exactClassVol : y.exactAll); // snapshot taken before the group
   const highest = b.type === 'ToMaxVolume' || b.type === 'ToMaxTotalVolume';
-  let km = 0, tV = 0;
+  let tC = null, tV = 0;
   if (highest) {
-    for (const y of base) { const v = exactOf(y, !totalBased); if (v > tV) { tV = v; km = kOf(y.req, !totalBased); } }
+    let best = -Infinity, bestY = null;
+    for (const y of base) { const v = exactOf(y, !totalBased); if (v > best) { best = v; bestY = y; } }
+    tC = conc(bestY.req, !totalBased);
+    let prev = A;
+    for (let n = 1; n <= 100; n++) { const next = A + vol(tC, prev); if (Math.abs(next - prev) / next < SIZING_TOLERANCE) break; prev = next; }
+    tV = vol(tC, prev);
   }
-  const k = kOf(x.req, !totalBased), kAll = kOf(x.req, false);
-  let V = exactOf(x, !totalBased), Vall = exactOf(x, false);
-  let Nprev = null, N = 0, t = 0;
+  const cC = conc(x.req, !totalBased), cAll = conc(x.req, false);
+  let V = vol(cC, A), Vall = vol(cAll, A);
+  let Nprev = null, Vprev = null, N = 0, t = 0;
+  if (totalBased) { // "total" types: the current total starts at the bare assay volume, one step from V = 0 first
+    const t0 = highest ? A + tV : fixedTarget;
+    Nprev = t0 - A; Vprev = 0;
+  }
   for (let it = 0; it < 100; it++) {
     t = highest ? (totalBased ? A + tV : tV) : fixedTarget;
     N = totalBased ? t - (A + V) : t - V;
-    if (Nprev != null && Math.abs(N - Nprev) / Math.max(Math.abs(N), 1e-12) < TOPUP_TOLERANCE) { N = Nprev; break; }
-    Nprev = N;
+    if (Nprev != null && Math.abs(V - Vprev) / Math.max(Math.abs(N), 1e-12) < SIZING_TOLERANCE) { N = Nprev; break; }
+    Nprev = N; Vprev = V;
     const T = A + N + Vall;
-    V = k * T; Vall = kAll * T;
-    if (highest) tV = km * (A + tV);
+    V = vol(cC, T); Vall = vol(cAll, T);
+    if (highest) tV = vol(tC, A + tV);
   }
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {
-    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, (b.type === 'ToMaxVolume' ? Math.floor(N / inc + 0.49) : roundHalfEven(N / inc)) * inc)), t };
+    if (N <= upper || upper === Infinity) return { n: cleanFloat(Math.max(MIN_NORMALIZATION_VOLUME, lower, roundHalfEvenStrict(N / inc) * inc)), t };
     lower = upper;
   }
   return { n: N, t };
+}
+
+/** .NET Math.Round(double): nearest, ties (exactly .5 in binary) to even; no tolerance. */
+function roundHalfEvenStrict(q) {
+  const f = Math.floor(q), d = q - f;
+  if (d === 0.5) return f % 2 === 0 ? f : f + 1;
+  return d < 0.5 ? f : f + 1;
 }
 
 function solvePctNormalization(x, p, fluids, classId) {

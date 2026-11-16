@@ -800,10 +800,9 @@ pub fn compute_protocol(protocol: &Protocol) -> Vec<PlateResult> {
     result
 }
 
-/// Top-up of the "to volume / to highest / to total" types as D300e Control 4.0.1 computes it; see
-/// iteratedTopUp in src/dispense.js (fitted on D3, T05 ×3, probe-20 hold-out and probe-21 sweep).
+/// Top-up of the "to volume / to highest / to total" types as D300e Control 4.0.1 computes it; a port of
+/// iteratedTopUp in src/dispense.js (see there for the rules and their evidence).
 /// Returns (rounded top-up, final target used for sizing).
-pub const TOPUP_TOLERANCE: f64 = 0.0008;
 #[allow(clippy::too_many_arguments)]
 fn iterated_top_up<B: TopUpWell>(
     x: &B,
@@ -815,8 +814,8 @@ fn iterated_top_up<B: TopUpWell>(
     fluids: &FluidLookup,
     cls: &FluidClass,
 ) -> (f64, f64) {
-    let k_of = |req: &WellFluids, class_only: bool| {
-        let mut k = 0.0;
+    let conc = |req: &WellFluids, class_only: bool| -> Vec<(f64, f64)> {
+        let mut out = vec![];
         for (id, &c) in req {
             let Some(f) = fluids.get(id) else { continue };
             if f.by_vol || c == 0.0 || c.is_nan() {
@@ -825,26 +824,48 @@ fn iterated_top_up<B: TopUpWell>(
             if class_only && f.class_id != Some(b.class_id) {
                 continue;
             }
-            k += c / stock_in_base(f);
+            out.push((c, stock_in_base(f)));
         }
-        k
+        out
     };
+    let vol = |cs: &[(f64, f64)], t: f64| cs.iter().fold(0.0, |v, &(c, s)| v + (c * t) / s);
     let highest = b.kind == "ToMaxVolume" || b.kind == "ToMaxTotalVolume";
-    let (mut km, mut tv) = (0.0, 0.0);
+    let mut t_c: Vec<(f64, f64)> = vec![];
+    let mut tv = 0.0;
     if highest {
+        let mut best = f64::NEG_INFINITY;
+        let mut best_y: Option<&B> = None;
         for y in base {
             let v = y.exact(!total_based);
-            if v > tv {
-                tv = v;
-                km = k_of(y.req(), !total_based);
+            if v > best {
+                best = v;
+                best_y = Some(y);
             }
         }
+        if let Some(y) = best_y {
+            t_c = conc(y.req(), !total_based);
+        }
+        let mut prev = a;
+        for _ in 1..=100 {
+            let next = a + vol(&t_c, prev);
+            if (next - prev).abs() / next < SIZING_TOLERANCE {
+                break;
+            }
+            prev = next;
+        }
+        tv = vol(&t_c, prev);
     }
-    let k = k_of(x.req(), !total_based);
-    let k_all = k_of(x.req(), false);
-    let mut v = x.exact(!total_based);
-    let mut v_all = x.exact(false);
-    let (mut n_prev, mut n, mut t): (Option<f64>, f64, f64) = (None, 0.0, 0.0);
+    let c_c = conc(x.req(), !total_based);
+    let c_all = conc(x.req(), false);
+    let mut v = vol(&c_c, a);
+    let mut v_all = vol(&c_all, a);
+    let (mut n_prev, mut v_prev): (Option<f64>, f64) = (None, 0.0);
+    let (mut n, mut t) = (0.0, 0.0);
+    if total_based {
+        let t0 = if highest { a + tv } else { fixed_target };
+        n_prev = Some(t0 - a);
+        v_prev = 0.0;
+    }
     for _ in 0..100 {
         t = if highest {
             if total_based { a + tv } else { tv }
@@ -853,17 +874,18 @@ fn iterated_top_up<B: TopUpWell>(
         };
         n = if total_based { t - (a + v) } else { t - v };
         if let Some(np) = n_prev {
-            if (n - np).abs() / js_max(n.abs(), 1e-12) < TOPUP_TOLERANCE {
+            if (v - v_prev).abs() / js_max(n.abs(), 1e-12) < SIZING_TOLERANCE {
                 n = np;
                 break;
             }
         }
         n_prev = Some(n);
+        v_prev = v;
         let tot = a + n + v_all;
-        v = k * tot;
-        v_all = k_all * tot;
+        v = vol(&c_c, tot);
+        v_all = vol(&c_all, tot);
         if highest {
-            tv = km * (a + tv);
+            tv = vol(&t_c, a + tv);
         }
     }
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
@@ -873,19 +895,22 @@ fn iterated_top_up<B: TopUpWell>(
     let mut lower = 0.0;
     for &(upper, inc) in cls.bands {
         if n <= upper || upper == f64::INFINITY {
-            let q = if b.kind == "ToMaxVolume" {
-                (n / inc + 0.49).floor()
-            } else {
-                round_half_even(n / inc)
-            };
-            return (
-                clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), q * inc)),
-                t,
-            );
+            let q = round_half_even_strict(n / inc);
+            return (clean_float(js_max(js_max(MIN_NORMALIZATION_VOLUME, lower), q * inc)), t);
         }
         lower = upper;
     }
     (n, t)
+}
+
+/// .NET Math.Round(double): nearest, exact binary ties to even, no tolerance.
+fn round_half_even_strict(q: f64) -> f64 {
+    let f = q.floor();
+    let d = q - f;
+    if d == 0.5 {
+        return if f % 2.0 == 0.0 { f } else { f + 1.0 };
+    }
+    if d < 0.5 { f } else { f + 1.0 }
 }
 
 trait TopUpWell {

@@ -142,14 +142,16 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
   }
 });
 
-test('normalization hold-outs (probe-20 random wells, all types; probe-21 sweep): documented accuracy', async () => {
-  // Not used to fit the rules' structure. Every fluid volume but one matches; the remaining differences are
-  // single top-ups one 0.4 nL step off (mostly the two "total volume" types). Guard against regressions.
+test('normalization probes 20 and 21: documented accuracy (regression guard)', async () => {
+  // probe-21 (single-fluid k sweep) was used to derive the top-up model; probe-20 (random wells, all types) was
+  // not used to derive it but was looked at while fitting earlier versions, so it is not a clean hold-out.
+  // probe-21: 1320/1321 (L20 sits 0.0002 steps from a rounding tie). probe-20: to-highest and to-volume all
+  // match; the two "total" types still have one-step misses (see iteratedTopUp in src/dispense.js).
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
   const rows = (tdd, rep) => +execFileSync('python3', ['-I', 'tools/compare/compare_report.py', tdd, rep], { cwd: root, encoding: 'utf8' }).match(/'vol_ok': (\d+)/)[1];
-  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 969);
-  assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1312);
+  assert.ok(rows('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml') >= 977);
+  assert.ok(rows('fixtures/reference/probes/probe-21-normsweep.tdd', 'fixtures/reference/reports/probes/probe-21-normsweep.xml') >= 1320);
 });
 
 test('synergy shares the DMSO limit between its fluids (T06/T07 valid ranges)', () => {

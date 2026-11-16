@@ -100,14 +100,24 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   bracket the factor to 1.000999–1.001001. The D3 wells at 1.0005 % (after the % top-up) are not flagged.
 - Pre-run summary also lists "A well of 30 nL or greater is recommended for each fluid on each plate".
 - Cassette order follows the fluids: when fluid 1 is on a D4+ head, the D4+ cassette is loaded first (probe-15).
-- Normalization top-up (ToVolume, ToMaxVolume, ToTotalVolume, ToMaxTotalVolume), fitted on D3, T05 + two
-  one-change copies, probe-20 (random hold-out, all types) and probe-21 (single-fluid k sweep 1e-5 to 0.0105):
-  iterate N = t − V (class) or t − (A + V) (total) from the unnormalized exact volumes; after each step
-  V ← k·(A + N + V_all), and for "highest" types the target well moves too, t_V ← k_max·(A + t_V). Stop when
-  N changed by < 0.08 % of N and keep the previous N. Round: ToMaxVolume floor(steps + 0.49), the others nearest
-  (ties even); none below 1 nL. The fluids are sized with the final A + t (ToMaxVolume) or t (ToMaxTotal).
-  Exact on D3 (5752 rows) and all three T05 files (was: 13 row-A misses each). Hold-outs: ToMax 498/505,
-  ToVolume 66/66 per plate, ToTotal 52/66, ToMaxTotal 44/65 top-ups, every miss one 0.4 nL step (src/dispense.js
-  iteratedTopUp). Still OPEN: the total-volume types (empty wells under ToMaxTotal get 290.4 vs 290).
+- Normalization top-up (ToVolume, ToMaxVolume, ToTotalVolume, ToMaxTotalVolume). probe-21 (single fluid,
+  k = C/S from 1e-5 to 0.011) was designed to isolate it: its plate 2 ("to 560 nL", fixed target) fits only
+  with the iteration starting from V₀ = Σ C·A/S and a stop at 0.1 % (the bracket is 0.0958–0.1002 %, i.e. the
+  sizing tolerance), keeping the previous N; plate 1 ("to highest") adds the target. Rules (src/dispense.js
+  iteratedTopUp):
+  - volumes are C·T/S per fluid, summed: this float order decides exact ties (D3 N2 = 37.5 steps → 38;
+    T05 A5 = 1253.4999999999998 → 1253), rounded like .NET Math.Round (no tie tolerance);
+  - "highest": the target well is sized with its convergence check from the first step (D3 k_max 0.00032 stays
+    at Σ C·A/S; probe-21 k_max 0.011 takes one step) and steps along with the well, t ← Σ C·(A + t)/S;
+  - stop when |ΔV| / N < 0.1 % (the change of the well's fluids, not of N: on plate 1 the moving target
+    partly cancels ΔV in ΔN);
+  - "total" types take a first step from V = 0, so wells whose fluids add < 0.1 % of N get the full t − A.
+  Results: D3 5752/5752, T05 + two copies 107/107 each, probe-21 1320/1321 (L20: 0.0002 steps below a tie),
+  probe-20 (not used to derive these rules, but looked at while fitting earlier versions): to-highest 175/175,
+  to-volume 66/66, to-total 58/66, to-highest-total 44/65.
+  OPEN — the two total types: some wells come out one 0.4 nL step low (similar wells K8 and K9 fall on opposite
+  sides), and under to-highest-total empty wells get 290.4 nL = the largest well's DISPENSED total while the
+  others follow its exact total. A fresh probe with predictions written down before the run is still needed to
+  call any of this validated.
 - An app-saved file (craft-ui-d3.tdd, canvas thumbnail, revision "Mac\D300 Craft") opens in D300e Control and
   shows its thumbnail in the recent list.
