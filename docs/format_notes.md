@@ -59,3 +59,27 @@ ClassID 0 DMSO · 1 Aqueous+Tween 20 · 2 Aqueous+Brij 35 · 3 Aqueous+Triton X1
 `<Color>` is written only when the user picks a non-default colour (default = palette index by fluid order:
 1 red, 2 green, 3 blue, 4 yellow, 5 pink, 6 cyan, …, 10 magenta).
 New fluids default to "Fluid N", DMSO, 10 mM, MaxVolume 1000 nL.
+
+## Run planning: cassettes, dispense heads, load volumes (simulated runs, 2026-11-15)
+
+Source: D300e Control 4.0.1 in simulation on PC-workstation. Protocols `fixtures/reference/probes/probe-*.tdd`
+(made by `tools/cassette/make_probes.mjs`), run reports `fixtures/reference/reports/probes/`, and the per-head
+fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tests/cassette.test.js`.
+
+- The pre-run summary ("Requirements", "Total load volumes") appears after Run → Simulate, before anything
+  is dispensed. Per-head volumes appear on the fill screen after "Loaded (F3)".
+- T8+ (8 heads): ≤ 20 µL dispensed per head. load = d / 0.87 + 0.3 µL (DMSO) or + 2.5 µL (aqueous),
+  shown to 0.1 µL; minimum 2.0 µL (DMSO) / 4.0 µL (aqueous, 1 point).
+- A fluid needing k = ⌈d/20⌉ heads: whole plates per head if next-fit packing in plate order fits in k heads,
+  else equal split (a well can be dispensed by two heads: "multiple" in the report).
+- D4+ (4 heads, "Use high-volume cassettes", ticked by default): used when a fluid needs > 2 T8+ heads.
+  ≤ 200 µL per head; load = 1.25·d + 15 µL, shown to 1 µL. Remainder above whole D4+ heads ≤ 40 µL goes to
+  T8+ heads filled to 20 µL; otherwise one more D4+ head, equal split.
+- Normalization ("DMSO normalization") is planned like a fluid, after the fluids.
+- Head order: T8+ cassettes first, then D4+; by first plate dispensed, then fluid, then head index.
+- The summary's total per fluid can differ by 0.1 µL from the sum of the per-head loads (e.g. 24.1 vs 12.0+12.0).
+- Volume solve: D300e runs 3 fixed-point steps (T = fixed·(1+k+k²)), not the exact solution; visible from
+  ~1 µL per well (probe-2/10 reports). One ToVolume-normalized well (probe-7 A1) still differs by 0.4 nL: open.
+- UNVERIFIED: aqueous on D4+; D4+ remainder 20–40 µL; whole-plate packing on D4+; the D3 run's normalization
+  heads (that run used a modified, unsaved protocol); behaviour with "Use high-volume cassettes" unticked
+  (the summary did not update when unticked).
