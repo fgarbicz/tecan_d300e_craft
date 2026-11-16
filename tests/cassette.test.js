@@ -163,12 +163,13 @@ test('probe-25 (blind for the T8+ cassette) and probe-26 (blind for the revised 
   const p25 = heads(plan(R + 'probe-25-blind.tdd'));
   assert.deepEqual(p25[0], ['T8+', ['e1 11.8', 'e1 10.1', 'e2 8.2', 'e2 11.8', 'e2 6.5', 'e1 10.9']]);
   assert.equal(p25[1][0], 'D4+');
-  assert.deepEqual(p25[1][1].slice(0, 3), ['e3 220', 'DMSO normalization 256', 'e3 117']); // head 4: see the todo below
+  assert.deepEqual(p25[1][1], ['e3 220', 'DMSO normalization 256', 'e3 117', 'DMSO normalization 258']);
   assert.deepEqual(heads(plan(R + 'probe-26-blind.tdd')), [
     ['D4+', ['g1 220', 'g2 167', 'DMSO normalization 213', 'DMSO normalization 213']],
     ['D4+', ['DMSO normalization 213']],
     ['T8+', ['g3 11.8', 'g3 11.8', 'g3 11.1', 'g3 7']]]);
 });
-test('D4+ load at an exact .5: probe-25 head 4 (1.25 × 193.996 + 15 = 257.495) was loaded as 258', { todo: 'probe-26 has 213.499 → 213, so no rounding of the same quantity gives both' }, () => {
+test('D4+ load at an exact .5: whole-plate head from d to 0.1 µL (probe-25 194.0 → 258), equal share exact (probe-26 158.7992 → 213)', () => {
   assert.equal(plan(R + 'probe-25-blind.tdd').cassettes[1].heads[3].load, 258);
+  assert.deepEqual(plan(R + 'probe-26-blind.tdd').cassettes[0].heads.slice(2).map((h) => h.load), [213, 213]);
 });

@@ -51,10 +51,13 @@ const TOL = 0.005;
 const roundTo = (x, d) => { const m = 10 ** d; return Math.round(x * m) / m; };
 
 /** Load volume (µL) for one head that dispenses `d` µL. */
-export function headLoad(cassette, d, isDmso = true) {
-  // the dispensed volume is taken to 0.1 µL first (as the report shows it): probe-25 193.99 → 194.0 → 257.5 → 258
-  // OPEN: at exact .5 the shown load is 1 µL off either way (probe-25 257.495 → 258, probe-26 213.499 → 213)
-  if (cassette.type === 'D4+') return roundTo(cassette.slope * d + cassette.dead, 0); // UNVERIFIED for aqueous
+export function headLoad(cassette, d, isDmso = true, { equalShare = false } = {}) {
+  // D4+: a head that dispenses whole plates or plate parts takes its volume to 0.1 µL first (as the report shows
+  // it): probe-25 193.996 → 194.0 → 257.5 → 258. A head that is one of k equal shares of a fluid uses the exact
+  // share: probe-26 476.3976 / 3 = 158.7992 → 213.499 → 213 (not 158.8 → 214). Every other D4+ load seen (31
+  // heads) fits both readings; these two ties are the only ones that separate them, so the split is
+  // FITTED on one datapoint each. (was: exact d everywhere, which put probe-25 head 4 at 257.)
+  if (cassette.type === 'D4+') return roundTo(cassette.slope * (equalShare ? d : roundTo(d, 1)) + cassette.dead, 0); // UNVERIFIED for aqueous
   const dead = isDmso ? 0.3 : 2.5, min = isDmso ? 2.0 : 4.0;
   return Math.max(min, roundTo(cassette.slope * d + dead, 1));
 }
@@ -130,9 +133,9 @@ function packOrSplit(perPlate, offset, total, k, cas, tryLargestFirst, cap = cas
   const items = part.map((v, p) => ({ v, p })).filter((x) => x.v > EPS);   // whole-plate packings: plate order
   const itemsRun = ord.map((p) => ({ v: part[p], p })).filter((x) => x.v > EPS); // fill plan: run order
   const equal = () => {
-    if (!start) return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: platesIn(perPlate, offset + (j * total) / k, offset + ((j + 1) * total) / k) }));
+    if (!start) return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, equalShare: true, plates: platesIn(perPlate, offset + (j * total) / k, offset + ((j + 1) * total) / k) }));
     const rot = ord.map((p) => part[p]); // cumulative over the rotated order, mapped back to plate numbers
-    return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, plates: new Set([...platesIn(rot, (j * total) / k, ((j + 1) * total) / k)].map((i) => ord[i])) }));
+    return Array.from({ length: k }, (_, j) => ({ cassette: cas, amount: total / k, equalShare: true, plates: new Set([...platesIn(rot, (j * total) / k, ((j + 1) * total) / k)].map((i) => ord[i])) }));
   };
   if (cas === T8) return fillPlan(itemsRun, total, k, cap, T8) || equal();
   const nextFit = [];
@@ -242,7 +245,7 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
         chosen.forEach((h, i) => {
           const isDmso = fluidClass(h.it.classId).isDmso;
           cas.heads.push({ head: i + 1, name: h.it.name, key: h.it.key, fluidId: h.it.fluidId, classId: h.it.classId,
-            dispensed: h.amount, load: headLoad(c, h.amount, isDmso), plates: [...h.plates].sort((a, b) => a - b) });
+            dispensed: h.amount, load: headLoad(c, h.amount, isDmso, { equalShare: !!h.equalShare }), plates: [...h.plates].sort((a, b) => a - b) });
         });
         cassettes.push(cas);
         if (c === D4) { // D4+ overflow: what the next D4+ cassette gets is planned again (probe-24: 2 × 191.2)

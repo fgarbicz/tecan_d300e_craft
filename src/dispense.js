@@ -423,7 +423,7 @@ function pctTopUp(req, fluids, b, A, p, cls) {
  * stops at the first i with |Vᵢ − Vᵢ₋₁| / Nᵢ < 0.1 % and returns Nᵢ (at most 4 steps, i ≤ 3: the three
  * largest-k wells stop at i = 3 although their ratio is 0.10–0.11 %). Wells whose fluids add < 0.1 % of the gap
  * therefore get the whole gap. The fluids are dispensed as sized at step j = min(max(i, 1), 2), i.e. with Tⱼ.
- * Open: E21 (ratio 0.1048 % at i = 1) has fluid volume V₁ where this gives V₂ (one 0.4 nL step).
+ * E21 (ratio 0.1048 % at i = 1): see the sizing step below.
  */
 function totalTopUp(cs, vol, A, gap, cls) {
   // the sequence (Tᵢ, Vᵢ, Nᵢ) for i = 0…3
@@ -432,7 +432,13 @@ function totalTopUp(cs, vol, A, gap, cls) {
   for (let k = 0; k < 4; k++) { const T = A + Np + Vp, V = vol(cs, T), N = gap - Vp; Ts.push(T); Vs.push(V); Ns.push(N); Vp = V; Np = N; }
   let i = 3;
   for (let k = 0; k < 4; k++) if (Math.abs(Vs[k] - (k ? Vs[k - 1] : 0)) / Math.max(Math.abs(Ns[k]), 1e-12) < SIZING_TOLERANCE) { i = k; break; }
-  const N = Ns[i], sizing = Ts[Math.min(Math.max(i, 1), 2)];
+  // Fluid sizing step j ≤ min(max(i, 1), 2): the first j ≥ 1 whose fluid change is < 0.1 % of the PREVIOUS top-up,
+  // |Vⱼ − Vⱼ₋₁| / Nⱼ₋₁. Only E21 separates this from "j = i": its top-up stops at i = 2 (0.1048 % of N₁) but its
+  // fluid is V₁ (0.0979 % of N₀); F13 (0.163 % of N₀) is V₂. FITTED on that one well.
+  // (was: sizing = Ts[min(max(i, 1), 2)], E21 one 0.4 nL step low)
+  let j = 2;
+  for (let k = 1; k <= 2; k++) if (Math.abs(Vs[k] - Vs[k - 1]) / Math.max(Math.abs(Ns[k - 1]), 1e-12) < SIZING_TOLERANCE) { j = k; break; }
+  const N = Ns[i], sizing = Ts[Math.min(j, Math.max(i, 1))];
   if (!(N >= MIN_NORMALIZATION_VOLUME - 1e-9)) return { n: 0, t: A + gap, sizing };
   let lower = 0;
   for (const [upper, inc] of cls.bands) {

@@ -150,7 +150,7 @@ test('normalization run reports: D3, T05 and its two one-change copies match eve
 });
 
 test('"to total volume": probe-23 plate 1 sweep and the probe-20 group (two fluids, not used for fitting) match', async () => {
-  // Lagged iteration (src/dispense.js totalTopUp). probe-23 plate 1: 663/664 rows (E21: fluid one step off).
+  // Lagged iteration (src/dispense.js totalTopUp). probe-23 plate 1: 664/664 rows.
   const { execFileSync } = await import('node:child_process');
   const root = join(import.meta.dirname, '..');
   const plate = (tdd, rep, p) => JSON.parse(execFileSync('python3', ['-I', '-c', `
@@ -169,7 +169,7 @@ for r in rows:
   if e is None or abs(e-float(r[15]))>1e-6: bad.append(w)
 print(json.dumps({'rows':len(rows),'bad':bad}))`, tdd, rep, String(p)], { cwd: root, encoding: 'utf8' }));
   const p23 = plate('fixtures/reference/probes/probe-23-totalsweep.tdd', 'fixtures/reference/reports/probes/probe-23-totalsweep.xml', 1);
-  assert.deepEqual(p23.bad, ['E21'], JSON.stringify(p23));
+  assert.deepEqual(p23.bad, [], JSON.stringify(p23)); // E21: fluid sized at the step whose change is < 0.1 % of the previous top-up
   // probe-20 plate 2 rows I–K are the "to total" group: no misses there
   const p20 = plate('fixtures/reference/probes/probe-20-normholdout.tdd', 'fixtures/reference/reports/probes/probe-20-normholdout.xml', 2);
   assert.deepEqual(p20.bad.filter((w) => /^[IJK]\d/.test(w)), []);

@@ -987,8 +987,16 @@ fn total_top_up(cs: &[(f64, f64)], vol: &dyn Fn(&[(f64, f64)], f64) -> f64, a: f
             break;
         }
     }
+    // fluid sizing step: first j ≥ 1 with |Vⱼ − Vⱼ₋₁| / Nⱼ₋₁ < 0.1 %, at most min(max(i, 1), 2) (src/dispense.js; E21)
+    let mut j = 2;
+    for k in 1..=2 {
+        if (vs[k] - vs[k - 1]).abs() / js_max(f64::abs(ns[k - 1]), 1e-12) < SIZING_TOLERANCE {
+            j = k;
+            break;
+        }
+    }
     let n = ns[i];
-    let sizing = ts[i.clamp(1, 2)];
+    let sizing = ts[j.min(i.clamp(1, 2))];
     #[allow(clippy::neg_cmp_op_on_partial_ord)]
     if !(n >= MIN_NORMALIZATION_VOLUME - 1e-9) {
         return (0.0, a + gap, sizing);
