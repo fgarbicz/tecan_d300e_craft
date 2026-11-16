@@ -11,7 +11,8 @@ import { wellKey, wellName } from './tdd.js';
 import { unitKind, unitLabel, scrapWellValues, compounds, toDisplay } from './dispense.js';
 
 export const DRUG_PALETTE = ['#2f6fde', '#d9480f', '#2b8a3e', '#ae3ec9', '#e8590c', '#1098ad', '#c2255c', '#5c940d', '#f08c00', '#3b5bdb', '#862e9c', '#0b7285'];
-export const fluidColor = (f) => DRUG_PALETTE[((f.id % DRUG_PALETTE.length) + DRUG_PALETTE.length) % DRUG_PALETTE.length];
+// a diluted stock (fluid shift / extend) is the same drug as its root: same colour
+export const fluidColor = (f) => { const id = f.rootFluidId != null ? f.rootFluidId : f.id; return DRUG_PALETTE[((id % DRUG_PALETTE.length) + DRUG_PALETTE.length) % DRUG_PALETTE.length]; };
 
 /** Display unit of a fluid's well values (as the app shows them). */
 export function wellUnitOf(protocol, f) {

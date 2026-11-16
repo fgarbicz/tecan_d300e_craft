@@ -9,7 +9,8 @@
 //   "plate":  { "type": "384", "wellVolumeUL": 50, "dmsoLimitPct": 1, "border": 1, "replicates": 3, "scrap": true, "shake": false,
 //               "dilutedStocks": true,          // add "Drug - 1:N" stocks when a series goes below one drop (D300e shift/extend)
 //               "randomize": false | "cellLine", "randomSeed": 1 },  // shuffle well positions within each cell line
-//   "drugs":  [ { "name": "Bortezomib", "stock": "1 mM", "class": "DMSO", "mw": 384.24 }, … ],
+//   "drugs":  [ { "name": "Bortezomib", "stock": "1 mM", "class": "DMSO", "mw": 384.24, "unit": "nM" }, … ],
+//               // "unit": the unit this drug's doses are shown in (plan, app, Excel); default µM (ng/mL for mass stocks)
 //   "design": { "primary":  { "drug": "Bortezomib", "top": "0.02 µM", "dilution": "1:1.4", "levels": 10, "replicates": 2, "zero": true },
 //               // or a range: { "drug": "X", "top": "10 µM", "bottom": "0.1 nM", "levels": 10 } → evenly spaced on a log scale
 //               "partners": [ { "drug": "MEN", "top": "3 µM", "dilution": "1:2", "levels": 6, "replicates": 2, "zero": true,
@@ -25,6 +26,7 @@ import { computeProtocol, primingIssues, MOLARITY_UNITS, MASS_UNITS, fromDisplay
 import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole, resolveStocks, randomizeByCellLine, seededRng, rangeStep } from './experiment.js';
 
 import { planRun } from './cassette.js';
+import { setDrugUnit, drugUnit, unitOfFn } from './units.js';
 import { doseLevels, scrapTest } from './dosemap.js';
 
 const UNIT_ALIASES = { um: 'µM', 'μm': 'µM', 'µm': 'µM', mm: 'mM', nm: 'nM', pm: 'pM', m: 'M', 'mg/ml': 'mg_mL', 'ug/ml': 'µg_mL', 'µg/ml': 'µg_mL', 'ng/ml': 'ng_mL', 'pg/ml': 'pg_mL' };
@@ -60,6 +62,10 @@ export function designExperiment(spec) {
     const classId = d.class == null ? 0 : CLASS_BY_NAME[String(d.class).toLowerCase()];
     if (classId == null) throw new Error(`Unknown fluid class "${d.class}" for ${d.name} (DMSO, a+Tw, a+B, a+TX, a+Tw+g, …)`);
     const f = addFluid(protocol, { name: d.name, concentration: toBase(st), concentrationUnit: st.unit, classId });
+    if (d.unit != null) {
+      const raw = String(d.unit).trim().replace('_', '/'), u = UNIT_ALIASES[raw.toLowerCase()] || raw;
+      try { setDrugUnit(meta, protocol, f, u); } catch { throw new Error(`Unit "${d.unit}" cannot be used for ${d.name} (stock in ${unitLabel(st.unit)}): use ${st.unit in MOLARITY_UNITS ? 'M, mM, µM, nM or pM' : 'mg/mL, µg/mL, ng/mL or pg/mL'}`); }
+    }
     drugs.set(d.name, { fluid: f, mw: d.mw ?? null, stock: st });
   }
   const fluidOf = (name) => { if (name == null) return null; const x = drugs.get(name); if (!x) throw new Error(`Drug "${name}" is used in the design but not listed under drugs`); return x.fluid.id; };
@@ -120,6 +126,9 @@ const fmtConc = (v) => (v >= 100 ? v.toFixed(0) : v >= 1 ? +v.toPrecision(3) : +
 export function makePlan(protocol, meta, spec = {}) {
   const computed = computeProtocol(protocol);
   const run = planRun(protocol, computed);
+  const unitOf = unitOfFn(meta, protocol);
+  const axisUnit = (id) => { const f = protocol.fluids.find((x) => x.id === id); return f ? drugUnit(meta, protocol, f) : null; };
+  const inUnit = (v, u) => (u ? fromDisplay(v, 'µM') / fromDisplay(1, u) : v); // base → display unit
   const issues = []; let maxDmso = 0, maxDmsoScrap = 0;
   const vehicleDmso = new Map(); // block name → DMSO % of its vehicle (0/0) wells
   computed.forEach(({ wells }, pi) => { for (const [k, w] of wells) {
@@ -140,7 +149,7 @@ export function makePlan(protocol, meta, spec = {}) {
     // pipette at least 1 µL of stock (to 0.5 µL), however little of the dilution the heads need
     const stockPart = fl && fl.dilutionFactor ? Math.max(1, Math.ceil((prep / fl.dilutionFactor) * 2) / 2) : 0;
     const dilution = root && fl.dilutionFactor ? { from: root.name, factor: fl.dilutionFactor, stockUL: stockPart, solventUL: +(stockPart * (fl.dilutionFactor - 1)).toPrecision(4),
-      levels: (meta.experiment?.stockNotes || []).filter((n) => n.fluid === fl.name).flatMap((n) => n.levels) } : null;
+      levels: (meta.experiment?.stockNotes || []).filter((n) => n.fluid === fl.name).flatMap((n) => n.levels).map((v) => inUnit(v, unitOf(fl))), unit: unitLabel(unitOf(fl)) } : null;
     return { name: f.name, stock, dispensedUL: round(f.dispensed, 2), loadUL: round(f.load, 1), heads: f.heads.length, prepareUL: prep, massMg: root ? null : massMg != null ? +massMg.toPrecision(3) : null, dilution };
   });
   // cells
@@ -166,12 +175,13 @@ export function makePlan(protocol, meta, spec = {}) {
   return {
     name: meta.experiment.title || spec.name || '',
     plates, blocks: (meta.blocks || []).map((b) => ({ name: b.name, cellLine: b.cellLine || null, plates: b.plates.map((p) => p + 1),
-      region: b.copies ? b.copies.map((r) => `${wellName(r.r0, r.c0)}–${wellName(r.r0 + r.rows - 1, r.c0 + r.cols - 1)}`) : [], primaryLevels: b.primaryLevels, partnerLevels: b.partnerLevels })),
-    prepare, cassettes: run.cassettes.map((c2) => ({ index: c2.index, type: c2.type, heads: c2.heads.map((h) => ({ head: h.head, fluid: h.name, dispensedUL: round(h.dispensed, 3), loadUL: h.load })) })),
+      region: b.copies ? b.copies.map((r) => `${wellName(r.r0, r.c0)}–${wellName(r.r0 + r.rows - 1, r.c0 + r.cols - 1)}`) : [], primaryLevels: (b.primaryLevels || []).map((v) => inUnit(v, axisUnit(b.primary))), partnerLevels: (b.partnerLevels || []).map((v) => inUnit(v, axisUnit(b.partner))),
+      primaryUnit: axisUnit(b.primary) ? unitLabel(axisUnit(b.primary)) : null, partnerUnit: axisUnit(b.partner) ? unitLabel(axisUnit(b.partner)) : null })),
+    prepare, cassettes: run.cassettes.map((c2) => ({ index: c2.index, type: c2.type, heads: c2.heads.map((h) => ({ head: h.head, fluid: h.name, stock: prepare.find((x) => x.name === h.name)?.stock || '', dispensedUL: round(h.dispensed, 3), loadUL: h.load })) })),
     seeding, pbs: { wells: pbsWells, volumePerWellUL: pbsUL, totalML: round((pbsWells * pbsUL * 1.1) / 1000, 2) },
     maxDmsoPct: round(maxDmso * 100, 4), maxDmsoScrapPct: round(maxDmsoScrap * 100, 4), unusedInnerWells: unused,
     vehicleDmsoPct: vehicleDmsoByBlock(protocol, meta, computed),
-    doses: doseLevels(protocol, { skip: scrapTest(protocol, meta, wellRole) }),
+    doses: doseLevels(protocol, { skip: scrapTest(protocol, meta, wellRole), unitOf }),
     stockNotes: meta.experiment?.stockNotes || [],
     randomized: protocol.plates.map((p, i) => (p.randomization?.length ? i + 1 : null)).filter(Boolean),
     warnings: Object.entries(byCode).map(([code, list]) => ({ code, count: list.length, examples: list.slice(0, 8).map((x) => `P${x.plate} ${x.well}${x.fluid ? ' ' + x.fluid : ''}`) })),
@@ -212,7 +222,7 @@ export function planMarkdown(plan, { files = [] } = {}) {
   for (const b of plan.blocks) L.push(`| ${b.plates.join(', ')} | ${b.name} | ${b.cellLine || '–'} | ${b.region.join(' and ')} |`);
   for (const b of plan.blocks) {
     const [pa, pb] = b.name.split(' × ');
-    L.push('', `**${b.name}** (plates ${b.plates.join(', ')}): ${pa} along the columns ${b.primaryLevels.map(fmtLevel).join(', ')}` + (pb ? `; ${pb} along the rows ${b.partnerLevels.map(fmtLevel).join(', ')}` : '') + ` (µM; replicates in adjacent wells). Vehicle DMSO ${plan.vehicleDmsoPct[b.name] ?? '–'} %.`);
+    L.push('', `**${b.name}** (plates ${b.plates.join(', ')}): ${pa} along the columns ${b.primaryLevels.map(fmtLevel).join(', ')} ${b.primaryUnit || 'µM'}` + (pb ? `; ${pb} along the rows ${b.partnerLevels.map(fmtLevel).join(', ')} ${b.partnerUnit || 'µM'}` : '') + ` (replicates in adjacent wells). Vehicle DMSO ${plan.vehicleDmsoPct[b.name] ?? '–'} %.`);
   }
   const vd = [...new Set(Object.values(plan.vehicleDmsoPct))];
   if (vd.length > 1) L.push('', `⚠ The plate sets have different vehicle DMSO (${vd.join(' vs ')} %): compare viabilities within a set, or normalize all sets to the same DMSO.`);
@@ -227,7 +237,7 @@ export function planMarkdown(plan, { files = [] } = {}) {
   L.push('## 1. Prepare the drug stocks', '', '| Drug | Stock | Dispensed | Load into heads | Prepare | Powder per 1 mL stock |', '|---|---|---|---|---|---|');
   for (const d of plan.prepare) L.push(`| ${d.name} | ${d.stock} | ${d.dispensedUL} µL | ${d.loadUL.toFixed(1)} µL (${d.heads} head${d.heads > 1 ? 's' : ''}) | **${d.prepareUL} µL**${d.dilution ? ` (mix ${d.dilution.stockUL} µL ${d.dilution.from} stock + ${d.dilution.solventUL} µL solvent = 1:${d.dilution.factor})` : ''} | ${d.massMg == null ? '–' : d.massMg < 0.1 ? +(d.massMg * 1000).toPrecision(3) + ' µg' : d.massMg + ' mg'} |`);
   const dil = plan.prepare.filter((d) => d.dilution);
-  if (dil.length) L.push('', `Diluted stocks (D300e "fluid shift / extend"): ${dil.map((d) => `**${d.name}** = ${d.dilution.from} 1:${d.dilution.factor}${d.dilution.levels.length ? ` (dispenses ${d.dilution.levels.map(fmtLevel).join(', ')} µM)` : ''}`).join('; ')}. These levels need less than one drop (13 pL for DMSO) of the original stock, so the D300e dispenses them from a second, diluted stock in its own dispense head. Make it in the same solvent as the stock (DMSO for DMSO stocks).`);
+  if (dil.length) L.push('', `Diluted stocks (D300e "fluid shift / extend"): ${dil.map((d) => `**${d.name}** = ${d.dilution.from} 1:${d.dilution.factor}${d.dilution.levels.length ? ` (dispenses ${d.dilution.levels.map(fmtLevel).join(', ')} ${d.dilution.unit})` : ''}`).join('; ')}. These levels need less than one drop (13 pL for DMSO) of the original stock, so the D300e dispenses them from a second, diluted stock in its own dispense head. Make it in the same solvent as the stock (DMSO for DMSO stocks).`);
   L.push('', '"Dispensed" includes the priming (scrap) wells. "Prepare" = what the heads take + 10 % + 2 µL for pipetting; take it from your stock. "Powder per 1 mL" only if you make the stock fresh (needs a molecular weight).', '');
   L.push('## 2. Seed the cells', '');
   if (plan.seeding.length) {
@@ -235,10 +245,11 @@ export function planMarkdown(plan, { files = [] } = {}) {
     for (const s of plan.seeding) L.push(`| ${s.cellLine} | ${s.plates.join(', ')} | ${s.wells} | ${s.cellsPerWell ?? '?'} | ${s.cellsPerML ? s.cellsPerML.toLocaleString('en-US') + ' /mL' : '?'} | ${s.suspensionML} mL of ${s.seedingVolumeUL} µL/well | ${s.totalCells ? s.totalCells.toLocaleString('en-US') : '?'} |`);
   } else L.push('No cell lines given.');
   L.push('', `PBS / medium in the border: ${plan.pbs.wells} wells × ${plan.pbs.volumePerWellUL} µL ≈ ${plan.pbs.totalML} mL (+10 %).`, '');
-  L.push('## 3. Load the D300e', '', 'Open the .tdd in D300e Control, Run. Fill each head with the bold volume (D300e shows the same numbers on its fill screen).', '');
+  const lsvg = files.find((f) => /_loading\.svg$/.test(f));
+  L.push('## 3. Load the D300e', '', `Open the .tdd in D300e Control, Run. Fill each head with the bold volume (D300e shows the same numbers on its fill screen).${lsvg ? ` Drawing of the cassettes: \`${lsvg.split(/[\\/]/).pop()}\`.` : ''}`, '');
   for (const c of plan.cassettes) {
-    L.push(`**Cassette ${c.index} · ${c.type}**`, '', '| Head | Fluid | Load |', '|---|---|---|');
-    for (const h of c.heads) L.push(`| ${h.head} | ${h.fluid} | **${c.type === 'D4+' ? h.loadUL : h.loadUL.toFixed(1)} µL** |`);
+    L.push(`**Cassette ${c.index} · ${c.type}**`, '', '| Head | Solution | Concentration | Load |', '|---|---|---|---|');
+    for (const h of c.heads) L.push(`| ${h.head} | ${h.fluid} | ${h.stock || '–'} | **${c.type === 'D4+' ? h.loadUL : h.loadUL.toFixed(1)} µL** |`);
     L.push('');
   }
   L.push('## 4. After the incubation', '', 'Read the plates (e.g. CellTiter-Glo), open the protocol in Tecan D300 Craft, paste each plate\'s values in Results, and export Excel / the SynergyFinder package.', '');

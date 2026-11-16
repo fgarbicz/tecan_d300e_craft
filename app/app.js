@@ -11,10 +11,12 @@ import { randomizeByCellLine } from '../src/experiment.js';
 import { newMeta, reconcileMeta, serializeMeta, parseMeta, sidecarName, wellRole, assignCellLine, setRole, addCellLine, removeCellLine, ROLE_LABEL,
   metaAddPlate, metaRemovePlate, metaReplicatePlate, metaClearPlate, metaCopyWells, metaPasteWells, isBorder } from '../src/experiment.js';
 import { planRun } from '../src/cassette.js';
+import { drugUnit, setDrugUnit, unitsFor, unitOfFn } from '../src/units.js';
+import { cassetteSvg, fluidLook, THEME_VARS, standalone, LIGHT } from '../src/draw.js';
 import { icon } from './icons.js';
 import { openWizard } from './wizard.js';
 import { synergyMatrices, heatmapSvg, exportFigure } from './synergy_view.js';
-import { DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapTest } from '../src/dosemap.js';
+import { fluidColor as rootFluidColor, DRUG_PALETTE, drugScales, wellBackground, rampColor, rampCss, doseMapSvg, scrapTest } from '../src/dosemap.js';
 
 export const APP_NAME = 'Tecan D300 Craft';
 const APP_VERSION = '0.2.0';
@@ -28,7 +30,7 @@ export const S = {
 };
 export const $ = (id) => document.getElementById(id);
 const PALETTE = DRUG_PALETTE; // shared with the dose maps (src/dosemap.js)
-export const fluidColor = (f) => PALETTE[f.id % PALETTE.length];
+export const fluidColor = (f) => rootFluidColor(f); // a diluted stock has its root drug's colour
 export const plate = () => S.protocol.plates[S.plateIdx];
 export const fluidById = (id) => S.protocol.fluids.find((f) => f.id === id);
 const cellLineById = (id) => S.meta.cellLines.find((c) => c.id === id);
@@ -59,7 +61,10 @@ export function toast(msg, ms = 3500) {
 
 // ---------------- units ----------------
 const fluidKind = (f) => (f.byVol ? 'volume' : unitKind(f.concentrationUnit));
-export const wellUnit = (f) => (f.byVol ? S.protocol.settings.VolumeUnit || 'nL' : fluidKind(f) === 'mass' ? S.protocol.settings.MassConcentrationUnit || 'ng_mL' : S.protocol.settings.MolarityConcentrationUnit || 'µM');
+// Doses are shown and typed in each drug's own unit (experiment file: meta.drugUnits); the .tdd keeps µM / ng/mL.
+export const wellUnit = (f) => drugUnit(S.meta, S.protocol, f);
+const cv = (f, v) => (f && v != null ? toDisplay(v, wellUnit(f)) : v);  // stored value → shown number
+const cb = (f, x) => (f ? fromDisplay(x, wellUnit(f)) : x);              // typed number → stored value
 export const fmt = (x, d = 4) => (x == null || Number.isNaN(x) ? '–' : Math.abs(x) >= 1e4 || (Math.abs(x) < 1e-3 && x !== 0) ? x.toExponential(d - 1) : Number(x.toPrecision(d)).toString());
 const stockDisplay = (f) => (f.byVol ? '' : `${fmt(toDisplay(f.concentration, f.concentrationUnit), 5)} ${unitLabel(f.concentrationUnit)}`);
 export function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -193,8 +198,9 @@ function renderFluids() {
   for (const f of S.protocol.fluids) {
     const tr = document.createElement('tr'); if (f.id === S.fluidId) tr.className = 'active';
     const cls = FLUID_CLASSES[f.classId]?.short ?? `class ${f.classId}`;
-    tr.innerHTML = `<td><span class="swatch" style="background:${fluidColor(f)}"></span></td><td>${esc(f.name)}</td><td class="muted">${f.byVol ? 'by volume' : esc(stockDisplay(f))}</td><td class="muted">${esc(cls)}</td><td><button class="small icon-only" data-edit="${f.id}" title="Edit">${icon('edit', 14)}</button></td>`;
-    tr.onclick = (e) => { const b = e.target.closest('[data-edit]'); if (b) return editFluid(fluidById(+b.dataset.edit)); S.fluidId = f.id; render(); };
+    tr.innerHTML = `<td><span class="swatch" style="background:${fluidColor(f)}"></span></td><td>${esc(f.name)}</td><td class="muted">${f.byVol ? 'by volume' : esc(stockDisplay(f))}</td><td class="muted">${esc(cls)}</td><td>${f.byVol || f.rootFluidId != null ? '' : `<select class="unit-pick" data-unit="${f.id}" title="Unit for this drug's doses: what you read and type. The file for the D300e is not affected.">${unitsFor(f).map((u) => `<option value="${u}" ${u === wellUnit(f) ? 'selected' : ''}>${unitLabel(u)}</option>`).join('')}</select>`}</td><td><button class="small icon-only" data-edit="${f.id}" title="Edit">${icon('edit', 14)}</button></td>`;
+    tr.onclick = (e) => { if (e.target.closest('[data-unit]')) return; const b = e.target.closest('[data-edit]'); if (b) return editFluid(fluidById(+b.dataset.edit)); S.fluidId = f.id; render(); };
+    tr.querySelector('[data-unit]')?.addEventListener('change', (e) => mutate('dose unit', () => setDrugUnit(S.meta, S.protocol, f, e.target.value)));
     t.appendChild(tr);
   }
 }
@@ -364,14 +370,14 @@ function doseScales() { return drugScales(S.protocol, { skip: doseScrap() }); }
 function exportDoseMap(format) {
   const roleOf = (pi, r, c) => wellRole(S.meta, S.protocol.plates[pi], pi, r, c);
   const base = S.fileName.replace(/\.tdd$/, '');
-  return exportFigure(doseMapSvg(S.protocol, { title: `${base} — dose map`, roleOf }), `${base}_dosemap`, format, saveBlob);
+  return exportFigure(doseMapSvg(S.protocol, { title: `${base} — dose map`, roleOf, unitOf: unitOfFn(S.meta, S.protocol) }), `${base}_dosemap`, format, saveBlob);
 }
 
 function renderLegend(showId, range, res, doses) {
   const L = $('legend');
   if (S.layer === 'doses') {
     const here = [...doses.values()].filter((sc) => sc.plates.has(S.plateIdx) && (showId == null || sc.fluid.id === showId));
-    L.innerHTML = (here.length ? here.map((sc) => `<span class="dose-key"><b>${esc(sc.fluid.name)}</b><span>${fmt(sc.min, 3)}</span><span class="bar" style="background:${rampCss(sc.color)}"></span><span>${fmt(sc.max, 3)} ${esc(unitLabel(sc.unit))}</span><span class="muted">${sc.levels.length} level${sc.levels.length === 1 ? '' : 's'}</span></span>`).join('')
+    L.innerHTML = (here.length ? here.map((sc) => `<span class="dose-key"><b>${esc(sc.fluid.name)}</b><span>${fmt(cv(sc.fluid, sc.min), 3)}</span><span class="bar" style="background:${rampCss(sc.color)}"></span><span>${fmt(cv(sc.fluid, sc.max), 3)} ${esc(unitLabel(wellUnit(sc.fluid)))}</span><span class="muted">${sc.levels.length} level${sc.levels.length === 1 ? '' : 's'}</span></span>`).join('')
       : '<span>No drugs on this plate.</span>') +
       '<span class="muted">log scale, same colours on every plate · two drugs: left / right half · S = scrap well (off scale)</span>' +
       `<span class="spacer"></span><button class="small" id="doseSvg">${icon('save', 13)} Dose map SVG</button><button class="small" id="dosePng">PNG</button>`;
@@ -382,7 +388,7 @@ function renderLegend(showId, range, res, doses) {
   if (S.layer === 'drugs') {
     if (showId != null && range) {
       const f = fluidById(showId);
-      L.innerHTML = `<span>${esc(f.name)}</span><span>${fmt(range.min)}</span><span class="bar" style="background:${rampCss(fluidColor(f))}"></span><span>${fmt(range.max)} ${esc(unitLabel(wellUnit(f)))} (log scale)</span>`;
+      L.innerHTML = `<span>${esc(f.name)}</span><span>${fmt(cv(f, range.min))}</span><span class="bar" style="background:${rampCss(fluidColor(f))}"></span><span>${fmt(cv(f, range.max))} ${esc(unitLabel(wellUnit(f)))} (log scale)</span>`;
     } else L.innerHTML = S.protocol.fluids.map((f) => `<span><span class="swatch" style="background:${fluidColor(f)}"></span> ${esc(f.name)}</span>`).join('') + legendCommon();
   } else if (S.layer === 'cells') {
     L.innerHTML = S.meta.cellLines.map((c) => `<span><span class="sw" style="background:${c.color}"></span>${esc(c.name)}</span>`).join('') + (S.meta.cellLines.length ? '' : '<span>Add a cell line on the left, select wells, then Annotate → Assign.</span>') + legendCommon();
@@ -414,7 +420,7 @@ function wellTitle(r, c, role) {
   const pm = S.meta.plates[S.plateIdx];
   const lines = [`${wellName(r, c)} — ${ROLE_LABEL[role] || role}`];
   const cl = pm?.cellLines[wellKey(r, c)]; if (cl) lines.push(`Cell line: ${cellLineById(cl)?.name ?? cl}`);
-  if (m) for (const [id, v] of m) { const f = fluidById(id); lines.push(`${f?.name ?? id}: ${fmt(v, 5)} ${unitLabel(wellUnit(f || { byVol: false, concentrationUnit: 'µM' }))}`); }
+  if (m) for (const [id, v] of m) { const f = fluidById(id); lines.push(`${f?.name ?? id}: ${fmt(cv(f, v), 5)} ${unitLabel(wellUnit(f || { byVol: false, concentrationUnit: 'µM' }))}`); }
   if (res && Number.isFinite(res.totalVolume) && (m?.size || res.normalization)) lines.push(`Total ${fmt(res.totalVolume / 1000, 6)} µL, DMSO ${(res.dmsoFraction * 100).toFixed(3)} %`);
   const v = readoutValue(S.plateIdx, r, c); if (v != null) lines.push(`Readout: ${v}`);
   if (res?.warnings.length) lines.push('⚠ ' + res.warnings.map(warnText).join('; '));
@@ -433,7 +439,7 @@ function renderInspector() {
   const head = `<strong>${wellName(r, c)}</strong> <span class="muted">· ${esc(ROLE_LABEL[role] || role)}${cl ? ' · ' + esc(cellLineById(cl)?.name) : ''}</span>`;
   if (!res || (!res.fluids.length && !res.normalization)) { el.innerHTML = `${head}<p class="muted">No drugs in this well.</p>`; return; }
   const rows = res.fluids.map((x) => { const f = fluidById(x.fluidId); const u = unitLabel(wellUnit(f));
-    return `<tr><td><span class="swatch" style="background:${fluidColor(f)}"></span> ${esc(f.name)}</td><td>${fmt(x.requested, 6)} ${u}</td><td>${x.volume} nL</td><td>${x.dispensed != null ? fmt(x.dispensed, 8) + ' ' + u : '–'}</td></tr>`; }).join('');
+    return `<tr><td><span class="swatch" style="background:${fluidColor(f)}"></span> ${esc(f.name)}</td><td>${fmt(cv(f, x.requested), 6)} ${u}</td><td>${x.volume} nL</td><td>${x.dispensed != null ? fmt(cv(f, x.dispensed), 8) + ' ' + u : '–'}</td></tr>`; }).join('');
   el.innerHTML = `${head}
     <table><tr><th>Drug</th><th>Requested</th><th>Dispense</th><th>Actual conc.</th></tr>${rows}
     ${res.normalization ? `<tr><td>Normalization (DMSO)</td><td></td><td>${res.normalization} nL</td><td></td></tr>` : ''}</table>
@@ -444,12 +450,12 @@ function renderInspector() {
 export function warnText(w) {
   const f = w.fluidId != null ? fluidById(w.fluidId)?.name : '';
   switch (w.code) {
-    case 'below_min_volume': return `${f}: below the smallest drop (${fmt(w.requestedVolume * 1000, 3)} pL requested)`;
-    case 'above_max_volume': return `${f}: above 10 µL per fluid per well`;
-    case 'dmso_limit': return `DMSO ${(w.dmsoFraction * 100).toFixed(3)} % exceeds the limit ${+(w.limit * 100).toPrecision(6)} %`;
-    case 'no_solution': return 'Concentrations cannot be reached (fluid volumes would exceed the well)';
-    case 'above_stock': return `${f}: requested concentration ≥ stock`;
-    case 'no_stock': return `${f}: stock concentration missing`;
+    case 'below_min_volume': return `${f}: this dose needs less than one drop of the stock (${fmt(w.requestedVolume * 1000, 3)} pL; the smallest drop is about 13 pL). Use a more dilute stock, or let the wizard add a diluted stock.`;
+    case 'above_max_volume': return `${f}: more than 10 µL of one solution in a well, which the D300e does not do. Use a more concentrated stock.`;
+    case 'dmso_limit': return `This well gets ${(w.dmsoFraction * 100).toFixed(3)} % DMSO, more than the limit of ${+(w.limit * 100).toPrecision(6)} %. Use a more concentrated stock, a lower dose, or raise the plate's DMSO limit.`;
+    case 'no_solution': return 'These doses cannot be reached: the drug solutions alone would be more than the well holds. Use more concentrated stocks.';
+    case 'above_stock': return `${f}: the dose is as high as the stock itself, or higher. Use a more concentrated stock.`;
+    case 'no_stock': return `${f}: the stock concentration is not set (pencil button next to the drug).`;
     default: return w.code;
   }
 }
@@ -584,7 +590,7 @@ function rangeHint(fid) {
   const f = fluidById(fid), p = plate(); if (!f || !p) return '';
   if (f.byVol) return 'Volume in nL';
   const { min, max } = validRange(f, p); const u = unitLabel(wellUnit(f));
-  return `Valid range ${fmt(min, 3)} – ${fmt(max, 3)} ${u}`;
+  return `This stock can give ${fmt(cv(f, min), 3)} – ${fmt(cv(f, max), 3)} ${u} in a well (one drop up to the DMSO limit)`;
 }
 const selCount = () => `${S.sel.size} well${S.sel.size === 1 ? '' : 's'} selected`;
 
@@ -607,7 +613,7 @@ function renderOpPanel() {
 }
 
 function renderSet(el) {
-  el.innerHTML = `<p class="hint">Put one concentration of a drug into the selected wells.</p><div class="form"><label>Drug</label><select id="opFluid">${fluidOptions(S.fluidId)}</select>
+  el.innerHTML = `<p class="hint">Give the selected wells one dose of a drug. Select wells on the plate first.</p><div class="form"><label>Drug</label><select id="opFluid">${fluidOptions(S.fluidId)}</select>
     <label>Value</label><span><input id="opVal" type="number" step="any" min="0"> <span id="opUnit"></span></span></div>
     <p class="hint" id="opRange"></p><p class="hint" id="opSel"></p>
     <div class="actions"><button id="opApply" class="primary">${icon('check', 15)} Apply</button><button id="opRemove">Remove drug from selection</button></div>`;
@@ -615,7 +621,7 @@ function renderSet(el) {
   $('opFluid').addEventListener('change', () => { S.fluidId = +$('opFluid').value; upd(); });
   panelUpdate = () => { upd(); $('opSel').textContent = selCount(); $('opApply').disabled = $('opRemove').disabled = !S.sel.size; };
   $('opApply').onclick = async () => {
-    const fid = +$('opFluid').value, v = +$('opVal').value; if (!(v > 0)) return toast('Enter a value above 0');
+    const fid = +$('opFluid').value, v = cb(fluidById(fid), +$('opVal').value); if (!(v > 0)) return toast('Enter a value above 0');
     const cells = selectedCells();
     if (conflicts(plate(), cells, fid).length && !(await ask(`${esc(fluidById(fid).name)} is already in some selected wells. Replace those values?`, 'Replace'))) return;
     await maybeShift(fid, v, v, (useFid) => setValue(plate(), cells, useFid, v), 'set value');
@@ -624,7 +630,7 @@ function renderSet(el) {
 }
 
 function renderTitration(el) {
-  el.innerHTML = `<p class="hint">A dilution series across the selected wells. Select exactly levels × replicates wells.</p>
+  el.innerHTML = `<p class="hint">A series of doses across the selected wells, e.g. 8 doses × 3 wells each = select 24 wells.</p>
     <div class="form"><label>Drug</label><select id="tFluid">${fluidOptions(S.fluidId, (f) => !f.byVol)}</select>
     <label>Specify by</label><select id="tMode"><option value="highLow">Highest & lowest</option><option value="high">Highest</option><option value="low">Lowest</option></select>
     <label>Highest</label><input id="tHigh" type="number" step="any" min="0">
@@ -639,7 +645,8 @@ function renderTitration(el) {
   dists.low = dists.high;
   const read = () => {
     const rep = Math.max(1, Math.floor(+$('tRep').value || 1));
-    return { fid: +$('tFluid').value, mode: $('tMode').value, distribution: $('tDist').value, high: +$('tHigh').value, low: +$('tLow').value, factor: +$('tFac').value, increment: +$('tFac').value, replicates: rep, levels: S.sel.size / rep };
+    const tf = fluidById(+$('tFluid').value); // typed in the drug's unit
+    return { fid: +$('tFluid').value, mode: $('tMode').value, distribution: $('tDist').value, high: cb(tf, +$('tHigh').value), low: cb(tf, +$('tLow').value), factor: +$('tFac').value, increment: cb(tf, +$('tFac').value), replicates: rep, levels: S.sel.size / rep };
   };
   const fillDist = () => {
     const mode = $('tMode').value; const cur = $('tDist').value || (S.form.titration?.tDist);
@@ -652,7 +659,7 @@ function renderTitration(el) {
     $('tFac').disabled = !facUse; $('tFacL').textContent = o.distribution === 'linear' ? 'Increment' : 'Factor (1:N)';
     $('tRange').textContent = rangeHint(o.fid);
     $('tInfo').textContent = `${selCount()} → ${Number.isInteger(o.levels) && o.levels > 0 ? o.levels + ' levels' : 'not a multiple of the replicates'}`;
-    try { const lv = titrationLevels(o); $('tPreview').textContent = 'Levels: ' + lv.map((x) => fmt(x, 4)).join(', '); } catch (e) { $('tPreview').textContent = S.sel.size ? e.message : ''; }
+    try { const lv = titrationLevels(o); const tf = fluidById(o.fid); $('tPreview').textContent = 'Levels: ' + lv.map((x) => fmt(cv(tf, x), 4)).join(', ') + (tf ? ' ' + unitLabel(wellUnit(tf)) : ''); } catch (e) { $('tPreview').textContent = S.sel.size ? e.message : ''; }
     $('tApply').disabled = !S.sel.size;
   };
   fillDist();
@@ -700,11 +707,11 @@ async function maybeShift(fid, high, low, apply, label) {
 }
 
 function renderNormalize(el) {
-  el.innerHTML = `<p class="hint">Top up DMSO so every selected well gets the same amount (vehicle-matched controls).</p>
+  el.innerHTML = `<p class="hint">Tops up the selected wells with plain DMSO so they all contain the same amount. Include the no-drug wells: they become the vehicle controls.</p>
     <div class="form"><label>Fluid class</label><select id="nCls">${Object.entries(FLUID_CLASSES).map(([id, c]) => `<option value="${id}">${c.label}</option>`).join('')}</select>
     <label>Method</label><select id="nType">${Object.entries(NORMALIZE_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
     <label id="nParamL">Value</label><span><input id="nPct" type="number" step="any" min="0" value="${+(plate().dmsoLimit * 100).toPrecision(6)}"> <span id="nUnit"></span></span></div>
-    <p class="hint" id="nSel"></p><p class="hint">A well can be in one group per fluid class; applying replaces its previous group for that class.</p>
+    <p class="hint" id="nSel"></p><p class="hint">A well belongs to one top-up group at a time; applying again replaces the earlier one.</p>
     <div class="actions"><button id="nApply" class="primary">${icon('normalize', 15)} Normalize selection</button><button id="nRemove">Remove from selection</button></div>
     <h3>Groups</h3><ul class="warnlist">${S.protocol.backfills.map((b, i) => `<li>${i + 1}. ${esc(NORMALIZE_TYPES[b.type] || b.type)}${b.param != null ? ` (${NORMALIZE_PARAM[b.type] === '%' ? +(b.param * 100).toPrecision(6) + ' %' : b.param + ' nL'})` : ''} · ${FLUID_CLASSES[b.classId]?.short ?? b.classId} · ${b.wells.length} wells on plate(s) ${[...new Set(b.wells.map((w) => w.p + 1))].join(', ')} <button class="small" data-g="${i}">Select</button></li>`).join('') || '<li class="muted">None</li>'}</ul>`;
   const upd = () => { const u = NORMALIZE_PARAM[$('nType').value]; $('nPct').disabled = !u; $('nUnit').textContent = u ? (u === '%' ? '% of total' : 'nL') : ''; };
@@ -729,17 +736,17 @@ function renderAnnotate(el) {
   el.innerHTML = `<h3 style="margin-top:0">${icon('border', 16)} Evaporation barrier</h3>
     <label class="chk"><input type="checkbox" id="aBorder" ${st.borderPBS ? 'checked' : ''}> Outer wells are PBS / medium (no cells, not analyzed)</label>
     <div class="form" style="margin-top:6px"><label>Border depth</label><select id="aDepth">${[1, 2].map((d) => `<option value="${d}" ${st.borderDepth === d ? 'selected' : ''}>${d} row/column${d > 1 ? 's' : ''}</option>`).join('')}</select></div>
-    <p class="hint">Border wells that receive a drug (e.g. scrap / priming wells) are not counted as PBS.</p>
+    <p class="hint">Border wells that receive a drug (priming wells) do not count as PBS.</p>
     <h3>${icon('cells', 16)} Cell lines</h3>
     ${S.meta.cellLines.length ? `<div class="form"><label>Cell line</label><select id="aCl">${S.meta.cellLines.map((c) => `<option value="${c.id}" ${c.id === S.cellLineId ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>` : '<p class="hint">Add a cell line on the left first.</p>'}
     <p class="hint" id="aSel"></p>
     <div class="actions"><button id="aAssign" class="primary">${icon('cells', 15)} Assign to selection</button><button id="aAssignAll" title="Every well inside the border on this plate">Whole plate</button><button id="aClear">Clear</button></div>
     <div class="actions"><button id="aAllPlates" title="Copy this plate's cell-line map to every plate">${icon('dup', 15)} Same layout on all plates</button></div>
     <h3>${icon('cells', 16)} Randomize</h3>
-    <p class="hint">Shuffle where each design well is dispensed, only among the wells of the same cell line (cells stay where you seed them). Stored in the .tdd as D300e's plate randomization; readouts pasted as read are mapped back. ${plate().randomization?.length ? `<b>This plate is randomized (${plate().randomization.length} wells).</b>` : ''}</p>
+    <p class="hint">Shuffles which well gets which dose, only among wells of the same cell line, so you still seed the cells as drawn. The D300e prints the shuffled positions; when you paste the read-out, the app sorts it back for you. ${plate().randomization?.length ? `<b>This plate is randomized (${plate().randomization.length} wells).</b>` : ''}</p>
     <div class="actions"><button id="aRand">Randomize this plate</button><button id="aRandAll">All plates</button><button id="aRandOff" ${plate().randomization?.length ? '' : 'disabled'}>Remove</button></div>
     <h3>${icon('tag', 16)} Well roles</h3>
-    <p class="hint">Treated and vehicle (cells, no drug) are worked out automatically. Mark the rest:</p>
+    <p class="hint">Wells with drug (treated) and wells with cells but no drug (vehicle control) are recognised automatically. Mark the others:</p>
     <div class="actions" style="flex-wrap:wrap">
       <button data-role="blank" title="Medium only, no cells: background for the readout">Blank</button>
       <button data-role="exclude" title="Leave out of the analysis (e.g. a bad well)">Exclude</button>
@@ -805,7 +812,7 @@ function renderSynergy(el) {
     <label class="full chk"><input type="checkbox" id="sNorm" checked> Normalize DMSO to highest class volume</label>
     </div>${Array.from({ length: st.n }, (_, i) => fluidBlock(i)).join('')}
     <div class="actions"><button id="sGo" class="primary">${icon('synergy', 15)} Create plates</button></div>`;
-  const upRange = () => { for (const p of el.querySelectorAll('[data-range]')) { const i = p.dataset.range; const f = fluidById(+$(`sy_fid${i}`).value); const { min, max } = validRange(f, { assayVolume: +$('sAssay').value * 1000, dmsoLimit: +$('sDmso').value / 100 }, st.n); p.textContent = `Valid range ${fmt(min, 3)} – ${fmt(max, 3)} ${unitLabel(wellUnit(f))}`; } };
+  const upRange = () => { for (const p of el.querySelectorAll('[data-range]')) { const i = p.dataset.range; const f = fluidById(+$(`sy_fid${i}`).value); const { min, max } = validRange(f, { assayVolume: +$('sAssay').value * 1000, dmsoLimit: +$('sDmso').value / 100 }, st.n); p.textContent = `Valid range ${fmt(cv(f, min), 3)} – ${fmt(cv(f, max), 3)} ${unitLabel(wellUnit(f))}`; } };
   el.oninput = upRange; panelUpdate = upRange;
   if (S.meta.settings.borderPBS) { setTimeout(() => { if (!$('sExR').value && !$('sExC').value) { const p = plate() || newPlate(); $('sExR').value = `A, ${rowLabel(p.rows - 1)}`; $('sExC').value = `1, ${p.cols}`; } }, 0); }
   $('sType').onchange = () => { st.type = $('sType').value; renderOpPanel(); };
@@ -815,7 +822,7 @@ function renderSynergy(el) {
     let spec;
     try {
       const fluids = Array.from({ length: st.n }, (_, i) => {
-        const o = { mode: 'highLow', high: +$(`sy_high${i}`).value, low: +$(`sy_low${i}`).value, levels: Math.floor(+$(`sy_lv${i}`).value), distribution: $(`sy_dist${i}`).value };
+        const sf = fluidById(+$(`sy_fid${i}`).value); const o = { mode: 'highLow', high: cb(sf, +$(`sy_high${i}`).value), low: cb(sf, +$(`sy_low${i}`).value), levels: Math.floor(+$(`sy_lv${i}`).value), distribution: $(`sy_dist${i}`).value };
         const includeZero = $(`sy_zero${i}`).checked;
         return { fluidId: +$(`sy_fid${i}`).value, levels: synergyLevels({ ...o, includeZero }), includeZero, order: $(`sy_ord${i}`).value };
       });
@@ -853,7 +860,7 @@ function renderCheck(el) {
   el.innerHTML = `<h3 style="margin-top:0">Warnings (${issues.length})</h3><ul class="warnlist">${Object.entries(byCode).map(([code, list]) => `<li class="w">⚠ ${list.length} × ${esc(warnText(list[0].x))}${list.length > 1 ? ' …' : ''}<br><span class="muted">${list.slice(0, 12).map((i) => `P${i.pi + 1} ${wellName(...splitKey(i.k))}`).join(', ')}${list.length > 12 ? ' …' : ''}</span> <button class="small" data-code="${code}">Select</button></li>`).join('') || '<li style="color:var(--ok)">✓ No warnings</li>'}</ul>
     <p>Highest DMSO in any well: <b>${(maxDmso * 100).toFixed(4)} %</b></p>
     <h3>Priming (≥ ${PRIMING_VOLUME} nL per drug per plate)</h3>
-    <p class="hint">Guide Appendix F: each plate should have one well with ≥ ${PRIMING_VOLUME} nL of every drug it uses, so the head is primed before small volumes. A "scrap" well in the border does it.</p>
+    <p class="hint">Priming: every plate should have one well that gets at least ${PRIMING_VOLUME} nL of each drug, so the dispense head is running properly before the small doses (Tecan's recommendation). A spare "scrap" well in the border does this.</p>
     <ul class="warnlist">${priming.filter((x) => x.lacking.length).map((x) => `<li class="w">Plate ${x.plate + 1}: ${x.lacking.map((l) => `${esc(fluidById(l.fluidId)?.name)} (max ${fmt(l.maxVolume, 3)} nL)`).join(', ')} <button class="small" data-scrap="${x.plate}">Add scrap well</button></li>`).join('') || '<li style="color:var(--ok)">✓ Every plate primes every drug</li>'}</ul>
     ${noCells.length ? `<h3>Cell lines</h3><ul class="warnlist"><li class="w">No cell line on plate${noCells.length > 1 ? 's' : ''} ${noCells.map((i) => i + 1).join(', ')}</li></ul>` : ''}
     <h3>Dispensed per drug</h3><table class="fluids">${S.protocol.fluids.map((f) => { const t = totals.get(f.id); return `<tr><td><span class="swatch" style="background:${fluidColor(f)}"></span> ${esc(f.name)}</td><td>${t ? fmt(t.volume / 1000, 5) + ' µL' : '–'}</td><td class="muted">${t ? t.wells + ' wells' : ''}</td></tr>`; }).join('')}</table>
@@ -886,17 +893,25 @@ function renderRun(el) {
   if (!plan || !plan.cassettes.length) { el.innerHTML = '<div class="callout">Nothing to dispense yet.</div>'; return; }
   const t8 = plan.cassettes.filter((c) => c.type === 'T8+').length, d4 = plan.cassettes.filter((c) => c.type === 'D4+').length;
   el.innerHTML = `<div class="callout"><b>You need ${t8 ? `${t8} × T8+` : ''}${t8 && d4 ? ' and ' : ''}${d4 ? `${d4} × D4+ (high-volume)` : ''} cassette${t8 + d4 > 1 ? 's' : ''}</b> for ${S.protocol.plates.length} plate${S.protocol.plates.length > 1 ? 's' : ''}.
-      Load each head with the volume in bold. Computed the way D300e Control 4.0.1 does (matched on simulated runs, Nov 2026), with "Use high-volume cassettes" ticked (its default).</div>
+      Pipette the bold volume into each head, left to right. Colour = solution; a striped head is a diluted stock; empty heads stay empty.</div>
+    <div class="drawing zoomable" id="runDraw" title="Click to enlarge">${cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS, compact: (el.clientWidth || 320) < 440 })}</div>
+    <div class="actions"><button id="runBig" class="small">Enlarge</button><button id="runSvg" class="small">${icon('save', 13)} Save drawing (SVG)</button><button id="runPng" class="small">PNG</button></div>
+    <h3>The same as a table</h3>
     ${plan.cassettes.map((c) => `<div class="cassette-h">${icon('cassette', 16)} Cassette ${c.index} · ${c.type}</div>
-      <table class="plan"><tr><th>Head</th><th>Fluid</th><th class="num">Dispensed</th><th class="num">Load</th></tr>
-      ${c.heads.map((h) => `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
-    <h3>Per fluid</h3><table class="plan"><tr><th>Fluid</th><th class="num">Heads</th><th class="num">Dispensed</th><th class="num">Total load</th></tr>
-    ${plan.fluids.map((f) => `<tr><td>${esc(f.name)}</td><td class="num">${f.heads.length}</td><td class="num">${fmt(f.dispensed, 4)} µL</td><td class="load">${f.heads.some((h) => h.type === 'D4+') ? Math.round(f.load) : f.load.toFixed(1)} µL</td></tr>`).join('')}</table>
-    <p class="hint">Heads are filled in this order on the instrument. Rules matched on simulated D300e runs (13 probes + your D3 run). If the instrument's pre-run screen ever shows different loads, load what it asks for and tell us.</p>
+      <table class="plan"><tr><th>Head</th><th>Solution</th><th>Conc.</th><th class="num">Dispensed</th><th class="num">Load</th></tr>
+      ${c.heads.map((h) => `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td>${esc(fluidLook(S.protocol, h.fluidId, h.classId === 0).conc)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
+    <h3>Per solution: how much to have ready</h3><table class="plan"><tr><th>Solution</th><th>Conc.</th><th class="num">Heads</th><th class="num">Dispensed</th><th class="num">Total load</th></tr>
+    ${plan.fluids.map((f) => `<tr><td>${esc(f.name)}</td><td>${esc(fluidLook(S.protocol, f.fluidId, f.classId === 0).conc)}</td><td class="num">${f.heads.length}</td><td class="num">${fmt(f.dispensed, 4)} µL</td><td class="load">${f.heads.some((h) => h.type === 'D4+') ? Math.round(f.load) : f.load.toFixed(1)} µL</td></tr>`).join('')}</table>
+    <p class="hint">"Dispensed" is what reaches the plates; "Load" includes what stays in the head. The D300e shows the same volumes on its fill screen before the run. If it ever asks for something different, load what the instrument asks for and report it.</p>
     <div class="actions"><button id="runCsv">${icon('save', 15)} Save loading sheet (CSV)</button></div>`;
+  const drawing = () => standalone(cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: LIGHT, title: `${S.fileName.replace(/\.tdd$/, '')} — what to pipette into each dispense head` }));
+  const enlarge = () => dialog(`<h3>What to pipette into each dispense head</h3><div class="drawing" style="width:min(820px,84vw)">${cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS })}</div><p class="hint">Colour = solution · striped = diluted stock · empty circle = leave the head empty. Volumes include what stays in the head.</p>`, () => true, 'Close', { cancel: null });
+  $('runDraw').onclick = enlarge; $('runBig').onclick = enlarge;
+  $('runSvg').onclick = () => exportFigure(drawing(), S.fileName.replace(/\.tdd$/, '') + '_loading', 'svg', saveBlob);
+  $('runPng').onclick = () => exportFigure(drawing(), S.fileName.replace(/\.tdd$/, '') + '_loading', 'png', saveBlob);
   $('runCsv').onclick = () => {
-    const rows = [['Cassette', 'Type', 'Head', 'Fluid', 'Dispensed (µL)', 'Load (µL)']];
-    for (const c of plan.cassettes) for (const h of c.heads) rows.push([c.index, c.type, h.head, h.name, +h.dispensed.toFixed(4), h.load]);
+    const rows = [['Cassette', 'Type', 'Head', 'Solution', 'Concentration', 'Dispensed (µL)', 'Load (µL)']];
+    for (const c of plan.cassettes) for (const h of c.heads) rows.push([c.index, c.type, h.head, h.name, fluidLook(S.protocol, h.fluidId, h.classId === 0).conc, +h.dispensed.toFixed(4), h.load]);
     saveCsv(S.fileName.replace(/\.tdd$/, '') + '_loading.csv', rows);
   };
 }
@@ -957,7 +972,7 @@ async function renderSynergySection(el) {
   const lim = Math.max(10, ...mats.flatMap((m) => [...m.bliss.values()].map((v) => Math.abs(v))));
   S.synFormats ||= { png: true, pdf: true, svg: true, rds: true, html: false };
   el.innerHTML = `<h3>${icon('synergy', 16)} Synergy (${mats.length} cell line × drug pair${mats.length > 1 ? 's' : ''})</h3>
-    <p class="hint">Bliss independence from the condition means. For ZIP, HSA, Loewe and fitted surfaces, use SynergyFinder below.</p>
+    <p class="hint">Bliss excess: how much more (red) or less (blue) the combination kills than expected if the two drugs acted independently, from the mean of the replicates. For ZIP, HSA, Loewe and fitted surfaces use the SynergyFinder package below.</p>
     ${mats.map((m, i) => `<div class="syn-card"><div class="syn-figs">${heatmapSvg(m, 'viability')}${heatmapSvg(m, 'bliss', { limit: lim })}</div>
       <div class="actions"><button class="small" data-fig="${i}" data-f="svg">SVG</button><button class="small" data-fig="${i}" data-f="png">PNG</button></div></div>`).join('')}
     <h3>SynergyFinder (R)</h3>
@@ -1046,12 +1061,19 @@ function pasteSel() {
 function showStart() {
   const st = $('start');
   st.innerHTML = `<div class="inner"><h1><span class="logo" style="width:34px;height:34px"></span>${APP_NAME}</h1>
-    <p class="lead">Design D300e drug-printer protocols on the Mac, keep track of cell lines and controls, and turn plate-reader data into an annotated Excel file. Protocols are saved in D300e Control's own .tdd format.</p>
+    <p class="lead">Plan a drug-printing experiment for the Tecan D300e: which well gets which dose, what to pipette into the dispenser, and where the cells go. After the read-out, turn the plate-reader numbers into viability and synergy tables. Protocols are saved as .tdd files that D300e Control opens directly.</p>
     <div class="cards">
-      <button class="card" id="stWizard">${icon('wizard', 28)}<b>New experiment</b><span>Step-by-step: plates and PBS border, drugs and dilution series, combinations, replicates, cell lines.</span></button>
-      <button class="card" id="stOpen">${icon('open', 28)}<b>Open protocol</b><span>A .tdd from D300e Control or this app. Its experiment file (cell lines, data) loads with it.</span></button>
-      <button class="card" id="stBlank">${icon('plate', 28)}<b>Blank protocol</b><span>One empty 384-well plate; set values and titrations by hand, as in D300e Control.</span></button>
+      <button class="card" id="stWizard">${icon('wizard', 28)}<b>New experiment</b><span>Five guided steps with pictures: plates, drugs, doses, cell lines, and what you will need at the bench.</span></button>
+      <button class="card" id="stOpen">${icon('open', 28)}<b>Open protocol</b><span>A .tdd file from D300e Control or from this app. Its experiment file (cell lines, results) opens with it.</span></button>
+      <button class="card" id="stBlank">${icon('plate', 28)}<b>Blank protocol</b><span>One empty 384-well plate. Fill wells by hand, as in D300e Control.</span></button>
     </div>
+    <ol class="flow" aria-label="How an experiment goes">
+      <li><b>Design</b><span>doses, plates, cell lines</span></li>
+      <li><b>Prepare</b><span>seed cells, PBS border, drug tubes</span></li>
+      <li><b>Print</b><span>fill the heads as drawn, run the D300e</span></li>
+      <li><b>Read</b><span>e.g. CellTiter-Glo after incubation</span></li>
+      <li><b>Results</b><span>paste values: viability, synergy, Excel</span></li>
+    </ol>
     <p class="foot">Tip: hover any button for help. ⌘Z undoes anything.</p></div>`;
   st.hidden = false;
   $('stWizard').onclick = () => { if (!S.protocol) blankDoc(); hideStart(); startWizard(); };

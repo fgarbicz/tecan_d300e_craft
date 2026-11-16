@@ -13,7 +13,8 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
 
 1. **Collect the inputs.** Ask only for what is missing; never invent a stock concentration.
    - drugs: name, stock concentration with unit (e.g. "10 mM"), class (default DMSO), optional MW (g/mol) for
-     the powder mass;
+     the powder mass, optional `"unit"` = the unit this drug's doses are shown in everywhere (plan, app, Excel):
+     "nM" for a potent drug, "µM" (default) or "mM". Doses in the spec can be written in any unit regardless;
    - design: the primary drug (along the columns) and partner drug(s) (along the rows, each its own plate set):
      top concentration, dilution step (any of "1:3", "1.5", "÷2", "×0.667", "-33%"; "1:0.33" = remove a third),
      number of non-zero levels, replicates (adjacent wells), include 0 (default yes: gives single agents and
@@ -49,7 +50,9 @@ against D300e Control 4.0.1 run reports and simulated runs (docs/format_notes.md
 
 3. **Run** from the repo: `bin/d300craft design experiments/<dir>/spec.json --out experiments/<dir>`
    It writes `<name>.tdd`, `<name>.craft.json`, `<name>_plan.md`, `<name>_plan.json`, `<name>_dosemap.svg`
-   (colour map of every drug's concentration gradient on every plate) and prints the plan.
+   (colour map of every drug's concentration gradient on every plate), `<name>_loading.svg` (drawing of every
+   cassette: which dispense head gets which solution and how many µL; striped = diluted stock) and prints the
+   plan. Show the user both drawings.
    Errors (grid does not fit, unknown drug, bad unit) are plain sentences; "does not fit" names what would fit
    (fewer levels, fewer replicates per plate, no border): fix the spec or ask the user.
 

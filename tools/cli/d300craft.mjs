@@ -23,6 +23,10 @@ const { designAndPlan, makePlan, planMarkdown } = await src('design.js');
 const { parseTdd } = await src('tdd.js');
 const { parseMeta, reconcileMeta, sidecarName, wellRole } = await src('experiment.js');
 const { doseMapSvg, doseSummary, scrapTest } = await src('dosemap.js');
+const { cassetteSvg, fluidLook, standalone } = await src('draw.js');
+const { planRun } = await src('cassette.js');
+const { computeProtocol } = await src('dispense.js');
+const { unitOfFn } = await src('units.js');
 
 const EXAMPLE = {
   name: 'MM synergy example',
@@ -68,12 +72,14 @@ if (cmd === 'design') {
   const out = resolve(opt.out || '.');
   mkdirSync(out, { recursive: true });
   let r; try { r = designAndPlan(spec, base); } catch (e) { die(e.message); }
-  const files = [`${base}.tdd`, `${base}.craft.json`, `${base}_plan.md`, `${base}_plan.json`, `${base}_dosemap.svg`].map((f) => join(out, f));
+  const files = [`${base}.tdd`, `${base}.craft.json`, `${base}_plan.md`, `${base}_plan.json`, `${base}_dosemap.svg`, `${base}_loading.svg`].map((f) => join(out, f));
   for (const f of files.slice(0, 2)) if (existsSync(f) && !opt.force) die(`${f} exists (use --force to overwrite)`);
   writeFileSync(files[0], r.tdd);
   writeFileSync(files[1], r.sidecar);
-  writeFileSync(files[4], doseMapSvg(r.protocol, { title: `${base} — dose map`, roleOf: (pi, rr, c) => wellRole(r.meta, r.protocol.plates[pi], pi, rr, c) }));
-  const md = planMarkdown(r.plan, { files: [files[0], files[1], files[4]] });
+  writeFileSync(files[4], doseMapSvg(r.protocol, { title: `${base} — dose map`, roleOf: (pi, rr, c) => wellRole(r.meta, r.protocol.plates[pi], pi, rr, c), unitOf: unitOfFn(r.meta, r.protocol) }));
+  // the loading sheet as a drawing: every cassette with its heads, colour = solution, bold = volume to pipette
+  writeFileSync(files[5], standalone(cassetteSvg(planRun(r.protocol, computeProtocol(r.protocol)).cassettes, (h) => fluidLook(r.protocol, h.fluidId, h.classId === 0), { title: `${base} — what to pipette into each dispense head` })));
+  const md = planMarkdown(r.plan, { files: [files[0], files[1], files[4], files[5]] });
   writeFileSync(files[2], md);
   writeFileSync(files[3], JSON.stringify(r.plan, null, 2) + '\n');
   process.stdout.write(opt.json ? JSON.stringify({ files, plan: r.plan }, null, 2) + '\n' : md + '\n');

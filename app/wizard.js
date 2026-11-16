@@ -8,13 +8,15 @@ import { computeProtocol, validRange, FLUID_CLASSES, MOLARITY_UNITS, MASS_UNITS,
 import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, isBorder, axisLevels, rangeStep, resolveStocks, randomizeByCellLine, seededRng } from '../src/experiment.js';
 import { suggestShift } from '../src/ops.js';
 import { planRun } from '../src/cassette.js';
+import { drugUnit, unitsFor, setDrugUnit } from '../src/units.js';
+import { cassetteSvg, levelStripSvg, plateSvg, plateStackSvg, fluidLook, THEME_VARS, shortNum } from '../src/draw.js';
 import { icon } from './icons.js';
 
 const STEPS = ['Plates', 'Drugs', 'Layout', 'Cell lines', 'Review'];
 const NORM = {
-  block: { label: 'DMSO to highest, across the plate set', nz: { type: 'ToMaxVolume', scope: 'block' } },
-  plate: { label: 'DMSO to the DMSO limit (% of total), per plate', nz: { type: 'ToAssayVolumePct', param: 0.01, scope: 'plate' } },
-  none: { label: 'No normalization', nz: null },
+  block: { label: 'Same DMSO in every well (recommended)', nz: { type: 'ToMaxVolume', scope: 'block' } },
+  plate: { label: 'Every well up to the DMSO limit', nz: { type: 'ToAssayVolumePct', param: 0.01, scope: 'plate' } },
+  none: { label: 'No top-up', nz: null },
 };
 let W = null;
 
@@ -22,7 +24,7 @@ function defaults(S) {
   const cur = S.protocol.plates[0];
   const empty = !S.protocol.plates.some((p) => p.wells.size) && !S.protocol.fluids.length;
   let last = null; try { last = JSON.parse(localStorage.getItem('d300.wizard') || 'null'); } catch { /* none */ }
-  const drugs = S.protocol.fluids.filter((f) => !f.byVol).map((f) => ({ existingId: f.id, name: f.name, stock: +toDisplay(f.concentration, f.concentrationUnit).toPrecision(10), unit: f.concentrationUnit, classId: f.classId }));
+  const drugs = S.protocol.fluids.filter((f) => !f.byVol && f.rootFluidId == null).map((f) => ({ existingId: f.id, name: f.name, stock: +toDisplay(f.concentration, f.concentrationUnit).toPrecision(10), unit: f.concentrationUnit, classId: f.classId, doseUnit: drugUnit(S.meta, S.protocol, f) }));
   return {
     step: 0, target: empty ? 'replace' : 'append',
     plateType: last?.plateType || cur?.plateType || 'Default384', assayUL: last?.assayUL ?? (cur ? cur.assayVolume / 1000 : 50), dmsoPct: last?.dmsoPct ?? (cur ? cur.dmsoLimit * 100 : 1),
@@ -58,6 +60,15 @@ const note = (t, bad = false) => { const n = $w('wzNote'); n.textContent = t || 
 const unitOpts = (sel) => [...Object.keys(MOLARITY_UNITS), ...Object.keys(MASS_UNITS)].map((u) => `<option value="${u}" ${u === sel ? 'selected' : ''}>${unitLabel(u)}</option>`).join('');
 const drugOpts = (sel, withNone = false) => (withNone ? `<option value="-1" ${sel === -1 ? 'selected' : ''}>— none (single drug) —</option>` : '') + W.drugs.map((x, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${x.name || `Drug ${i + 1}`}</option>`).join('');
 const dims = () => PLATE_TYPES[W.plateType];
+/** Unit in which a drug's doses are typed and shown (same kind as its stock; default µM or ng/mL). */
+function doseUnit(x) {
+  const ok = x ? unitsFor({ concentrationUnit: x.unit, byVol: false }) : Object.keys(MOLARITY_UNITS);
+  if (x && (!x.doseUnit || !ok.includes(x.doseUnit))) x.doseUnit = x.unit in MASS_UNITS ? 'ng_mL' : 'µM';
+  return x ? x.doseUnit : 'µM';
+}
+const unitOfAxis = (o) => doseUnit(W.drugs[o.drug]);
+const toBase = (o, v) => fromDisplay(+v, unitOfAxis(o));
+const pic = (svg, cls = '') => `<div class="drawing ${cls}">${svg}</div>`;
 
 function draw(ctx) {
   const { esc } = ctx;
@@ -66,8 +77,9 @@ function draw(ctx) {
   $w('wzNext').innerHTML = W.step === STEPS.length - 1 ? `${icon('check', 15)} Create ${W.target === 'replace' ? 'protocol' : 'plates'}` : `Next ${icon('next', 15)}`;
   note('');
   const b = $w('wzBody');
+  b.oninput = null; b.onchange = null;
   if (W.step === 0) {
-    b.innerHTML = `<p>What goes on the plates? Every layout you design next is repeated on this many plates.</p><div class="form">
+    b.innerHTML = `<div class="wz-split"><div><p>Which plates do you print on? Every layout you design next is repeated on this many identical plates.</p><div class="form">
       <label>Plate</label><select id="w_type">${Object.entries(PLATE_TYPES).map(([k, v]) => `<option value="${k}" ${k === W.plateType ? 'selected' : ''}>${v.label} (${v.rows} × ${v.cols})</option>`).join('')}</select>
       <label title="Medium + cells already in each well">Well volume</label><span><input id="w_assay" type="number" step="any" value="${W.assayUL}"> µL (medium + cells)</span>
       <label>DMSO limit</label><span><input id="w_dmso" type="number" step="any" value="${+(+W.dmsoPct).toPrecision(6)}"> % per well</span>
@@ -77,10 +89,17 @@ function draw(ctx) {
       <label class="full chk"><input type="checkbox" id="w_shake" ${W.dontShake ? 'checked' : ''}> Don't shake plates</label>
       <label class="full chk" title="D300e 'fluid shift / extend': a series that needs less than one drop of the stock gets a second, diluted stock (Drug - 1:N) in its own dispense head"><input type="checkbox" id="w_dil" ${W.dilutedStocks ? 'checked' : ''}> Add a diluted stock automatically when a series goes below one drop of the stock (like D300e's fluid shift / extend)</label>
       <label>Result</label><select id="w_target"><option value="replace" ${W.target === 'replace' ? 'selected' : ''}>New protocol (replace the current one)</option><option value="append" ${W.target === 'append' ? 'selected' : ''}>Add plates to the current protocol</option></select>
-      </div><p class="hint">The border wells get PBS or medium by hand to limit evaporation; the D300e does not dispense into them (except priming wells).</p>`;
+      </div></div><div class="wz-pic"><h4>Your plate</h4><div id="w_platePic"></div><p class="hint" id="w_plateInfo"></p></div></div>`;
+    const drawPlate = () => {
+      save(); const dm = dims();
+      $w('w_platePic').innerHTML = pic(plateSvg({ rows: dm.rows, cols: dm.cols, wells: new Map() }, { colorOf: () => '#888', border: W.border, theme: THEME_VARS }), 'narrow');
+      const inR = dm.rows - 2 * W.border, inC = dm.cols - 2 * W.border;
+      $w('w_plateInfo').innerHTML = W.border ? `Shaded wells = border: fill them with PBS or medium by hand so the inner wells do not dry out. The D300e does not dispense there (except priming wells). <b>${inR} rows × ${inC} columns</b> = ${inR * inC} wells are left for the experiment.` : `No border: all ${dm.rows * dm.cols} wells are used. Edge wells evaporate faster.`;
+    };
+    b.oninput = drawPlate; b.onchange = drawPlate; drawPlate();
   } else if (W.step === 1) {
-    b.innerHTML = `<p>Which drugs, and what are their stock concentrations (what you load into the cassette)?</p>
-      <div class="wz-row head"><span>Name</span><span>Stock</span><span>Unit</span><span colspan="2">Class</span><span></span><span></span><span></span></div>
+    b.innerHTML = `<p>Which drugs, and how concentrated is each stock, i.e. the tube you pipette into the dispense head?</p>
+      <div class="wz-row head"><span>Name</span><span>Stock conc.</span><span>Unit</span><span style="grid-column: span 3">Solvent (fluid class)</span><span></span><span></span></div>
       ${W.drugs.map((x, i) => `<div class="wz-row"><input data-d="name" data-i="${i}" value="${esc(x.name)}" placeholder="e.g. Bortezomib" ${x.existingId != null ? 'title="Already in this protocol"' : ''}>
         <input data-d="stock" data-i="${i}" type="number" step="any" value="${x.stock}"><select data-d="unit" data-i="${i}">${unitOpts(x.unit)}</select>
         <select data-d="classId" data-i="${i}" style="grid-column: span 3">${Object.entries(FLUID_CLASSES).filter(([, c]) => !c.byVolumeOnly).map(([id, c]) => `<option value="${id}" ${+id === x.classId ? 'selected' : ''}>${c.label}</option>`).join('')}</select>
@@ -91,58 +110,82 @@ function draw(ctx) {
   } else if (W.step === 2) {
     const dm = dims(), inner = { rows: dm.rows - 2 * W.border, cols: dm.cols - 2 * W.border };
     const axis = (o, prefix, withNone) => `<select data-a="drug" data-p="${prefix}">${drugOpts(o.drug, withNone)}</select>
-      <input data-a="high" data-p="${prefix}" type="number" step="any" value="${o.high}" placeholder="top">
-      <input data-a="low" data-p="${prefix}" type="number" step="any" value="${o.low}" placeholder="optional" title="Lowest concentration: with it, the dilution step is calculated so the levels run evenly (log scale) from top to lowest">
-      <input data-a="factor" data-p="${prefix}" value="${o.factor}" ${+o.low > 0 ? 'disabled' : ''} title="Any step: 1:3, 1.5, ÷2, ×0.667, −33 %, 1:0.33 (= remove a third). Calculated when a lowest concentration is given.">
-      <input data-a="levels" data-p="${prefix}" type="number" min="0" value="${o.levels}">
-      <input data-a="reps" data-p="${prefix}" type="number" min="1" value="${o.reps}">
-      <label class="chk"><input data-a="zero" data-p="${prefix}" type="checkbox" ${o.zero ? 'checked' : ''}> 0</label>`;
-    b.innerHTML = `<p>The <b>primary drug</b> runs along the columns; each <b>partner</b> runs along the rows and gets its own set of ${W.reps} plate${W.reps > 1 ? 's' : ''}. Replicates sit next to each other. Inside the border there are <b>${inner.rows} rows × ${inner.cols} columns</b>.</p>
-      <div class="wz-row head wz-axis"><span>Drug</span><span>Top conc. (µM)</span><span>Lowest (µM)</span><span>Dilution step</span><span>Levels</span><span>Replicates</span><span>Add 0</span><span>Normalization</span><span></span></div>
-      <div class="wz-row wz-axis">${axis(W.primary, 'p', false)}<span class="muted">columns</span><span></span></div>
+      <input data-a="high" data-p="${prefix}" type="number" step="any" value="${o.high}" placeholder="highest" ${o.drug === -1 ? 'disabled' : ''}>
+      <input data-a="low" data-p="${prefix}" type="number" step="any" value="${o.low}" placeholder="optional" ${o.drug === -1 ? 'disabled' : ''} title="Lowest dose. If you fill it in, the dilution step is calculated so the doses run evenly from highest to lowest.">
+      ${o.drug === -1 ? '<span></span>' : `<select data-a="unit" data-p="${prefix}" title="Unit for this drug's doses">${unitsFor({ concentrationUnit: W.drugs[o.drug]?.unit || 'mM', byVol: false }).map((u) => `<option value="${u}" ${u === unitOfAxis(o) ? 'selected' : ''}>${unitLabel(u)}</option>`).join('')}</select>`}
+      <input data-a="factor" data-p="${prefix}" value="${o.factor}" ${+o.low > 0 || o.drug === -1 ? 'disabled' : ''} title="How much less each next dose is: 1:3, 1.5, ÷2, ×0.667, −33 %, 1:0.33 (= remove a third). Calculated for you when a lowest dose is given.">
+      <input data-a="levels" data-p="${prefix}" type="number" min="0" value="${o.levels}" ${o.drug === -1 ? 'disabled' : ''} title="Number of doses, not counting 0">
+      <input data-a="reps" data-p="${prefix}" type="number" min="1" value="${o.reps}" title="Wells per dose next to each other on the plate">
+      <label class="chk" title="Adds wells without this drug: the other drug alone, and the vehicle control"><input data-a="zero" data-p="${prefix}" type="checkbox" ${o.zero ? 'checked' : ''}> 0</label>`;
+    b.innerHTML = `<div class="wz-split"><div>
+      <p>The <b>first drug</b> runs across the columns. Each <b>second drug</b> runs down the rows and gets its own set of ${W.reps} plate${W.reps > 1 ? 's' : ''}. Space inside the border: <b>${inner.rows} rows × ${inner.cols} columns</b>.</p>
+      <div class="wz-row head wz-axis"><span>Drug</span><span>Highest dose</span><span>Lowest dose</span><span>Unit</span><span>Dilution step</span><span>Doses</span><span>Wells per dose</span><span>Add 0</span><span>DMSO top-up</span><span></span></div>
+      <div class="wz-row wz-axis">${axis(W.primary, 'p', false)}<span class="muted">columns →</span><span></span></div>
       <div class="wz-levels" id="lv_p"></div>
-      ${W.partners.map((o, i) => `<div class="wz-row wz-axis">${axis(o, i, true)}<select data-a="norm" data-p="${i}">${Object.entries(NORM).map(([k, v]) => `<option value="${k}" ${o.norm === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select><button class="small icon-only" data-delp="${i}" title="Remove">${icon('trash', 14)}</button></div><div class="wz-levels" id="lv_${i}"></div>`).join('')}
-      <p><button id="w_addP" class="small">${icon('plus', 14)} Add partner drug</button></p>
-      <div class="callout" id="w_sum"></div>
-      <p class="hint">Either a dilution step (1:3 divides by 3 per level; 1.5 or 1:0.33 = remove a third gives 10 → 6.67 → 4.44 µM) or a <b>lowest</b> concentration: then the step is calculated so that the levels run evenly on a log scale from top to lowest, e.g. 10 µM → 0.0001 µM in 6 levels = 1:10. "Add 0" adds a no-drug level, so the matrix contains each drug alone and the vehicle control (both 0). <b>Valid range</b> = what the stock can reach in this well: from one drop (13 pL for DMSO) up to the DMSO limit. Concentrations in µM for molar stocks.</p>`;
+      ${W.partners.map((o, i) => `<div class="wz-row wz-axis">${axis(o, i, true)}<select data-a="norm" data-p="${i}" title="Tops every well up with DMSO so all wells, including the controls, contain the same amount">${Object.entries(NORM).map(([k, v]) => `<option value="${k}" ${o.norm === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select><button class="small icon-only" data-delp="${i}" title="Remove">${icon('trash', 14)}</button></div><div class="wz-levels" id="lv_${i}"></div>`).join('')}
+      <p><button id="w_addP" class="small">${icon('plus', 14)} Add another second drug (its own plate set)</button></p>
+      <div class="wz-key"><span><i style="background:var(--accent)"></i>dose from the stock</span><span><i style="background:repeating-linear-gradient(45deg,var(--accent) 0 2px,#fff 2px 4px)"></i>dose from a diluted stock</span><span><i style="border:2px dashed var(--warn);box-sizing:border-box"></i>cannot be dispensed</span><span><i style="background:var(--well-empty);border:1px solid var(--line);box-sizing:border-box"></i>0 = no drug</span></div>
+      <p class="hint">Give a <b>dilution step</b> (1:3 = each dose is a third of the one before) <b>or</b> a <b>lowest dose</b> — then the step is worked out for you. Darker circle = higher dose. "Add 0" gives you each drug alone and the vehicle control.</p>
+      </div><div class="wz-pic" id="w_pic"></div></div>`;
     $w('w_addP').onclick = () => { save(); W.partners.push({ drug: Math.min(W.partners.length + 1, W.drugs.length - 1), high: '', low: '', factor: 2, levels: 6, zero: true, reps: 2, norm: 'block' }); draw(ctx); };
     for (const x of b.querySelectorAll('[data-delp]')) x.onclick = () => { save(); W.partners.splice(+x.dataset.delp, 1); draw(ctx); };
     let tmr = null;
-    const upd = () => {
+    const upd = (e) => {
+      // a new unit keeps the doses: 10 µM becomes 10000 nM (for every row that uses this drug)
+      if (e?.target?.dataset?.a === 'unit') {
+        const o = e.target.dataset.p === 'p' ? W.primary : W.partners[+e.target.dataset.p], x = W.drugs[o.drug], from = unitOfAxis(o), to = e.target.value;
+        save(); x.doseUnit = to;
+        const k = fromDisplay(1, from) / fromDisplay(1, to);
+        for (const ax of [W.primary, ...W.partners]) if (ax.drug === o.drug) for (const f of ['high', 'low']) if (+ax[f] > 0) ax[f] = String(+(+ax[f] * k).toPrecision(10));
+        return draw(ctx);
+      }
+      if (e?.target?.dataset?.a === 'drug') { save(); return draw(ctx); }
       save(); levelsPreview(ctx);
-      for (const el of b.querySelectorAll('[data-a="factor"]')) { const o = el.dataset.p === 'p' ? W.primary : W.partners[+el.dataset.p]; el.disabled = +o.low > 0; }
-      clearTimeout(tmr); tmr = setTimeout(() => summary(ctx, $w('w_sum')), 250);
+      for (const el of b.querySelectorAll('[data-a="factor"]')) { // with a lowest dose the step is calculated: show it
+        const o = el.dataset.p === 'p' ? W.primary : W.partners[+el.dataset.p]; el.disabled = +o.low > 0 || o.drug === -1;
+        if (+o.low > 0 && o.drug !== -1) { const st = rangeStep(toBase(o, o.high), lowOf(o), Math.floor(o.levels)); if (st) { el.value = `1:${+st.toPrecision(3)}`; o.factor = el.value; } }
+      }
+      clearTimeout(tmr); tmr = setTimeout(() => picture(ctx, $w('w_pic')), 200);
     };
-    b.oninput = upd; upd();
+    b.oninput = upd; b.onchange = null; upd();
   } else if (W.step === 3) {
-    b.innerHTML = `<p>Which cells go on the plates? Cell lines are stored in the experiment file next to the .tdd (the D300e ignores them) and label every well in the Excel results.</p>
+    b.innerHTML = `<div class="wz-split"><div><p>Which cells go on the plates? Cell lines are saved in the experiment file next to the protocol (the D300e does not need them) and label every well in the results.</p>
       <div class="form"><label>Cell lines</label><input id="w_cells" value="${esc(W.cellLines)}" placeholder="e.g. MM.1S, KMS-11, U266 (comma separated)">
       <label>Arrangement</label><select id="w_cellMode">
         <option value="same" ${W.cellMode === 'same' ? 'selected' : ''}>One cell line on every plate (the first one)</option>
-        <option value="perLine" ${W.cellMode === 'perLine' ? 'selected' : ''}>Each cell line gets its own plates (plates × cell lines)</option>
+        <option value="perLine" ${W.cellMode === 'perLine' ? 'selected' : ''}>Each cell line gets its own plates</option>
         <option value="splitRows" ${W.cellMode === 'splitRows' ? 'selected' : ''}>Two cell lines per plate: top half / bottom half</option>
         <option value="splitCols" ${W.cellMode === 'splitCols' ? 'selected' : ''}>Two cell lines per plate: left half / right half</option>
-        <option value="none" ${W.cellMode === 'none' ? 'selected' : ''}>Assign later (Annotate tab)</option></select>
-      <label class="full chk" title="Each plate gets its own random permutation; wells only move to other wells of the same cell line, so cells stay where you seed them. Stored in the .tdd (D300e Randomize)."><input type="checkbox" id="w_rand" ${W.randomize ? 'checked' : ''}> Randomize well positions within each cell line (against edge and gradient effects)</label></div>
-      <p class="hint" id="w_cellInfo"></p>`;
+        <option value="none" ${W.cellMode === 'none' ? 'selected' : ''}>Decide later (Annotate tab)</option></select>
+      <label class="full chk" title="Each plate gets its own random order. A well only swaps places with wells of the same cell line, so you seed the cells exactly as drawn. Saved in the protocol file; the D300e prints it that way."><input type="checkbox" id="w_rand" ${W.randomize ? 'checked' : ''}> Shuffle the well positions within each cell line (reduces edge and position effects)</label></div>
+      <p class="hint" id="w_cellInfo"></p></div><div class="wz-pic" id="w_pic"></div></div>`;
+    let tmr = null;
     const info = () => {
       save(); const n = Math.max(1, splitNames(W.cellLines).length), split = W.cellMode.startsWith('split');
-      const sets = W.cellMode === 'perLine' ? n : split ? Math.ceil(n / 2) : 1;
-      $w('w_cellInfo').textContent = (W.randomize && W.cellMode === 'none' ? 'Randomizing needs cell lines assigned here. ' : '') + `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''} = ${W.partners.length * W.reps * sets} plate${W.partners.length * W.reps * sets > 1 ? 's' : ''}.`
-        + (split ? ' Each half gets the same drug layout, so it must fit in half the plate (check the Layout step).' : '');
+      const sets = W.cellMode === 'perLine' ? n : split ? Math.ceil(n / 2) : 1, tot = W.partners.length * W.reps * sets;
+      $w('w_cellInfo').textContent = (W.randomize && W.cellMode === 'none' ? 'Shuffling needs the cell lines to be set here. ' : '') + `${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''} = ${tot} plate${tot > 1 ? 's' : ''}.`
+        + (split ? ' Each half gets the same drug layout, so the layout must fit in half the plate.' : '')
+        + (W.cellMode === 'same' && n > 1 ? ' Only the first cell line is used with this arrangement.' : '');
+      clearTimeout(tmr); tmr = setTimeout(() => picture(ctx, $w('w_pic')), 200);
     };
-    b.oninput = info; info();
+    b.oninput = info; b.onchange = info; info();
   } else if (W.step === 4) {
     let pv;
     try { pv = preview(ctx); } catch (e) { b.innerHTML = `<div class="callout warn">${esc(e.message)}</div>`; return; }
     const { protocol, meta, first } = pv;
     const nPl = protocol.plates.length - first;
-    b.innerHTML = `<div class="wz-preview"><div id="w_mini"></div><div>
+    const nBlocks = W.partners.length * Math.max(1, W.cellMode === 'perLine' ? splitNames(W.cellLines).length : W.cellMode.startsWith('split') ? Math.ceil(splitNames(W.cellLines).length / 2) : 1);
+    b.innerHTML = `<div class="wz-split"><div>
       <h3 style="margin-top:0">${nPl} plate${nPl > 1 ? 's' : ''}${W.target === 'append' ? ` added after the current ${first}` : ''}</h3>
-      <ul>${(meta.blocks || []).slice(-W.partners.length * Math.max(1, W.cellMode === 'perLine' ? splitNames(W.cellLines).length : W.cellMode.startsWith('split') ? Math.ceil(splitNames(W.cellLines).length / 2) : 1)).map((bl) => `<li>${esc(bl.name)}${bl.cellLine ? ` · ${esc(bl.cellLine)}` : ''}: plates ${bl.plates.map((p) => p + 1).join(', ')} — ${bl.region.rows} × ${bl.region.cols} wells</li>`).join('')}</ul>
-      <p>${needsHtml(pv, ctx)}</p>
-      <p class="hint">Plate 1 preview on the left (design positions${W.randomize ? '; the D300e dispenses them randomized' : ''}): colours = drugs, stripes = PBS border, S = priming well.</p></div></div>`;
-    miniPlate($w('w_mini'), protocol, meta, first, ctx);
+      <ul>${(meta.blocks || []).slice(-nBlocks).map((bl) => `<li><b>${esc(bl.name)}</b>${bl.cellLine ? ` · ${esc(bl.cellLine)}` : ''}: plate${bl.plates.length > 1 ? 's' : ''} ${bl.plates.map((p) => p + 1).join(', ')} — ${bl.region.rows} rows × ${bl.region.cols} columns of wells</li>`).join('')}</ul>
+      <h3>What happens next</h3>
+      <ol class="wz-next">
+        <li><b>Create</b> — the plates open in the editor; the <b>Run</b> tab shows the cassette drawing and a loading sheet.</li>
+        <li><b>Save</b> — one .tdd file for the D300e and one experiment file (cell lines, units) next to it.</li>
+        <li><b>Seed the cells</b> where the picture shows them, and fill the border with PBS.</li>
+        <li><b>At the D300e</b>: open the .tdd, press Run, pipette each head as drawn, load the plates when asked.</li>
+        <li><b>After reading the plates</b>: paste the values in the <b>Results</b> tab for viability, synergy and Excel.</li>
+      </ol></div><div class="wz-pic">${pictureHtml(pv, ctx)}</div></div>`;
     W._preview = pv;
   }
   if (W.step <= 3) for (const id of ['w_type']) $w(id)?.addEventListener('change', () => { save(); });
@@ -160,20 +203,24 @@ function save() {
   } else if (W.step === 2) {
     for (const el of document.querySelectorAll('#wzBody [data-a]')) {
       const o = el.dataset.p === 'p' ? W.primary : W.partners[+el.dataset.p]; const k = el.dataset.a;
+      if (k === 'unit') continue; // handled on change (converts the doses)
       o[k] = k === 'zero' ? el.checked : k === 'norm' || k === 'high' || k === 'low' || k === 'factor' ? el.value : +el.value;
     }
   } else if (W.step === 3 && $w('w_cells')) { W.cellLines = v('w_cells'); W.cellMode = v('w_cellMode'); W.randomize = $w('w_rand').checked; }
 }
 
-const lowOf = (o) => (+o.low > 0 ? +o.low : null);
+const lowOf = (o) => (+o.low > 0 ? toBase(o, o.low) : null);
+/** Dose levels of a row in the file's base unit (µM / ng/mL), highest first, then 0. */
 function levelsFor(o) {
-  const high = +o.high, low = lowOf(o);
-  if (low != null && !(low < high)) throw new Error('Lowest must be below the top concentration');
-  if (low != null && Math.floor(o.levels) < 2) throw new Error('A top–lowest range needs at least 2 levels');
+  const high = toBase(o, o.high), low = lowOf(o);
+  if (low != null && !(low < high)) throw new Error('The lowest dose must be below the highest');
+  if (low != null && Math.floor(o.levels) < 2) throw new Error('From highest to lowest needs at least 2 doses');
   if (!(o.levels > 0 && high > 0)) return o.zero ? [0] : [];
   return axisLevels({ high, low, factor: low != null ? null : parseDilution(o.factor).factor, levels: Math.floor(o.levels), includeZero: o.zero });
 }
-const stepLabel = (o) => { const st = rangeStep(+o.high, lowOf(o), Math.floor(o.levels)); return st ? `1:${+st.toPrecision(3)} (calculated)` : parseDilution(o.factor).label; };
+const stepLabel = (o) => { const st = rangeStep(toBase(o, o.high), lowOf(o), Math.floor(o.levels)); return st ? `1:${+st.toPrecision(3)} per step (calculated)` : parseDilution(o.factor).label; };
+
+/** One row's doses as a strip of wells, with plain-language notes on anything that cannot be dispensed as asked. */
 function levelsPreview(ctx) {
   const dm = dims(), inner = { rows: dm.rows - 2 * W.border, cols: dm.cols - 2 * W.border };
   W.split = W.cellMode === 'splitRows' || W.cellMode === 'splitCols';
@@ -182,32 +229,38 @@ function levelsPreview(ctx) {
   const plateLike = { assayVolume: W.assayUL * 1000, dmsoLimit: W.dmsoPct / 100 };
   const show = (o, el, axisLen, axisName) => {
     if (!el) return;
-    if (o.drug === -1) { el.innerHTML = `Single drug: ${o.reps} row${o.reps > 1 ? 's' : ''} of replicates.`; return; }
+    if (o.drug === -1) { el.innerHTML = `<div class="wz-msg"><div>One drug only: ${o.reps} row${o.reps > 1 ? 's' : ''} with the same doses (replicates).</div></div>`; return; }
     try {
+      const x = W.drugs[o.drug], u = unitOfAxis(o), ul = unitLabel(u), sh = (v) => shortNum(toDisplay(v, u));
+      if (!(+o.high > 0)) { el.innerHTML = '<div class="wz-msg"><div class="muted">Enter the highest dose.</div></div>'; return; }
       const lv = levelsFor(o); const n = lv.length * o.reps;
-      const x = W.drugs[o.drug]; const fl = x && { concentration: fromDisplay(x.stock, x.unit), concentrationUnit: x.unit, classId: x.classId, byVol: false };
-      const rg = fl && fl.concentration > 0 ? validRange(fl, plateLike, 2) : null;
+      const fl = x && { concentration: fromDisplay(x.stock, x.unit), concentrationUnit: x.unit, classId: x.classId, byVol: false };
+      const two = W.partners.some((p) => p.drug !== -1);
+      const rg = fl && fl.concentration > 0 ? validRange(fl, plateLike, two ? 2 : 1) : null;
       const below = rg ? lv.filter((v) => v && v < rg.min) : [], above = rg ? lv.filter((v) => v > rg.max) : [];
+      const sug = below.length && fl ? suggestShift(fl, plateLike, Math.max(...lv), Math.min(...lv.filter((v) => v > 0))) : null;
+      const canDilute = sug && sug.kind !== 'impossible' && W.dilutedStocks;
+      const dilName = canDilute ? `${x.name || 'drug'} - 1:${sug.factor}` : null;
+      const kinds = lv.map((v) => ({ v: toDisplay(v, u), kind: v === 0 ? 'zero' : rg && v > rg.max ? 'above' : rg && v < rg.min ? (canDilute ? 'diluted' : 'below') : canDilute && sug.kind === 'shift' ? 'diluted' : 'stock' }));
+      const color = ctx.fluidColor({ id: x.existingId ?? o.drug });
       const msgs = [];
+      msgs.push(`<div><span class="pill">${stepLabel(o)}</span> <b style="color:${n > axisLen ? 'var(--danger)' : 'inherit'}">${n} ${axisName}</b> of ${axisLen} available${rg ? ` · this ${x.stock} ${unitLabel(x.unit)} stock can give ${sh(rg.min)}–${sh(rg.max)} ${ul} in a well` : ''}</div>`);
       if (n > axisLen) {
         const zero = o.zero ? 1 : 0, maxLv = Math.floor(axisLen / o.reps) - zero, maxRep = Math.floor(axisLen / lv.length);
-        msgs.push(`<span style="color:var(--danger)">needs ${n} ${axisName} (${lv.length - zero} levels${zero ? ' + 0' : ''} × ${o.reps} replicates) but only ${axisLen} fit${W.split ? ' in half the plate' : ' inside the border'}: use ${[maxLv >= 1 ? `≤ ${maxLv} levels` : null, maxRep >= 1 && maxRep < o.reps ? `${maxRep} replicate${maxRep > 1 ? 's' : ''} per plate (and more plate replicates)` : null, W.border ? 'no PBS border' : null].filter(Boolean).join(', or ')}</span>`);
+        msgs.push(`<div style="color:var(--danger)">Too wide for the plate: ${lv.length - zero} doses${zero ? ' + 0' : ''} × ${o.reps} wells each = ${n} ${axisName}, but only ${axisLen} fit${W.split ? ' in half the plate' : ' inside the border'}. Use ${[maxLv >= 1 ? `at most ${maxLv} doses` : null, maxRep >= 1 && maxRep < o.reps ? `${maxRep} well${maxRep > 1 ? 's' : ''} per dose (and more plate replicates)` : null, W.border ? 'no PBS border' : null].filter(Boolean).join(', or ')}.</div>`);
       }
-      if (below.length && fl) {
-        const sh = suggestShift(fl, plateLike, Math.max(...lv), Math.min(...lv.filter((v) => v > 0)));
-        if (sh && sh.kind !== 'impossible' && W.dilutedStocks) msgs.push(`<span style="color:var(--accent)">${below.length} level${below.length > 1 ? 's' : ''} (${below.map((v) => ctx.fmt(v, 3)).join(', ')}) need less than one drop of the ${x.stock} ${unitLabel(x.unit)} stock → ${sh.kind === 'shift' ? `the whole series uses a diluted stock <b>${x.name || 'drug'} - 1:${sh.factor}</b>` : `a second stock <b>${x.name || 'drug'} - 1:${sh.factor}</b> (${+(x.stock / sh.factor).toPrecision(3)} ${unitLabel(x.unit)}) dispenses them`}: one more solution to prepare and one more dispense head</span>`);
-        else msgs.push(`<span style="color:var(--warn)">${below.length} level${below.length > 1 ? 's' : ''} below one drop of the stock (${ctx.fmt(rg.min, 2)}): ${sh?.kind === 'impossible' ? 'even a 1:9000 dilution is not enough — use a lower stock' : 'they will be flagged — tick "Add a diluted stock" on the Plates step, or use a lower stock'}</span>`);
-      }
-      if (above.length) msgs.push(`<span style="color:var(--danger)">${above.length} level${above.length > 1 ? 's' : ''} above ${ctx.fmt(rg.max, 3)}: more DMSO than the ${W.dmsoPct} % limit allows with this stock (with ${W.partners.some((p) => p.drug !== -1) ? 'two drugs sharing the limit' : 'one drug'}) — use a more concentrated stock or a lower top</span>`);
-      el.innerHTML = `<span class="pill">${stepLabel(o)}</span> ${lv.map((v) => ctx.fmt(v, 3)).join(' · ')} → <b>${n} ${axisName}</b> of ${axisLen}${rg ? ` · valid range of this stock ${ctx.fmt(rg.min, 2)}–${ctx.fmt(rg.max, 2)}` : ''}${msgs.length ? '<br>' + msgs.join('<br>') : ''}`;
-    } catch (e) { el.textContent = o.high ? e.message : 'Enter the top concentration'; }
+      if (below.length && canDilute) msgs.push(`<div style="color:var(--accent)">${sug.kind === 'shift' ? `All doses come from a diluted stock, <b>${ctx.esc(dilName)}</b>` : `The ${below.length} lowest dose${below.length > 1 ? 's' : ''} (${below.map(sh).join(', ')} ${ul}) come from a second, diluted stock: <b>${ctx.esc(dilName)}</b>`} (${+(x.stock / sug.factor).toPrecision(3)} ${unitLabel(x.unit)}). You prepare one more tube (1 part stock + ${sug.factor - 1} parts solvent) and it takes one more dispense head. Why: these doses need less than one drop of the ${x.stock} ${unitLabel(x.unit)} stock.</div>`);
+      else if (below.length) msgs.push(`<div style="color:var(--warn)">${below.length} dose${below.length > 1 ? 's are' : ' is'} too low for this stock (below ${sh(rg.min)} ${ul} = less than one drop): ${sug?.kind === 'impossible' ? 'even a 1:9000 dilution is not enough. Start from a less concentrated stock.' : 'tick "Add a diluted stock automatically" on the Plates step, or start from a less concentrated stock.'}</div>`);
+      if (above.length) msgs.push(`<div style="color:var(--danger)">${above.length} dose${above.length > 1 ? 's are' : ' is'} too high for this stock (above ${sh(rg.max)} ${ul}): the well would get more DMSO than the ${W.dmsoPct} % limit${two ? ', which the two drugs share' : ''}. Use a more concentrated stock or a lower highest dose.</div>`);
+      el.innerHTML = pic(levelStripSvg(kinds, color, { unit: ul, replicates: o.reps, theme: THEME_VARS, dilutedName: dilName })) + `<div class="wz-msg">${msgs.join('')}</div>`;
+    } catch (e) { el.innerHTML = `<div class="wz-msg"><div style="color:var(--danger)">${ctx.esc(e.message)}</div></div>`; }
   };
   show(W.primary, $w('lv_p'), inner.cols, 'columns');
   W.partners.forEach((o, i) => show(o, $w(`lv_${i}`), inner.rows, 'rows'));
 }
 
-/** What the current design needs: plates, cassettes / heads, solutions to prepare, warnings (HTML). */
-function needsHtml(pv, ctx) {
+/** Short text: plates, cassettes, solutions, warnings (HTML lines). */
+function needsLines(pv, ctx) {
   const { esc } = ctx;
   const { protocol, computed, plan, first, stockNotes } = pv;
   const nPl = protocol.plates.length - first;
@@ -216,23 +269,38 @@ function needsHtml(pv, ctx) {
   let dmso = 0, low = 0;
   computed.forEach(({ wells }, pi) => { if (pi < first) return; for (const w of wells.values()) for (const x of w.warnings) { if (x.code === 'dmso_limit') dmso++; if (x.code === 'below_min_volume') low++; } });
   const byType = {}; for (const c of plan.cassettes) { const t = (byType[c.type] ||= { n: 0, heads: 0 }); t.n++; t.heads += c.heads.length; }
-  const cas = Object.entries(byType).map(([t, x]) => `${x.n} × ${t} cassette${x.n > 1 ? 's' : ''} (${x.heads} of ${x.n * (t === 'T8+' ? 8 : 4)} heads used)`).join(' + ') || '–';
-  const sol = plan.fluids.map((f) => `${esc(f.name)}: ${f.heads.length} head${f.heads.length > 1 ? 's' : ''}, load ${+f.load.toFixed(1)} µL`).join('<br>');
-  const L = [];
-  L.push(`<b>${nPl} plate${nPl > 1 ? 's' : ''}</b> = ${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} plate replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''}.`);
-  L.push(`<b>Cassettes:</b> ${cas}. A head holds one solution; one solution needs several heads when it dispenses more than a head takes (20 µL on a T8+ head, 10 µL while any well gets less than 1 nL; 200 µL on a D4+ head).`);
-  L.push(`<b>${plan.fluids.length} solution${plan.fluids.length > 1 ? 's' : ''} to load</b> (exact per-head volumes in the Run tab):<br>${sol}`);
+  const L = { plates: `<b>${nPl} plate${nPl > 1 ? 's' : ''}</b> = ${W.partners.length} layout${W.partners.length > 1 ? 's' : ''} × ${W.reps} replicate${W.reps > 1 ? 's' : ''}${sets > 1 ? ` × ${sets} ${split ? 'cell-line pairs' : 'cell lines'}` : ''}`, notes: [] };
+  L.cassettes = Object.entries(byType).map(([t, x]) => `<b>${x.n} × ${t}</b> (${x.heads} of ${x.n * (t === 'T8+' ? 8 : 4)} heads filled)`).join(' + ') || 'none';
+  L.solutions = `${plan.fluids.length} solution${plan.fluids.length > 1 ? 's' : ''} to pipette`;
   for (const n of stockNotes || []) {
-    if (n.kind === 'impossible') L.push(`<span style="color:var(--warn)">⚠ ${esc(n.drug)}: ${n.levels.length} level(s) stay below one drop even after a 1:9000 dilution.</span>`);
-    else L.push(`<span style="color:var(--accent)">${esc(n.fluid)} = ${esc(n.drug)} stock diluted 1:${n.factor} ${n.kind === 'shift' ? 'replaces the stock for the whole series' : `dispenses ${n.levels.map((v) => ctx.fmt(v, 3)).join(', ')} µM`}.</span>`);
+    if (n.kind === 'impossible') L.notes.push(`<span style="color:var(--warn)">⚠ ${esc(n.drug)}: ${n.levels.length} dose(s) stay below one drop even after a 1:9000 dilution.</span>`);
+    else L.notes.push(`<span style="color:var(--accent)">Prepare <b>${esc(n.fluid)}</b>: ${esc(n.drug)} stock diluted 1:${n.factor} (striped head).</span>`);
   }
-  if (W.randomize) L.push(W.cellMode === 'none' || !names.length ? '<span style="color:var(--warn)">Randomization skipped: assign cell lines in this wizard.</span>' : 'Well positions are randomized within each cell line (one permutation per plate, stored in the .tdd).');
-  L.push(dmso || low ? `<span style="color:var(--warn)">⚠ ${dmso ? `${dmso} wells over the DMSO limit` : ''}${dmso && low ? ', ' : ''}${low ? `${low} wells below the smallest drop` : ''}.</span>` : '<span style="color:var(--ok)">✓ Every well can be dispensed within the DMSO limit.</span>');
-  return L.join('<br>');
+  if (W.randomize) L.notes.push(W.cellMode === 'none' || !names.length ? '<span style="color:var(--warn)">Randomizing was skipped: it needs cell lines (step 4).</span>' : 'Wells are shuffled within each cell line when printed; the picture shows the planned positions.');
+  L.notes.push(dmso || low ? `<span style="color:var(--warn)">⚠ ${[dmso ? `${dmso} wells get more DMSO than the limit` : '', low ? `${low} wells need less than one drop` : ''].filter(Boolean).join(', ')}. See the notes under each drug.</span>` : '<span style="color:var(--ok)">✓ Every well can be printed as planned.</span>');
+  return L;
 }
-function summary(ctx, el) {
+/** The picture panel: plate 1, the plates needed, the cassettes with every head to fill. */
+function pictureHtml(pv, ctx) {
+  const { protocol, meta, plan, first } = pv, p = protocol.plates[first], pm = meta.plates[first];
+  const fl = new Map(protocol.fluids.map((f) => [f.id, f]));
+  const scrap = new Set(Object.entries(pm?.roles || {}).filter(([, r]) => r === 'scrap').map(([k]) => k));
+  const blocks = (meta.blocks || []).filter((bl) => bl.plates.some((i) => i >= first));
+  const b0 = blocks.find((bl) => bl.plates.includes(first));
+  const lineColor = (name) => meta.cellLines.find((c) => c.name === name)?.color || 'var(--ink)';
+  const names = (b0?.cellLine || '').split(' / ').filter(Boolean);
+  const regions = b0 ? (b0.copies || [b0.region]).map((g, i) => ({ ...g, label: names[i] ?? (names.length === 1 ? names[0] : ''), color: names[i] ? lineColor(names[i]) : names.length === 1 ? lineColor(names[0]) : '#6b7385' })) : [];
+  const groups = blocks.map((bl) => ({ label: `${bl.name}${bl.cellLine ? ' · ' + bl.cellLine : ''}`, count: bl.plates.length, first: bl.plates[0] + 1, color: ctx.fluidColor(fl.get(bl.primary) || { id: 0 }), split: (bl.copies || []).length > 1 }));
+  const L = needsLines(pv, ctx);
+  return `<h4>Plate ${first + 1}${regions.some((g) => g.label) ? ' · outlined = where each cell line is seeded' : ''}</h4>${pic(plateSvg(p, { colorOf: (id) => ctx.fluidColor(fl.get(id) || { id }), border: W.border, scrap, regions, theme: THEME_VARS }))}
+    <div class="wz-key">${[...new Set([...p.wells.values()].flatMap((m) => [...m.keys()]).map((id) => fl.get(id)).filter(Boolean).map((f) => (f.rootFluidId != null ? fl.get(f.rootFluidId) || f : f)))].map((f) => `<span><i style="background:${ctx.fluidColor(f)}"></i>${ctx.esc(f.name)}</span>`).join('')}${scrap.size ? '<span><i style="border:1px dashed var(--ink);box-sizing:border-box"></i>priming well</span>' : ''}${W.border ? '<span><i style="background:var(--accent);opacity:.25"></i>PBS border</span>' : ''}</div>
+    <h4>Plates to print</h4>${pic(plateStackSvg(groups, { theme: THEME_VARS }))}<div class="wz-msg"><div>${L.plates}</div></div>
+    <h4>Cassettes and dispense heads</h4>${pic(cassetteSvg(plan.cassettes, (h) => fluidLook(protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS }))}
+    <div class="wz-msg"><div>${L.cassettes} · ${L.solutions}. Pipette the bold volume into each head.</div>${L.notes.map((x) => `<div>${x}</div>`).join('')}</div>`;
+}
+function picture(ctx, el) {
   if (!el) return;
-  try { el.innerHTML = needsHtml(preview(ctx), ctx); el.className = 'callout'; } catch (e) { el.innerHTML = ctx.esc(e.message); el.className = 'callout warn'; }
+  try { el.innerHTML = pictureHtml(preview(ctx), ctx); } catch (e) { el.innerHTML = `<h4>Not ready yet</h4><div class="wz-msg"><div style="color:var(--warn)">${ctx.esc(e.message)}</div></div>`; }
 }
 
 function validate(ctx) {
@@ -268,7 +336,8 @@ function preview(ctx) {
     if (ex) return ex.id;
     return addFluid(protocol, { name: d.name.trim(), concentration: fromDisplay(d.stock, d.unit), concentrationUnit: d.unit, classId: d.classId }).id;
   });
-  const axis = (o) => ({ fluidId: o.drug === -1 ? null : ids[o.drug], high: +o.high, low: o.drug === -1 ? null : lowOf(o), factor: o.drug === -1 ? 2 : lowOf(o) != null ? rangeStep(+o.high, lowOf(o), Math.floor(o.levels)) : parseDilution(o.factor).factor, levels: o.drug === -1 ? 0 : Math.floor(o.levels), includeZero: o.drug === -1 ? true : o.zero, replicates: Math.max(1, Math.floor(o.reps)) });
+  W.drugs.forEach((d, i) => { const f = protocol.fluids.find((x) => x.id === ids[i]); if (f) setDrugUnit(meta, protocol, f, doseUnit(d)); });
+  const axis = (o) => ({ fluidId: o.drug === -1 ? null : ids[o.drug], high: o.drug === -1 ? 1 : toBase(o, o.high), low: o.drug === -1 ? null : lowOf(o), factor: o.drug === -1 ? 2 : lowOf(o) != null ? rangeStep(toBase(o, o.high), lowOf(o), Math.floor(o.levels)) : parseDilution(o.factor).factor, levels: o.drug === -1 ? 0 : Math.floor(o.levels), includeZero: o.drug === -1 ? true : o.zero, replicates: Math.max(1, Math.floor(o.reps)) });
   const spec = {
     plate: { plateType: W.plateType, assayVolume: W.assayUL * 1000, dmsoLimit: W.dmsoPct / 100, dontShake: W.dontShake },
     border: W.border, plateReplicates: W.reps, scrap: W.scrap,
