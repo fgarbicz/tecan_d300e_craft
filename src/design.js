@@ -25,7 +25,7 @@ import { addFluid, parseDilution, PLATE_TYPES } from './ops.js';
 import { computeProtocol, primingIssues, MOLARITY_UNITS, MASS_UNITS, fromDisplay, FLUID_CLASSES, unitLabel } from './dispense.js';
 import { buildExperiment, applyExperiment, newMeta, addCellLine, seedBlocks, serializeMeta, wellRole, resolveStocks, randomizeByCellLine, seededRng, rangeStep } from './experiment.js';
 
-import { planRun } from './cassette.js';
+import { planRun, normalizeUsedHeads } from './cassette.js';
 import { setDrugUnit, drugUnit, unitOfFn } from './units.js';
 import { doseLevels, scrapTest } from './dosemap.js';
 
@@ -55,6 +55,8 @@ export function designExperiment(spec) {
   const meta = newMeta(protocol);
   meta.experiment.title = spec.name || '';
   meta.settings.borderPBS = border > 0; meta.settings.borderDepth = border || 1;
+  // spec.usedT8Heads: heads already used on the T8+ cassette that goes in first (press SKIP for them on the fill screen)
+  if (spec.usedT8Heads != null) meta.settings.usedT8Heads = normalizeUsedHeads(spec.usedT8Heads);
   const drugs = new Map();
   for (const d of spec.drugs || []) {
     if (!d.name) throw new Error('Every drug needs a name');
@@ -124,7 +126,7 @@ const fmtConc = (v) => (v >= 100 ? v.toFixed(0) : v >= 1 ? +v.toPrecision(3) : +
 /** Everything needed at the bench, from a protocol + meta (any source: designed, opened, edited). */
 export function makePlan(protocol, meta, spec = {}) {
   const computed = computeProtocol(protocol);
-  const run = planRun(protocol, computed);
+  const run = planRun(protocol, computed, { usedT8Heads: meta?.settings?.usedT8Heads });
   const unitOf = unitOfFn(meta, protocol);
   const axisUnit = (id) => { const f = protocol.fluids.find((x) => x.id === id); return f ? drugUnit(meta, protocol, f) : null; };
   const inUnit = (v, u) => (u ? fromDisplay(v, 'µM') / fromDisplay(1, u) : v); // base → display unit
@@ -176,7 +178,7 @@ export function makePlan(protocol, meta, spec = {}) {
     plates, blocks: (meta.blocks || []).map((b) => ({ name: b.name, cellLine: b.cellLine || null, plates: b.plates.map((p) => p + 1),
       region: b.copies ? b.copies.map((r) => `${wellName(r.r0, r.c0)}–${wellName(r.r0 + r.rows - 1, r.c0 + r.cols - 1)}`) : [], primaryLevels: (b.primaryLevels || []).map((v) => inUnit(v, axisUnit(b.primary))), partnerLevels: (b.partnerLevels || []).map((v) => inUnit(v, axisUnit(b.partner))),
       primaryUnit: axisUnit(b.primary) ? unitLabel(axisUnit(b.primary)) : null, partnerUnit: axisUnit(b.partner) ? unitLabel(axisUnit(b.partner)) : null })),
-    prepare, cassettes: run.cassettes.map((c2) => ({ index: c2.index, type: c2.type, heads: c2.heads.map((h) => ({ head: h.head, fluid: h.name, stock: prepare.find((x) => x.name === h.name)?.stock || '', dispensedUL: round(h.dispensed, 3), loadUL: h.load })) })),
+    prepare, cassettes: run.cassettes.map((c2) => ({ index: c2.index, type: c2.type, ...(c2.skipped?.length ? { skippedHeads: c2.skipped } : {}), heads: c2.heads.map((h) => ({ head: h.head, fluid: h.name, stock: prepare.find((x) => x.name === h.name)?.stock || '', dispensedUL: round(h.dispensed, 3), loadUL: h.load })) })),
     seeding, pbs: { wells: pbsWells, volumePerWellUL: pbsUL, totalML: round((pbsWells * pbsUL * 1.1) / 1000, 2) },
     maxDmsoPct: round(maxDmso * 100, 4), maxDmsoScrapPct: round(maxDmsoScrap * 100, 4), unusedInnerWells: unused,
     vehicleDmsoPct: vehicleDmsoByBlock(protocol, meta, computed),
@@ -248,7 +250,9 @@ export function planMarkdown(plan, { files = [] } = {}) {
   L.push('## 3. Load the D300e', '', `Open the .tdd in D300e Control, Run. Fill each head with the bold volume (D300e shows the same numbers on its fill screen).${lsvg ? ` Drawing of the cassettes: \`${lsvg.split(/[\\/]/).pop()}\`.` : ''}`, '');
   for (const c of plan.cassettes) {
     L.push(`**Cassette ${c.index} · ${c.type}**`, '', '| Head | Solution | Concentration | Load |', '|---|---|---|---|');
-    for (const h of c.heads) L.push(`| ${h.head} | ${h.fluid} | ${h.stock || '–'} | **${c.type === 'D4+' ? h.loadUL : h.loadUL.toFixed(1)} µL** |`);
+    const rows = [...c.heads, ...(c.skippedHeads || []).map((head) => ({ head, skip: true }))].sort((a, b) => a.head - b.head);
+    for (const h of rows) L.push(h.skip ? `| ${h.head} | SKIP (used in an earlier run) | – | – |` : `| ${h.head} | ${h.fluid} | ${h.stock || '–'} | **${c.type === 'D4+' ? h.loadUL : h.loadUL.toFixed(1)} µL** |`);
+    if (c.skippedHeads?.length) L.push('', `Partly used cassette: put it in first and press **SKIP** on D300e's fill screen for head${c.skippedHeads.length > 1 ? 's' : ''} ${c.skippedHeads.join(', ')}. D300e's pre-run summary does not know about the skips yet.`);
     L.push('');
   }
   L.push('## 4. After the incubation', '', 'Read the plates (e.g. CellTiter-Glo), open the protocol in Tecan D300 Craft, paste each plate\'s values in Results, and export Excel / the SynergyFinder package.', '');

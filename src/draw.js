@@ -59,6 +59,8 @@ export function shortNum(v) {
  * cassettes: planRun(...).cassettes — [{ type: 'T8+'|'D4+', index, heads: [{ head, name, fluidId, load }] }]
  * look(head) → { color, diluted }.   opts: { theme, title }
  * A T8+ cassette is drawn with its 8 heads, a D4+ with its 4 larger ones; unused heads stay empty.
+ * Heads listed in `c.skipped` (already used in an earlier run) get a grey no-entry mark and "SKIP": press SKIP for
+ * them on D300e's fill screen (src/cassette.js skipUsedHeads).
  */
 export function cassetteSvg(cassettes, look, { theme = LIGHT, title = null, compact = false } = {}) {
   // compact (narrow containers, e.g. a side panel): 4 heads per row, so the 8 heads of a T8+ take two rows
@@ -71,7 +73,7 @@ export function cassetteSvg(cassettes, look, { theme = LIGHT, title = null, comp
     const n = c.type === 'D4+' ? 4 : 8, cols = c.type === 'D4+' ? 4 : perRow, pitch = bodyW / cols, r = c.type === 'D4+' || compact ? 20 : 16, rows = rowsOf(c);
     const big = pitch > 60;
     s += `<text x="${padX}" y="${y + 14}" font-size="12" font-weight="600" style="fill:${theme.ink}">Cassette ${c.index} · ${esc(c.type)}</text>`;
-    s += `<text x="${W - padX}" y="${y + 14}" font-size="10.5" text-anchor="end" style="fill:${theme.muted}">${c.type === 'D4+' ? 'high volume, 4 heads' : '8 heads'} · ${c.heads.length} to fill</text>`;
+    s += `<text x="${W - padX}" y="${y + 14}" font-size="10.5" text-anchor="end" style="fill:${theme.muted}">${c.type === 'D4+' ? 'high volume, 4 heads' : '8 heads'} · ${c.heads.length} to fill${c.skipped?.length ? ` · ${c.skipped.length} used: skip` : ''}</text>`;
     for (let row = 0; row < rows; row++) {
       const y0 = y + 20 + row * rowH;
       s += `<rect x="${padX}" y="${y0}" width="${bodyW}" height="58" rx="9" style="fill:${theme.body};stroke:${theme.line}"/>`;
@@ -79,6 +81,13 @@ export function cassetteSvg(cassettes, look, { theme = LIGHT, title = null, comp
         const i = row * cols + j; if (i >= n) break;
         const cx = padX + pitch * (j + 0.5), cy = y0 + 34, h = c.heads.find((x) => x.head === i + 1);
         s += `<text x="${f1(cx)}" y="${y0 + 12}" font-size="9" text-anchor="middle" style="fill:${theme.muted}">${i + 1}</text>`;
+        if (!h && c.skipped?.includes(i + 1)) { // already used in an earlier run: press SKIP on the fill screen
+          s += `<g><title>Head ${i + 1}: already used — press SKIP for it on the D300e fill screen</title><circle cx="${f1(cx)}" cy="${cy}" r="${r}" style="fill:${theme.muted};stroke:${theme.ink}" fill-opacity="0.45" stroke-opacity="0.35"/>`
+            + `<rect x="${f1(cx - r * 0.62)}" y="${f1(cy - r * 0.16)}" width="${f1(r * 1.24)}" height="${f1(r * 0.32)}" rx="1.5" style="fill:${theme.panel}"/></g>`;
+          s += `<text x="${f1(cx)}" y="${y0 + 73}" font-size="${big ? 11.5 : 10}" font-weight="700" text-anchor="middle" style="fill:${theme.muted}">SKIP</text>`;
+          s += `<text x="${f1(cx)}" y="${y0 + 86}" font-size="${big ? 9.6 : 8.6}" text-anchor="middle" style="fill:${theme.muted}">used</text>`;
+          continue;
+        }
         if (!h) { s += `<circle cx="${f1(cx)}" cy="${cy}" r="${r}" style="fill:${theme.empty};stroke:${theme.line}" stroke-dasharray="3 3"/>`; continue; }
         const lk = look(h); let fill = lk.color;
         if (lk.diluted) { const pt = hatch(lk.color); defs += pt.def; fill = `url(#${pt.id})`; }

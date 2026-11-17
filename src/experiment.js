@@ -26,7 +26,7 @@ export function newMeta(protocol) {
   return {
     version: META_VERSION, app: 'Tecan D300 Craft',
     experiment: { title: '', date: '', notes: '', assay: 'CellTiter-Glo' },
-    settings: { borderPBS: true, borderDepth: 1 },
+    settings: { borderPBS: true, borderDepth: 1, usedT8Heads: [] },
     cellLines: [],
     plates: (protocol?.plates || []).map(() => newPlateMeta()),
     tdd: null,
@@ -37,6 +37,8 @@ export function newMeta(protocol) {
 export function reconcileMeta(meta, protocol) {
   const m = meta && meta.version ? meta : newMeta(protocol);
   m.settings = { borderPBS: true, borderDepth: 1, ...(m.settings || {}) };
+  // heads already used on the first T8+ cassette (skipped with SKIP on D300e's fill screen; src/cassette.js)
+  m.settings.usedT8Heads = Array.isArray(m.settings.usedT8Heads) ? m.settings.usedT8Heads : [];
   m.experiment = { title: '', date: '', notes: '', assay: 'CellTiter-Glo', ...(m.experiment || {}) };
   m.cellLines = Array.isArray(m.cellLines) ? m.cellLines : [];
   m.plates = Array.isArray(m.plates) ? m.plates : [];

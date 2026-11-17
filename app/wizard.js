@@ -372,7 +372,7 @@ function preview(ctx) {
   }
   meta.experiment.stockNotes = [...(meta.experiment.stockNotes || []), ...stockNotes];
   const computed = computeProtocol(protocol);
-  return { protocol, meta, computed, plan: planRun(protocol, computed), first, stockNotes };
+  return { protocol, meta, computed, plan: planRun(protocol, computed, { usedT8Heads: meta.settings?.usedT8Heads }), first, stockNotes };
 }
 
 function miniPlate(el, protocol, meta, pi, ctx) {

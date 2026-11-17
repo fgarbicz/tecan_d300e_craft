@@ -238,3 +238,10 @@ dialog.wizard[open] { display: flex; flex-direction: column; }
 .rand-bar .seg button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .rand-bar > button { padding: 3px 9px; }
 .plate-grid.printed .well { cursor: default; }
+
+/* partly used T8+ cassette: heads to SKIP (run plan) */
+.usedheads { margin: 8px 0 10px; }
+.usedheads summary { cursor: pointer; font-weight: 600; }
+.usedhead-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; margin-top: 4px; }
+.usedhead { display: inline-flex; gap: 4px; align-items: center; }
+table.plan tr.muted td { color: var(--muted); font-style: italic; }

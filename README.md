@@ -145,7 +145,8 @@ everything the D300e would refuse or warn about.
 ### Run plan: what to pipette into which head
 Which cassettes to insert (T8+, D4+), what solution goes into each head and the volume to load — as a
 drawing you can print or save, and as a table. These are the numbers D300e Control asks for when you
-press Run.
+press Run. Reusing a **partly used T8+ cassette**? Tick the heads already used: Craft moves the solutions to the
+free heads the way D300e Control does when you press **SKIP** for a used head on its fill screen.
 
 <img src="docs/manual/shots/31.webp" width="860" alt="Run tab: cassette drawing with heads, solutions, concentrations and load volumes">
 

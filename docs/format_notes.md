@@ -89,6 +89,28 @@ fill screens (read off screen). Implemented in `src/cassette.js`, tested in `tes
   "plate fluid is split between multiple dispense heads, and there are no wells greater than 30 nL in some
   cases" is not produced by this app.
 
+## Partly used T8+ cassette: SKIP on the fill screen (simulated runs, 2026-11-17, probe-33)
+
+Protocols `fixtures/reference/probes/probe-33{a,d,e}*.tdd` (`tools/cassette/make_probe33.mjs`), run reports
+`fixtures/reference/reports/probes/probe-33*.xml`, predictions written before the runs in
+`docs/handoff/probe33_predictions.md`. Implemented in `src/cassette.js` `skipUsedHeads`, tested in `tests/cassette.test.js`.
+- No setting for used heads: Settings › Protocol Runs has only the four run options; the cassette load screen asks
+  "Load a T8+ cassette" with an optional Cassette ID; the head picture is not clickable.
+- The fill screen has a **SKIP** button next to FILLED for the head it is about to fill. A skipped head gets a
+  no-entry mark; the planned heads move on, in order, to the next free head. Works for any head, not only the first
+  (33e: head 1 FILLED, heads 2–3 SKIPPED). The report's event log has "Skipped dispensehead n." and
+  "Head Skipped (user)"; the run summary lists the head as "Skipped", unused ones as "Good".
+- Overflow goes to the next T8+ cassette from its head 1 (33d: 10 heads, 3 skipped → 5 on cassette 1 heads 4–8,
+  5 on cassette 2 heads 1–5).
+- The plan made at Run is shifted, not re-planned: 33e's two-head fluid g1 (36 µL → 18 + 18) ended on cassette 1
+  head 8 and cassette 2 head 1 at 18 µL each (load 21.0), not filled to the 20 µL cap (would be 23.3) nor moved
+  whole to cassette 2.
+- The pre-run summary is computed before any skip (33a: "3 T8+ Dispenseheads (1 cassette)").
+- Not checked: runs that also use D4+ cassettes (where the extra T8+ cassette goes in the run order), SKIP on a D4+
+  head, skips on a later cassette, a normalization head being shifted (it is in the same head list, so assumed).
+- Fluids without wells take no head (pre-run summary of 33b-type protocols in Craft's model; the 33b/33c
+  dummy-fluid protocols were not run, as SKIP made them unnecessary).
+
 ## Volume sizing and the DMSO warning (simulated runs, 2026-11-15, second session)
 - Fluids are sized by fixed-point iteration V_i = C_i·T/S_i, T = fixed + ΣV_i, from V = 0. D300e stops once the
   total changes by < 0.1 % between steps (checked from the second step on) and uses the total of the step

@@ -224,7 +224,7 @@ const perPlateOf = (wells, nPlates) => { const a = new Array(nPlates).fill(0); f
  * Plan the run. Returns { cassettes: [{type, index, heads: [{head, name, fluidId, classId, dispensed, load}]}],
  * fluids: [{name, fluidId, classId, dispensed, load, heads}] } (volumes in µL).
  */
-export function planRun(protocol, computed, { highVolume = true } = {}) {
+export function planRun(protocol, computed, { highVolume = true, usedT8Heads = [] } = {}) {
   const items = perPlateAmounts(protocol, computed);
   const nPlates = computed.length;
   const heads = []; // {cassette, amount, plates, it, order, seg, done}
@@ -311,5 +311,48 @@ export function planRun(protocol, computed, { highVolume = true } = {}) {
     const load = hs.some((h) => h.type === 'D4+') ? roundTo(exact, 0) : roundTo(exact - 1e-9, 1);
     return { name: it.name, fluidId: it.fluidId, classId: it.classId, dispensed: it.perPlate.reduce((s, v) => s + v, 0), load, heads: hs };
   });
-  return { cassettes, fluids };
+  return usedT8Heads?.length ? skipUsedHeads({ cassettes, fluids }, usedT8Heads) : { cassettes, fluids };
+}
+
+/** Normalize a list of used head numbers (1–8) on the first T8+ cassette: unique, sorted, integers in range. */
+export function normalizeUsedHeads(list) {
+  return [...new Set((list || []).map(Number).filter((h) => Number.isInteger(h) && h >= 1 && h <= T8.heads))].sort((a, b) => a - b);
+}
+
+/**
+ * A partly used T8+ cassette (heads already used in an earlier run). On the fill screen D300e Control has a SKIP
+ * button for the head it is about to fill; a skipped head is marked as such and the planned heads move on, in
+ * order, to the next free heads — overflowing onto the next T8+ cassette from its head 1. Loads and per-head
+ * volumes do not change: the plan made at Run is kept and only shifted (probe-33a/d/e, 2026-11-17, run reports
+ * "Skipped dispensehead n"; 33e: a two-head fluid pushed across the cassette end stays 18 + 18 µL, not re-split).
+ * D300e's pre-run summary is computed before any skip, so it still shows the unskipped head and cassette count.
+ * UNVERIFIED: runs with D4+ cassettes too (where the extra T8+ cassette goes in the run order — here: right after
+ * the last T8+ cassette of the first T8+ group), and skips on later cassettes (not modelled).
+ * Returns the plan with the first T8+ cassette's `skipped` list set and the heads renumbered.
+ */
+export function skipUsedHeads(plan, usedHeads) {
+  const used = normalizeUsedHeads(usedHeads);
+  if (!used.length) return plan;
+  if (used.length >= T8.heads) throw new Error('All 8 heads of the first T8+ cassette are marked as used: load a new cassette instead');
+  const cassettes = plan.cassettes.map((c) => ({ ...c, heads: c.heads.map((h) => ({ ...h })) }));
+  const i0 = cassettes.findIndex((c) => c.type === T8.type);
+  if (i0 < 0) return plan; // no T8+ cassette in this run: nothing to skip
+  let i1 = i0; while (i1 + 1 < cassettes.length && cassettes[i1 + 1].type === T8.type) i1++;
+  const seq = cassettes.slice(i0, i1 + 1).flatMap((c) => c.heads);
+  const group = [];
+  let k = 0;
+  for (let ci = 0; k < seq.length; ci++) {
+    const free = Array.from({ length: T8.heads }, (_, j) => j + 1).filter((h) => ci > 0 || !used.includes(h));
+    const cas = { type: T8.type, index: 0, heads: [], ...(ci === 0 ? { skipped: used } : {}) };
+    for (const h of free) { if (k >= seq.length) break; cas.heads.push({ ...seq[k++], head: h }); }
+    group.push(cas);
+  }
+  cassettes.splice(i0, i1 - i0 + 1, ...group);
+  cassettes.forEach((c, i) => { c.index = i + 1; });
+  const fluids = plan.fluids.map((f) => {
+    const key = f.heads[0]?.key;
+    const hs = key == null ? [] : cassettes.flatMap((c) => c.heads.filter((h) => h.key === key).map((h) => ({ ...h, cassette: c.index, type: c.type })));
+    return { ...f, heads: hs };
+  });
+  return { cassettes, fluids, usedT8Heads: used };
 }

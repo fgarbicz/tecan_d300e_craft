@@ -78,7 +78,7 @@ if (cmd === 'design') {
   writeFileSync(files[1], r.sidecar);
   writeFileSync(files[4], doseMapSvg(r.protocol, { title: `${base} — dose map`, roleOf: (pi, rr, c) => wellRole(r.meta, r.protocol.plates[pi], pi, rr, c), unitOf: unitOfFn(r.meta, r.protocol) }));
   // the loading sheet as a drawing: every cassette with its heads, colour = solution, bold = volume to pipette
-  writeFileSync(files[5], standalone(cassetteSvg(planRun(r.protocol, computeProtocol(r.protocol)).cassettes, (h) => fluidLook(r.protocol, h.fluidId, h.classId === 0), { title: `${base} — what to pipette into each dispense head` })));
+  writeFileSync(files[5], standalone(cassetteSvg(planRun(r.protocol, computeProtocol(r.protocol), { usedT8Heads: r.meta.settings.usedT8Heads }).cassettes, (h) => fluidLook(r.protocol, h.fluidId, h.classId === 0), { title: `${base} — what to pipette into each dispense head` })));
   const md = planMarkdown(r.plan, { files: [files[0], files[1], files[4], files[5]] });
   writeFileSync(files[2], md);
   writeFileSync(files[3], JSON.stringify(r.plan, null, 2) + '\n');

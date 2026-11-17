@@ -225,3 +225,38 @@ test('probe-32 (blind): top-ups planned from their unrounded volumes — 257 / 2
     ['D4+', ['pr1 237', 'DMSO normalization 257', 'DMSO normalization 254', 'pr1 121']],
     ['D4+', ['DMSO normalization 262']]]);
 });
+
+// probe-33 (2026-11-17): a partly used T8+ cassette. Heads were skipped with the fill screen's SKIP button; the
+// run reports log "Skipped dispensehead n" and list where every fluid went (fixtures/reference/reports/probes).
+const planSkip = (rel, usedT8Heads) => { const p = parseTdd(readFileSync(join(root, rel), 'utf8')); return planRun(p, computeProtocol(p), { usedT8Heads }); };
+const placed = (r) => r.cassettes.map((c) => c.heads.map((h) => `${c.index}:${h.head} ${h.name} ${h.load}`)).flat();
+const reportSkips = (name) => [...readFileSync(join(root, 'fixtures/reference/reports/probes', name), 'utf8').matchAll(/Skipped dispensehead (\d+)\./g)].map((m) => +m[1]);
+
+test('probe-33a: heads 1–3 skipped → three drugs on heads 4–6 (run report)', () => {
+  assert.deepEqual(reportSkips('probe-33a-control.xml'), [1, 2, 3]);
+  const r = planSkip('fixtures/reference/probes/probe-33a-control.tdd', [1, 2, 3]);
+  assert.deepEqual(placed(r), ['1:4 f1 4.9', '1:5 f2 4.9', '1:6 f3 4.9']);
+  assert.deepEqual(r.cassettes[0].skipped, [1, 2, 3]);
+  assert.deepEqual(r.fluids.map((f) => f.load), [4.9, 4.9, 4.9]); // per-fluid totals do not change
+});
+
+test('probe-33d: skipped heads push the overflow onto cassette 2 from head 1 (run report)', () => {
+  assert.deepEqual(reportSkips('probe-33d-dummy3-7drugs.xml'), [1, 2, 3]);
+  assert.deepEqual(placed(planSkip('fixtures/reference/probes/probe-33d-dummy3-7drugs.tdd', [1, 2, 3])), [
+    '1:4 d1 2', '1:5 d2 2', '1:6 d3 2', '1:7 f1 4.9', '1:8 f2 4.9',
+    '2:1 f3 4.9', '2:2 f4 4.9', '2:3 f5 4.9', '2:4 f6 4.9', '2:5 f7 4.9']);
+});
+
+test('probe-33e: a skip after a filled head; a two-head fluid is shifted across cassettes, not re-split (run report)', () => {
+  assert.deepEqual(reportSkips('probe-33e-straddle.xml'), [2, 3]);
+  const r = planSkip('fixtures/reference/probes/probe-33e-straddle.tdd', [3, 2, 2]); // order and duplicates do not matter
+  assert.deepEqual(placed(r), ['1:1 f1 4.9', '1:4 f2 4.9', '1:5 f3 4.9', '1:6 f4 4.9', '1:7 f5 4.9', '1:8 g1 21', '2:1 g1 21']);
+  assert.deepEqual(r.fluids.find((f) => f.name === 'g1').heads.map((h) => [h.cassette, h.head, +h.dispensed.toFixed(3)]), [[1, 8, 18], [2, 1, 18]]);
+});
+
+test('used heads: none / out of range ignored, all eight refused', () => {
+  const base = plan('fixtures/reference/probes/probe-33a-control.tdd');
+  assert.deepEqual(placed(planSkip('fixtures/reference/probes/probe-33a-control.tdd', [])), placed(base));
+  assert.deepEqual(placed(planSkip('fixtures/reference/probes/probe-33a-control.tdd', [0, 9, 'x'])), placed(base));
+  assert.throws(() => planSkip('fixtures/reference/probes/probe-33a-control.tdd', [1, 2, 3, 4, 5, 6, 7, 8]), /All 8 heads/);
+});

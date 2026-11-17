@@ -10,7 +10,7 @@ import { PLATE_TYPES, newPlate, addFluid, removeFluid, setWell, setValue, confli
 import { randomizeByCellLine } from '../src/experiment.js';
 import { newMeta, reconcileMeta, serializeMeta, parseMeta, sidecarName, wellRole, assignCellLine, setRole, addCellLine, removeCellLine, ROLE_LABEL,
   metaAddPlate, metaRemovePlate, metaReplicatePlate, metaClearPlate, metaCopyWells, metaPasteWells, isBorder } from '../src/experiment.js';
-import { planRun } from '../src/cassette.js';
+import { planRun, normalizeUsedHeads } from '../src/cassette.js';
 import { drugUnit, setDrugUnit, unitsFor, unitOfFn } from '../src/units.js';
 import { cassetteSvg, fluidLook, THEME_VARS, standalone, LIGHT } from '../src/draw.js';
 import { icon } from './icons.js';
@@ -55,7 +55,7 @@ function afterHistory(msg) { S.plateIdx = Math.min(S.plateIdx, Math.max(0, S.pro
 
 function recompute() {
   try { S.computed = computeProtocol(S.protocol); } catch (e) { S.computed = null; console.error(e); toast(`Volume calculation failed: ${e.message}`); }
-  try { S.plan = S.computed ? planRun(S.protocol, S.computed) : null; } catch (e) { S.plan = null; console.error(e); }
+  try { S.plan = S.computed ? planRun(S.protocol, S.computed, { usedT8Heads: S.meta?.settings?.usedT8Heads }) : null; } catch (e) { S.plan = null; console.error(e); }
 }
 
 export function toast(msg, ms = 3500) {
@@ -936,12 +936,13 @@ function renderRun(el) {
   const t8 = plan.cassettes.filter((c) => c.type === 'T8+').length, d4 = plan.cassettes.filter((c) => c.type === 'D4+').length;
   el.innerHTML = `<div class="callout"><b>You need ${t8 ? `${t8} × T8+` : ''}${t8 && d4 ? ' and ' : ''}${d4 ? `${d4} × D4+ (high-volume)` : ''} cassette${t8 + d4 > 1 ? 's' : ''}</b> for ${S.protocol.plates.length} plate${S.protocol.plates.length > 1 ? 's' : ''}.
       Pipette the bold volume into each head, left to right. Colour = solution; a striped head is a diluted stock; empty heads stay empty.</div>
+    ${usedHeadsPicker(plan)}
     <div class="drawing zoomable" id="runDraw" title="Click to enlarge">${cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS, compact: (el.clientWidth || 320) < 440 })}</div>
     <div class="actions"><button id="runBig" class="small">Enlarge</button><button id="runSvg" class="small">${icon('save', 13)} Save drawing (SVG)</button><button id="runPng" class="small">PNG</button></div>
     <h3>The same as a table</h3>
     ${plan.cassettes.map((c) => `<div class="cassette-h">${icon('cassette', 16)} Cassette ${c.index} · ${c.type}</div>
       <table class="plan"><tr><th>Head</th><th>Solution</th><th>Conc.</th><th class="num">Dispensed</th><th class="num">Load</th></tr>
-      ${c.heads.map((h) => `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td>${esc(fluidLook(S.protocol, h.fluidId, h.classId === 0).conc)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
+      ${headRows(c).map((h) => h.skip ? `<tr class="muted"><td>${h.head}</td><td colspan="4">SKIP — used in an earlier run</td></tr>` : `<tr><td>${h.head}</td><td>${h.fluidId != null ? `<span class="swatch" style="background:${fluidColor(fluidById(h.fluidId))}"></span> ` : ''}${esc(h.name)}</td><td>${esc(fluidLook(S.protocol, h.fluidId, h.classId === 0).conc)}</td><td class="num">${fmt(h.dispensed, 4)} µL</td><td class="load">${c.type === 'D4+' ? h.load : h.load.toFixed(1)} µL</td></tr>`).join('')}</table>`).join('')}
     <h3>Per solution: how much to have ready</h3><table class="plan"><tr><th>Solution</th><th>Conc.</th><th class="num">Heads</th><th class="num">Dispensed</th><th class="num">Total load</th></tr>
     ${plan.fluids.map((f) => `<tr><td>${esc(f.name)}</td><td>${esc(fluidLook(S.protocol, f.fluidId, f.classId === 0).conc)}</td><td class="num">${f.heads.length}</td><td class="num">${fmt(f.dispensed, 4)} µL</td><td class="load">${f.heads.some((h) => h.type === 'D4+') ? Math.round(f.load) : f.load.toFixed(1)} µL</td></tr>`).join('')}</table>
     <p class="hint">"Dispensed" is what reaches the plates; "Load" includes what stays in the head. The D300e shows the same volumes on its fill screen before the run. If it ever asks for something different, load what the instrument asks for and report it.</p>
@@ -949,13 +950,41 @@ function renderRun(el) {
   const drawing = () => standalone(cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: LIGHT, title: `${S.fileName.replace(/\.tdd$/, '')} — what to pipette into each dispense head` }));
   const enlarge = () => dialog(`<h3>What to pipette into each dispense head</h3><div class="drawing" style="width:min(820px,84vw)">${cassetteSvg(plan.cassettes, (h) => fluidLook(S.protocol, h.fluidId, h.classId === 0), { theme: THEME_VARS })}</div><p class="hint">Colour = solution · striped = diluted stock · empty circle = leave the head empty. Volumes include what stays in the head.</p>`, () => true, 'Close', { cancel: null });
   $('runDraw').onclick = enlarge; $('runBig').onclick = enlarge;
+  for (const cb of el.querySelectorAll('input[data-used-head]')) cb.onchange = () => {
+    const h = Number(cb.dataset.usedHead), cur = normalizeUsedHeads(S.meta.settings.usedT8Heads);
+    const next = cb.checked ? normalizeUsedHeads([...cur, h]) : cur.filter((x) => x !== h);
+    if (next.length >= 8) { cb.checked = false; toast('All 8 heads used: start with a new cassette instead'); return; }
+    mutate(cb.checked ? `mark head ${h} used` : `mark head ${h} unused`, () => { S.meta.settings.usedT8Heads = next; });
+  };
   $('runSvg').onclick = () => exportFigure(drawing(), S.fileName.replace(/\.tdd$/, '') + '_loading', 'svg', saveBlob);
   $('runPng').onclick = () => exportFigure(drawing(), S.fileName.replace(/\.tdd$/, '') + '_loading', 'png', saveBlob);
   $('runCsv').onclick = () => {
     const rows = [['Cassette', 'Type', 'Head', 'Solution', 'Concentration', 'Dispensed (µL)', 'Load (µL)']];
-    for (const c of plan.cassettes) for (const h of c.heads) rows.push([c.index, c.type, h.head, h.name, fluidLook(S.protocol, h.fluidId, h.classId === 0).conc, +h.dispensed.toFixed(4), h.load]);
+    for (const c of plan.cassettes) for (const h of headRows(c)) {
+      rows.push(h.skip ? [c.index, c.type, h.head, 'SKIP (used in an earlier run)', '', '', '']
+        : [c.index, c.type, h.head, h.name, fluidLook(S.protocol, h.fluidId, h.classId === 0).conc, +h.dispensed.toFixed(4), h.load]);
+    }
     saveCsv(S.fileName.replace(/\.tdd$/, '') + '_loading.csv', rows);
   };
+}
+
+/** A cassette's filled heads and skipped (used) heads together, in head order. */
+const headRows = (c) => [...c.heads, ...(c.skipped || []).map((head) => ({ head, skip: true }))].sort((a, b) => a.head - b.head);
+
+// A partly used T8+ cassette: tick the heads used in an earlier run. D300e Control's fill screen has a SKIP button
+// for each head; Craft shifts the plan the way D300e does (src/cassette.js skipUsedHeads, probe-33).
+function usedHeadsPicker(plan) {
+  if (!plan.cassettes.some((c) => c.type === 'T8+')) return '';
+  const used = normalizeUsedHeads(S.meta.settings.usedT8Heads);
+  const boxes = Array.from({ length: 8 }, (_, i) => `<label class="usedhead"><input type="checkbox" data-used-head="${i + 1}" ${used.includes(i + 1) ? 'checked' : ''}> ${i + 1}</label>`).join(' ');
+  const first = plan.cassettes.find((c) => c.type === 'T8+');
+  const d4 = plan.cassettes.some((c) => c.type === 'D4+');
+  return `<details class="usedheads" ${used.length ? 'open' : ''}><summary>Reusing a partly used T8+ cassette?</summary>
+    <p class="hint">Tick the heads already used in an earlier run. Put that cassette in first (cassette ${first.index}). On the D300e fill screen,
+    press <b>SKIP</b> when it asks for a used head; the solutions move on to the next free heads, and what does not fit goes to the next T8+
+    cassette from its head 1. The volumes stay the same. D300e's pre-run summary is made before any skip, so it still shows the head and
+    cassette count without skips.${d4 ? ' <b>Not yet checked against D300e for runs that also use D4+ cassettes:</b> verify the order on the fill screens.' : ''}</p>
+    <div class="usedhead-row">Used heads: ${boxes}</div></details>`;
 }
 
 export function saveCsv(name, rows) {
