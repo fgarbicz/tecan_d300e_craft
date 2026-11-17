@@ -67,10 +67,24 @@ To remove Craft: *Settings → Apps → Installed apps → Tecan D300 Craft → 
 
 ### Mac
 1. Download the **`.dmg`**, open it and drag **Tecan D300 Craft** into **Applications**.
-2. The first time only: **right-click** the app in Applications → **Open** → **Open**.
-   (The app is not notarized by Apple yet, so a normal double-click is refused the first time. If you
-   already double-clicked: *System Settings → Privacy & Security → Open Anyway*.)
-3. After that, open it as any other app.
+2. Double-click the app. The first time, macOS says *"Apple could not verify 'Tecan D300 Craft' is free of
+   malware"*. Click **Done** (not *Move to Trash*).
+3. Open **System Settings → Privacy & Security**, scroll down to **Security**, and next to
+   *"Tecan D300 Craft" was blocked…* click **Open Anyway**. Enter your password, then click **Open Anyway**
+   once more.
+4. After that, open it as any other app.
+
+The app is not notarized by Apple yet, which is why macOS asks once. Since macOS 15 (Sequoia), right-click →
+**Open** no longer skips this check; you have to use step 3.
+
+**If macOS says the app "is damaged and can't be opened"** (the 0.4.0 `.dmg` downloaded before 17 November
+2026 had an incomplete signature), or if *Open Anyway* does not appear, open **Terminal** and run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Tecan D300 Craft.app"
+```
+
+That removes the "downloaded from the internet" flag from the app. It then opens normally.
 
 Intel Macs: no build yet — use the browser version (see [For developers](#for-developers)) or ask for one.
 
@@ -252,7 +266,7 @@ software is not decompiled or redistributed. D300e Control (simulation mode) is 
 - Browser version: `bin/serve.sh` → http://127.0.0.1:8931/app/ (Save downloads files instead of writing them in place)
 - Tests: `npm test` (Node ≥ 20, no dependencies) and `cargo test -p d300-core` — byte-identical round-trips of every
   protocol saved by D300e Control 4.0.1 and the full D3 run report (5752 dispense rows)
-- Mac app: `cd crates/d300-app && cargo tauri build` → `.app` and `.dmg` in `target/release/bundle/`
+- Mac app: `cd crates/d300-app && cargo tauri build` → `.app` and `.dmg` in `target/release/bundle/`. The bundle is ad-hoc signed (`bundle.macOS.signingIdentity: "-"` in `tauri.conf.json`); without that only the binary is signed and macOS reports a downloaded copy as "damaged". Check with `codesign --verify --deep --strict` on the `.app`.
   (needs `cargo install tauri-cli --version "^2" --locked`)
 - Windows and Linux installers: GitHub Actions, [`.github/workflows/build.yml`](.github/workflows/build.yml) — run it
   from the Actions tab or push a `v*` tag; the installers are attached to the run as artifacts

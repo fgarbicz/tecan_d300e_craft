@@ -81,7 +81,7 @@ dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
 
 <h2>2. Installing</h2>
 <div class="os">
-  <div><b>Mac</b><br><code>…_aarch64.dmg</code> (Apple silicon). Open the .dmg and drag the app to Applications. The app is not notarized: the first time, right-click it → <b>Open</b> → <b>Open</b> (or System Settings → Privacy &amp; Security → <b>Open Anyway</b>).</div>
+  <div><b>Mac</b><br><code>…_aarch64.dmg</code> (Apple silicon). Open the .dmg and drag the app to Applications. The app is not notarized, so the first time macOS refuses it ("Apple could not verify…"): click <b>Done</b>, then System Settings → Privacy &amp; Security → <b>Open Anyway</b> (since macOS 15, right-click → Open no longer works). If macOS says the app "is damaged", run <code>xattr -dr com.apple.quarantine "/Applications/Tecan D300 Craft.app"</code> in Terminal.</div>
   <div><b>Windows 10/11</b><br><code>…_x64-setup.exe</code> (installs for the current user, no admin rights needed) or <code>…_x64_en-US.msi</code> (for IT deployment). The installer is not signed: in the SmartScreen window choose <b>More info → Run anyway</b>. Uses Microsoft Edge WebView2, which Windows 10/11 already has; the setup installs it if missing.</div>
   <div><b>Linux</b><br><code>…_amd64.deb</code> (Ubuntu/Debian: <code>sudo apt install ./file.deb</code>), <code>….rpm</code> (Fedora), or <code>…_amd64.AppImage</code> (any distribution: <code>chmod +x</code>, then run it). Needs WebKitGTK 4.1, which current desktop distributions include.</div>
 </div>
@@ -167,7 +167,8 @@ bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
   <tr><td>Too much DMSO in some wells</td><td>Lower the highest dose, use a more concentrated stock, or raise the DMSO limit if your cells tolerate it.</td></tr>
   <tr><td>Randomized protocol saved with a version before 0.3.0 prints a different pattern</td><td>Older versions saved the shuffle in the reverse direction. Open the file, press <b>Shuffle again</b> and save.</td></tr>
   <tr><td>The dose map export shows the tidy layout of a randomized plate</td><td>Expected: it shows the plan. For the printed positions use the <i>As printed</i> view.</td></tr>
-  <tr><td>Mac: "cannot be opened because the developer cannot be verified"</td><td>Right-click → Open → Open, once.</td></tr>
+  <tr><td>Mac: "Apple could not verify … is free of malware" / "cannot be opened"</td><td>Click Done, then System Settings → Privacy &amp; Security → <b>Open Anyway</b>, once.</td></tr>
+  <tr><td>Mac: "is damaged and can't be opened", or no Open Anyway button</td><td>In Terminal: <code>xattr -dr com.apple.quarantine "/Applications/Tecan D300 Craft.app"</code></td></tr>
   <tr><td>Windows: "Windows protected your PC"</td><td>More info → Run anyway.</td></tr>
   <tr><td>Linux: the AppImage does not start</td><td><code>chmod +x</code> the file; on Ubuntu 24.04 and newer also <code>sudo apt install libfuse2t64</code>, or use the .deb.</td></tr>
 </table>
