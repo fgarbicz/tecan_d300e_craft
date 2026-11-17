@@ -10,7 +10,7 @@ dispense head, where the cells and the PBS border go. After the plate reader, pa
 get viability, Bliss and Chou–Talalay synergy (combination index, isobolograms) and an Excel workbook, matched to
 the wells where each dose was really printed.
 
-Runs on **Mac, Windows and Linux**. Current version: **0.4.0**.
+Runs on **Mac, Windows and Linux**. Current version: **0.4.1**.
 
 <p align="center">
   <img src="docs/images/tour-preview.webp" width="860" alt="Short preview of the guided tour: start screen, experiment wizard, drugs and doses">
@@ -38,17 +38,17 @@ Runs on **Mac, Windows and Linux**. Current version: **0.4.0**.
 ## Download
 
 All files are on the **[Releases page](https://github.com/fgarbicz/tecan_d300e_craft/releases/latest)**.
-Direct links for 0.4.0 (you need to be signed in to GitHub with access to this repository):
+Direct links for 0.4.1 (you need to be signed in to GitHub with access to this repository):
 
 | Computer | Download | Size |
 |---|---|---|
-| **Windows 10 / 11** (64-bit) | [**Tecan.D300.Craft_0.4.0_x64-setup.exe**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft_0.4.0_x64-setup.exe) — recommended, no admin rights needed | 2.7 MB |
-| | [Tecan.D300.Craft_0.4.0_x64_en-US.msi](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft_0.4.0_x64_en-US.msi) — for IT / managed installs | 4.0 MB |
-| **Mac** (Apple silicon: M1 and later) | [**Tecan.D300.Craft_0.4.0_aarch64.dmg**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft_0.4.0_aarch64.dmg) | 4.1 MB |
-| **Linux** — Ubuntu, Debian | [**Tecan.D300.Craft_0.4.0_amd64.deb**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft_0.4.0_amd64.deb) | 4.2 MB |
-| Linux — Fedora, RHEL | [Tecan.D300.Craft-0.4.0-1.x86_64.rpm](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft-0.4.0-1.x86_64.rpm) | 4.2 MB |
-| Linux — any distribution | [Tecan.D300.Craft_0.4.0_amd64.AppImage](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/Tecan.D300.Craft_0.4.0_amd64.AppImage) | 83 MB |
-| **Manual** (everything below, for offline use) | [tecan-d300-craft-manual-pack.zip](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/tecan-d300-craft-manual-pack.zip) | 27 MB |
+| **Windows 10 / 11** (64-bit) | [**Tecan.D300.Craft_0.4.1_x64-setup.exe**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft_0.4.1_x64-setup.exe) — recommended, no admin rights needed | 2.7 MB |
+| | [Tecan.D300.Craft_0.4.1_x64_en-US.msi](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft_0.4.1_x64_en-US.msi) — for IT / managed installs | 4.0 MB |
+| **Mac** (Apple silicon: M1 and later) | [**Tecan.D300.Craft_0.4.1_aarch64.dmg**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft_0.4.1_aarch64.dmg) | 4.1 MB |
+| **Linux** — Ubuntu, Debian | [**Tecan.D300.Craft_0.4.1_amd64.deb**](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft_0.4.1_amd64.deb) | 4.2 MB |
+| Linux — Fedora, RHEL | [Tecan.D300.Craft-0.4.1-1.x86_64.rpm](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft-0.4.1-1.x86_64.rpm) | 4.2 MB |
+| Linux — any distribution | [Tecan.D300.Craft_0.4.1_amd64.AppImage](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/Tecan.D300.Craft_0.4.1_amd64.AppImage) | 83 MB |
+| **Manual** (everything below, for offline use) | [tecan-d300-craft-manual-pack.zip](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/tecan-d300-craft-manual-pack.zip) | 27 MB |
 
 ---
 
@@ -77,7 +77,7 @@ To remove Craft: *Settings → Apps → Installed apps → Tecan D300 Craft → 
 The app is not notarized by Apple yet, which is why macOS asks once. Since macOS 15 (Sequoia), right-click →
 **Open** no longer skips this check; you have to use step 3.
 
-**If macOS says the app "is damaged and can't be opened"** (the 0.4.0 `.dmg` downloaded before 17 November
+**If macOS says the app "is damaged and can't be opened"** (a 0.4.0 `.dmg` downloaded before 17 November
 2026 had an incomplete signature), or if *Open Anyway* does not appear, open **Terminal** and run:
 
 ```sh
@@ -89,10 +89,10 @@ That removes the "downloaded from the internet" flag from the app. It then opens
 Intel Macs: no build yet — use the browser version (see [For developers](#for-developers)) or ask for one.
 
 ### Linux
-- **Ubuntu / Debian:** `sudo apt install ./Tecan.D300.Craft_0.4.0_amd64.deb`, then start *Tecan D300 Craft*
+- **Ubuntu / Debian:** `sudo apt install ./Tecan.D300.Craft_0.4.1_amd64.deb`, then start *Tecan D300 Craft*
   from the applications menu or run `d300-designer`.
-- **Fedora:** `sudo dnf install ./Tecan.D300.Craft-0.4.0-1.x86_64.rpm`
-- **Any distribution:** `chmod +x Tecan.D300.Craft_0.4.0_amd64.AppImage` and run it. On Ubuntu 24.04 and
+- **Fedora:** `sudo dnf install ./Tecan.D300.Craft-0.4.1-1.x86_64.rpm`
+- **Any distribution:** `chmod +x Tecan.D300.Craft_0.4.1_amd64.AppImage` and run it. On Ubuntu 24.04 and
   newer the AppImage also needs `sudo apt install libfuse2t64` (or use the .deb).
 
 Needs WebKitGTK 4.1, which current desktop distributions include.
@@ -103,9 +103,9 @@ Needs WebKitGTK 4.1, which current desktop distributions include.
 
 | | |
 |---|---|
-| 🎬 **Video tour** (4 min, captioned) | [Watch / download the MP4](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/tecan-d300-craft-tour.mp4) · [in the repository](docs/manual/tecan-d300-craft-tour.mp4) |
-| 🖱️ **Interactive tour** — the same experiment step by step, at your own pace | Download the [manual pack](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/tecan-d300-craft-manual-pack.zip), unzip, double-click `interactive-tour.html` (arrow keys / space to step, ▶ to play). Or open [`docs/manual/demo.html`](docs/manual/demo.html) from a clone of the repository. |
-| 📘 **User manual** (PDF, 24 pages) — install, glossary, the full tour, at the D300e, editing by hand, results, troubleshooting | [Download the PDF](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.0/tecan-d300-craft-manual.pdf) · [view in the repository](docs/manual/tecan-d300-craft-manual.pdf) |
+| 🎬 **Video tour** (4 min, captioned) | [Watch / download the MP4](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/tecan-d300-craft-tour.mp4) · [in the repository](docs/manual/tecan-d300-craft-tour.mp4) |
+| 🖱️ **Interactive tour** — the same experiment step by step, at your own pace | Download the [manual pack](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/tecan-d300-craft-manual-pack.zip), unzip, double-click `interactive-tour.html` (arrow keys / space to step, ▶ to play). Or open [`docs/manual/demo.html`](docs/manual/demo.html) from a clone of the repository. |
+| 📘 **User manual** (PDF, 25 pages) — install, glossary, the full tour, at the D300e, editing by hand, results, troubleshooting | [Download the PDF](https://github.com/fgarbicz/tecan_d300e_craft/releases/download/v0.4.1/tecan-d300-craft-manual.pdf) · [view in the repository](docs/manual/tecan-d300-craft-manual.pdf) |
 
 The tour follows one real-sized example: **Bortezomib × Venetoclax on two myeloma cell lines (MM.1S and
 KMS-11), 384-well plates, 50 µL per well, 2 replicate plates, randomized within each cell line.**

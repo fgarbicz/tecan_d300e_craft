@@ -50,11 +50,11 @@ dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
 <body><div class="doc">
 
 <section class="cover">
-  <div class="kicker">User manual · version 0.4.0</div>
+  <div class="kicker">User manual · version 0.4.1</div>
   <h1>Tecan D300 Craft</h1>
   <p class="lead">Design drug-printing experiments for the Tecan D300e digital dispenser on a Mac, Windows or Linux computer: doses, plates, cell lines, the cassettes to load, and — after the plate read — viability and synergy.</p>
   <img src="shots/24.webp" alt="Craft after the experiment wizard: a randomized 384-well plate and the cassette loading drawing">
-  <p class="meta">2026-11-17 · Screens shown: Craft 0.4.0. The guided tour is also available as an interactive page (<code>demo.html</code>) and a video (<code>tecan-d300-craft-tour.mp4</code>).</p>
+  <p class="meta">2026-11-17 · Screens shown: Craft 0.4.1. The guided tour is also available as an interactive page (<code>demo.html</code>) and a video (<code>tecan-d300-craft-tour.mp4</code>).</p>
 </section>
 
 <section class="toc">
@@ -141,7 +141,7 @@ dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
 <div class="step"><h4><span class="n">29</span>Check</h4><p>The Check tab lists anything the D300e would refuse or warn about — doses below one drop, too much DMSO, wells over the volume — in plain words with the wells to look at.</p><div class="shot"><img src="shots/29.webp" alt="Check"><div class="ring" style="left:calc(90.13020833333333% - 3px);top:calc(6.487847222222222% - 3px);width:calc(3.289930555555556% + 6px);height:calc(4.888888888888889% + 6px)"></div><span class="tag" style="left:90.13020833333333%;top:6.487847222222222%">29</span></div></div>
 <h3>Run plan</h3>
 <div class="step"><h4><span class="n">30</span>Run tab</h4><p>Run: which cassettes you need and what to pipette into each dispense head.</p><div class="shot"><img src="shots/30.webp" alt="Run tab"><div class="ring" style="left:calc(93.42013888888889% - 3px);top:calc(6.487847222222222% - 3px);width:calc(3.289930555555556% + 6px);height:calc(4.888888888888889% + 6px)"></div><span class="tag" style="left:93.42013888888889%;top:6.487847222222222%">30</span></div></div>
-<div class="step"><h4><span class="n">31</span>The cassette drawing</h4><p>Pipette the bold volume into each head, left to right. Each head shows the solution and its concentration; striped heads hold the diluted stock. Click to enlarge or save it for the bench.</p><div class="shot"><img src="shots/31.webp" alt="The cassette drawing"><div class="ring" style="left:calc(74.51388888888889% - 3px);top:calc(23.84201388888889% - 3px);width:calc(24.65277777777778% + 6px);height:calc(54.03819444444444% + 6px)"></div><span class="tag" style="left:74.51388888888889%;top:23.84201388888889%">31</span></div></div>
+<div class="step"><h4><span class="n">31</span>The cassette drawing</h4><p>Pipette the bold volume into each head, left to right. Each head shows the solution and its concentration; striped heads hold the diluted stock. Click to enlarge or save it for the bench.</p><div class="shot"><img src="shots/31.webp" alt="The cassette drawing"><div class="ring" style="left:calc(74.51388888888889% - 3px);top:calc(26.973958333333332% - 3px);width:calc(24.65277777777778% + 6px);height:calc(54.03819444444444% + 6px)"></div><span class="tag" style="left:74.51388888888889%;top:26.973958333333332%">31</span></div></div>
 <div class="step"><h4><span class="n">32</span>Save the protocol</h4><p>Save writes the .tdd for D300e Control and an experiment file next to it (cell lines, units, results). Copy both to the D300e computer, open the .tdd there and press Run.</p><div class="shot"><img src="shots/32.webp" alt="Save the protocol"><div class="ring" style="left:calc(17.65190972222222% - 3px);top:calc(0.6666666666666667% - 3px);width:calc(3.6111111111111107% + 6px);height:calc(5.043402777777778% + 6px)"></div><span class="tag" style="left:17.65190972222222%;top:2.5%">32</span></div></div>
 <h3>Results</h3>
 <div class="step"><h4><span class="n">33</span>After the read-out</h4><p>After incubation and the plate read (e.g. CellTiter-Glo), open the Results tab of the same file.</p><div class="shot"><img src="shots/33.webp" alt="After the read-out"><div class="ring" style="left:calc(96.71006944444444% - 3px);top:calc(6.487847222222222% - 3px);width:calc(3.289930555555556% + 6px);height:calc(4.888888888888889% + 6px)"></div><span class="tag" style="left:96.71006944444444%;top:6.487847222222222%">33</span></div></div>
@@ -159,6 +159,22 @@ dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
   <li>Seed the cells and fill the border with PBS as the <i>Cell lines</i> view shows, then load the plates when the D300e asks.</li>
   <li>Keep D300e Control's run report (Reports folder): it records what was actually dispensed.</li>
 </ol>
+
+<h3>Reusing a partly used T8+ cassette</h3>
+<p>Heads that were used in an earlier run can't be filled again, but the unused heads of the same cassette can be used.
+D300e Control has no setting for this. Instead, when its fill screen asks for a head, there is a <b>SKIP</b> button
+next to <b>FILLED</b>.</p>
+<ol>
+  <li>In Craft's <b>Run</b> tab, open <i>Reusing a partly used T8+ cassette?</i> and tick the heads that are already used.
+    The drawing marks them grey with "SKIP", and every solution moves to the next free head. If they run out, the rest
+    goes to the next T8+ cassette from its head 1. The volumes stay the same. The ticks are saved in the <code>.craft.json</code>.</li>
+  <li>At the D300e, insert the partly used cassette first. Its pre-run summary is made before any skip, so it still shows
+    the head and cassette count without skips.</li>
+  <li>On the fill screen, press <b>SKIP</b> for each used head, and <b>FILLED</b> for the others, as in Craft's drawing.
+    The run report lists the skipped heads.</li>
+</ol>
+<p>Checked in D300e Control's simulator for T8+ cassettes (skipping the first heads, a head after a filled one, and a
+solution split across two cassettes). Not yet checked for runs that also use D4+ cassettes; there, follow the fill screen.</p>
 
 <h2>6. Editing plates by hand</h2>
 <p>Everything the wizard makes can be changed by hand, and Craft opens any protocol saved by D300e Control. Select wells by dragging, Shift-click to extend, Ctrl-click (⌘-click on a Mac) to add wells, or click a row or column header. Then use a tab on the right:</p>
@@ -202,6 +218,7 @@ bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
   <tr><td>Files: every protocol saved by D300e Control opens and saves back byte-for-byte identical; Craft's files open in D300e Control with the designed doses (including a randomized plate: 850 of 850 rows)</td><td>All files tried</td></tr>
   <tr><td>Dispensed volumes per well (27 simulated runs)</td><td>26,688 of 26,701 rows identical</td></tr>
   <tr><td>Cassettes, heads and loads</td><td>Identical on every run compared</td></tr>
+  <tr><td>Partly used T8+ cassette: heads skipped with SKIP on the fill screen (3 runs)</td><td>Same heads as the run reports</td></tr>
   <tr><td>DMSO top-up "% of assay volume" and "same DMSO in every well"</td><td>Identical</td></tr>
   <tr><td>Diluted stocks: factors offered, split between stock and diluted stock</td><td>Identical where tested (factors 3, 6, 30, 300)</td></tr>
 </table>
@@ -215,6 +232,7 @@ bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
   <tr><td>Too much DMSO in some wells</td><td>Lower the highest dose, use a more concentrated stock, or raise the DMSO limit if your cells tolerate it.</td></tr>
   <tr><td>Randomized protocol saved with a version before 0.3.0 prints a different pattern</td><td>Older versions saved the shuffle in the reverse direction. Open the file, press <b>Shuffle again</b> and save.</td></tr>
   <tr><td>The dose map export shows the tidy layout of a randomized plate</td><td>Expected: it shows the plan. For the printed positions use the <i>As printed</i> view.</td></tr>
+  <tr><td>The D300e pre-run summary shows fewer heads or cassettes than Craft</td><td>Expected when heads are ticked as used: D300e only learns about them when you press SKIP on the fill screen.</td></tr>
   <tr><td>Mac: "Apple could not verify … is free of malware" / "cannot be opened"</td><td>Click Done, then System Settings → Privacy &amp; Security → <b>Open Anyway</b>, once.</td></tr>
   <tr><td>Mac: "is damaged and can't be opened", or no Open Anyway button</td><td>In Terminal: <code>xattr -dr com.apple.quarantine "/Applications/Tecan D300 Craft.app"</code></td></tr>
   <tr><td>Windows: "Windows protected your PC"</td><td>More info → Run anyway.</td></tr>

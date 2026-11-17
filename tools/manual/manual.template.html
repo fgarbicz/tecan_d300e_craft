@@ -112,6 +112,22 @@ dl.gloss dd{margin:2px 0 0 0;color:var(--ink)}
   <li>Keep D300e Control's run report (Reports folder): it records what was actually dispensed.</li>
 </ol>
 
+<h3>Reusing a partly used T8+ cassette</h3>
+<p>Heads that were used in an earlier run can't be filled again, but the unused heads of the same cassette can be used.
+D300e Control has no setting for this. Instead, when its fill screen asks for a head, there is a <b>SKIP</b> button
+next to <b>FILLED</b>.</p>
+<ol>
+  <li>In Craft's <b>Run</b> tab, open <i>Reusing a partly used T8+ cassette?</i> and tick the heads that are already used.
+    The drawing marks them grey with "SKIP", and every solution moves to the next free head. If they run out, the rest
+    goes to the next T8+ cassette from its head 1. The volumes stay the same. The ticks are saved in the <code>.craft.json</code>.</li>
+  <li>At the D300e, insert the partly used cassette first. Its pre-run summary is made before any skip, so it still shows
+    the head and cassette count without skips.</li>
+  <li>On the fill screen, press <b>SKIP</b> for each used head, and <b>FILLED</b> for the others, as in Craft's drawing.
+    The run report lists the skipped heads.</li>
+</ol>
+<p>Checked in D300e Control's simulator for T8+ cassettes (skipping the first heads, a head after a filled one, and a
+solution split across two cassettes). Not yet checked for runs that also use D4+ cassettes; there, follow the fill screen.</p>
+
 <h2>6. Editing plates by hand</h2>
 <p>Everything the wizard makes can be changed by hand, and Craft opens any protocol saved by D300e Control. Select wells by dragging, Shift-click to extend, Ctrl-click (⌘-click on a Mac) to add wells, or click a row or column header. Then use a tab on the right:</p>
 <table>
@@ -154,6 +170,7 @@ bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
   <tr><td>Files: every protocol saved by D300e Control opens and saves back byte-for-byte identical; Craft's files open in D300e Control with the designed doses (including a randomized plate: 850 of 850 rows)</td><td>All files tried</td></tr>
   <tr><td>Dispensed volumes per well (27 simulated runs)</td><td>26,688 of 26,701 rows identical</td></tr>
   <tr><td>Cassettes, heads and loads</td><td>Identical on every run compared</td></tr>
+  <tr><td>Partly used T8+ cassette: heads skipped with SKIP on the fill screen (3 runs)</td><td>Same heads as the run reports</td></tr>
   <tr><td>DMSO top-up "% of assay volume" and "same DMSO in every well"</td><td>Identical</td></tr>
   <tr><td>Diluted stocks: factors offered, split between stock and diluted stock</td><td>Identical where tested (factors 3, 6, 30, 300)</td></tr>
 </table>
@@ -167,6 +184,7 @@ bin/d300craft dosemap my-run.tdd          # dose map (SVG)</pre>
   <tr><td>Too much DMSO in some wells</td><td>Lower the highest dose, use a more concentrated stock, or raise the DMSO limit if your cells tolerate it.</td></tr>
   <tr><td>Randomized protocol saved with a version before 0.3.0 prints a different pattern</td><td>Older versions saved the shuffle in the reverse direction. Open the file, press <b>Shuffle again</b> and save.</td></tr>
   <tr><td>The dose map export shows the tidy layout of a randomized plate</td><td>Expected: it shows the plan. For the printed positions use the <i>As printed</i> view.</td></tr>
+  <tr><td>The D300e pre-run summary shows fewer heads or cassettes than Craft</td><td>Expected when heads are ticked as used: D300e only learns about them when you press SKIP on the fill screen.</td></tr>
   <tr><td>Mac: "Apple could not verify … is free of malware" / "cannot be opened"</td><td>Click Done, then System Settings → Privacy &amp; Security → <b>Open Anyway</b>, once.</td></tr>
   <tr><td>Mac: "is damaged and can't be opened", or no Open Anyway button</td><td>In Terminal: <code>xattr -dr com.apple.quarantine "/Applications/Tecan D300 Craft.app"</code></td></tr>
   <tr><td>Windows: "Windows protected your PC"</td><td>More info → Run anyway.</td></tr>
